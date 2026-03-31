@@ -8,5 +8,12 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   test: {
     environment: 'happy-dom',
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/cypress/**',
+      '**/.{idea,git,cache,output,temp}/**',
+      '**/.tabs/**',
+    ],
   }
 })

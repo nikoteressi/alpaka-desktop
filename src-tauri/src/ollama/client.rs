@@ -1,6 +1,5 @@
 use crate::db::DbConn;
 use crate::error::AppError;
-use crate::auth::keyring;
 use reqwest::{Client, RequestBuilder};
 
 #[derive(Clone)]

@@ -3,6 +3,7 @@ pub mod hosts;
 pub mod messages;
 pub mod migrations;
 pub mod settings;
+pub mod folders;
 
 use std::{
     path::Path,

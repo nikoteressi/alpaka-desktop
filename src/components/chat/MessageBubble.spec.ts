@@ -40,35 +40,30 @@ describe('MessageBubble.vue', () => {
       }
     })
 
-    expect(wrapper.text()).toContain('Thinking...')
+    expect(wrapper.text()).toContain('Executing Thought Process...')
     expect(wrapper.text()).toContain('Thought process here...')
-    const thinkingBox = wrapper.find('.animate-pulse.border-l-orange-500')
+    const thinkingBox = wrapper.find('.animate-think-pulse')
     expect(thinkingBox.exists()).toBe(true)
   })
 
-  it('markdown throttling logic wraps the content nicely', async () => {
-    const spyRequestAnimationFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      cb(0)
-      return 1
-    })
-
+  it('markdown throttling logic renders content correctly', async () => {
+    // We don't spy on RAF directly because useRafFn is an abstraction.
+    // Instead we wait for the reactive state to update.
+    
     const wrapper = mount(MessageBubble, {
       props: {
         message: {
           role: 'assistant',
           content: '**Bolded Content**',
-        }
+        },
+        isStreaming: false // Not streaming should render immediately
       }
     })
-
-    // Assert that the component scheduled a markdown render
-    expect(spyRequestAnimationFrame).toHaveBeenCalled()
 
     await wrapper.vm.$nextTick()
     
     // Check if the html updated
     const htmlDiv = wrapper.find('.rendered-markdown')
-    // Wait, the rendered text will contain 'Bolded Content' because `**` converts to `<strong>`
     expect(htmlDiv.html()).toContain('<strong>Bolded Content</strong>')
   })
 })

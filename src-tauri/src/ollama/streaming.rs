@@ -3,7 +3,6 @@ use crate::ollama::types::{ChatRequest, StreamResponse};
 use futures_util::StreamExt;
 use crate::ollama::client::OllamaClient;
 use serde_json::json;
-use std::time::Duration;
 use tauri::{AppHandle, Emitter, Runtime};
 use tokio::sync::broadcast;
 

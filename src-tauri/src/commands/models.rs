@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{Emitter, State};
 use futures_util::StreamExt;
 use crate::ollama::client::OllamaClient;
 
@@ -120,9 +120,9 @@ pub async fn core_pull_model<R: tauri::Runtime>(
 }
 
 #[tauri::command]
-pub async fn pull_model(
+pub async fn pull_model<R: tauri::Runtime>(
     state: State<'_, AppState>,
-    app: AppHandle,
+    app: tauri::AppHandle<R>,
     name: String,
 ) -> Result<(), AppError> {
     let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
@@ -159,6 +159,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_list_models_malformed_json() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("GET", "/api/tags")
+            .with_status(200)
+            .with_body(r#"{"models": "not a list"}"#)
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let result = core_list_models(&client).await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_list_models_error() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("GET", "/api/tags")
+            .with_status(500)
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let result = core_list_models(&client).await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
     async fn test_delete_model_success() {
         let mut server = Server::new_async().await;
         let mock = server.mock("DELETE", "/api/delete")
@@ -173,6 +206,86 @@ mod tests {
         mock.assert_async().await;
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_model_error() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("DELETE", "/api/delete")
+            .with_status(404)
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let result = core_delete_model(&client, "llama3").await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_core_pull_model_success() {
+        let mut server = Server::new_async().await;
+        // Mock NDJSON stream
+        let mock = server.mock("POST", "/api/pull")
+            .with_status(200)
+            .with_body(r#"{"status":"downloading","completed":10,"total":100}
+{"status":"downloading","completed":50,"total":100}
+{"status":"success"}
+"#)
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        
+        let app = tauri::test::mock_app();
+        let result = core_pull_model(&client, "llama3", &app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_core_pull_model_invalid_chunk_skips_line() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("POST", "/api/pull")
+            .with_status(200)
+            .with_body(r#"{"status":"downloading","completed":10,"total":100}
+not json at all
+{"status":"success"}
+"#)
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        
+        let app = tauri::test::mock_app();
+        let result = core_pull_model(&client, "llama3", &app.handle()).await;
+        mock.assert_async().await;
+
+        // Function should continue and succeed even if one line is bad
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_core_pull_model_http_error() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("POST", "/api/pull")
+            .with_status(403)
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        
+        let app = tauri::test::mock_app();
+        let result = core_pull_model(&client, "llama3", &app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
     }
 }
 

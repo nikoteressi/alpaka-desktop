@@ -36,7 +36,7 @@ mod tests {
                 return; // Gracefully pass in headless environments without mocked DBus
             }
         }
-        assert_eq!(initial_status.unwrap(), false);
+        assert!(!initial_status.unwrap());
 
         // Login (Set token)
         let login_res = login(host_id.clone(), token.clone()).await;
@@ -44,7 +44,7 @@ mod tests {
 
         // Verify status is true
         let status_after_login = get_auth_status(host_id.clone()).await.unwrap();
-        assert_eq!(status_after_login, true);
+        assert!(status_after_login);
 
         // Logout (Delete token)
         let logout_res = logout(host_id.clone()).await;
@@ -52,6 +52,6 @@ mod tests {
 
         // Verify status is false
         let status_after_logout = get_auth_status(host_id.clone()).await.unwrap();
-        assert_eq!(status_after_logout, false);
+        assert!(!status_after_logout);
     }
 }

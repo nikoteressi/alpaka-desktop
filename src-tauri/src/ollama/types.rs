@@ -33,7 +33,7 @@ pub struct StreamResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
+    
 
     #[test]
     fn test_message_serialization_with_images() {

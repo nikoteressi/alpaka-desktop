@@ -34,6 +34,18 @@ pub fn run() {
             commands::chat::send_message,
             commands::chat::export_conversation,
             commands::chat::backup_database,
+            commands::service::start_ollama,
+            commands::service::stop_ollama,
+            commands::service::ollama_service_status,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::settings::get_all_settings,
+            commands::settings::delete_setting,
+            commands::folders::link_folder,
+            commands::folders::unlink_folder,
+            commands::folders::list_folder_files,
+            commands::folders::update_included_files,
+            commands::folders::estimate_tokens,
         ])
         .setup(|app| {
             // ── Logging ────────────────────────────────────────────────────────

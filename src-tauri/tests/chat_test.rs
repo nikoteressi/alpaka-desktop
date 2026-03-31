@@ -1,5 +1,4 @@
 use mockito::Server;
-use serde_json::json;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::test::{mock_builder, mock_context, MockRuntime, noop_assets};
@@ -37,7 +36,7 @@ async fn test_send_message_emits_events() {
     let direct_conn = Connection::open_in_memory().unwrap();
     db::migrations::run(&direct_conn).unwrap();
 
-    let host = db::hosts::create(&direct_conn, NewHost {
+    let _host = db::hosts::create(&direct_conn, NewHost {
         name: "Test Host".into(),
         url: url.clone(),
         is_default: Some(true),
@@ -65,12 +64,12 @@ async fn test_send_message_emits_events() {
     });
     
     let events_clone2 = events.clone();
-    app_handle.listen("chat:thinking-start", move |event| {
+    app_handle.listen("chat:thinking-start", move |_event| {
         events_clone2.lock().unwrap().push("thinking-start".to_string());
     });
 
     let events_clone3 = events.clone();
-    app_handle.listen("chat:thinking-end", move |event| {
+    app_handle.listen("chat:thinking-end", move |_event| {
         events_clone3.lock().unwrap().push("thinking-end".to_string());
     });
 

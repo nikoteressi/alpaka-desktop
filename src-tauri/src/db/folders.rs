@@ -1,11 +1,11 @@
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use chrono::Utc;
 
-use crate::db::DbConn;
 use crate::error::AppError;
-use rusqlite::OptionalExtension;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FolderContext {
     pub id: String,
     pub conversation_id: String,
@@ -16,87 +16,159 @@ pub struct FolderContext {
     pub created_at: String,
 }
 
-pub async fn add_folder_context(
-    conn: DbConn,
-    conversation_id: String,
-    path: String,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NewFolderContext {
+    pub conversation_id: String,
+    pub path: String,
+    pub included_files_json: Option<String>,
+    pub auto_refresh: bool,
+    pub estimated_tokens: i64,
+}
+
+fn row_to_folder_context(row: &rusqlite::Row<'_>) -> rusqlite::Result<FolderContext> {
+    Ok(FolderContext {
+        id: row.get(0)?,
+        conversation_id: row.get(1)?,
+        path: row.get(2)?,
+        included_files_json: row.get(3)?,
+        auto_refresh: row.get::<_, i64>(4)? != 0,
+        estimated_tokens: row.get(5)?,
+        created_at: row.get(6)?,
+    })
+}
+
+pub fn add_folder_context(conn: &Connection, new: NewFolderContext) -> Result<FolderContext, AppError> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    
+    conn.execute(
+        "INSERT INTO folder_contexts (id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            id,
+            new.conversation_id,
+            new.path,
+            new.included_files_json,
+            new.auto_refresh as i64,
+            new.estimated_tokens,
+            now
+        ],
+    )?;
+
+    get_folder_context(conn, &id)
+}
+
+pub fn get_folder_context(conn: &Connection, id: &str) -> Result<FolderContext, AppError> {
+    conn.query_row(
+        "SELECT id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at 
+         FROM folder_contexts WHERE id = ?1",
+        params![id],
+        row_to_folder_context,
+    )
+    .map_err(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => AppError::NotFound(format!("Folder context '{id}' not found")),
+        other => AppError::from(other),
+    })
+}
+
+pub fn get_by_conversation(conn: &Connection, conversation_id: &str) -> Result<Vec<FolderContext>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at 
+         FROM folder_contexts WHERE conversation_id = ?1 ORDER BY created_at ASC"
+    )?;
+    
+    let rows = stmt.query_map(params![conversation_id], row_to_folder_context)?;
+    rows.map(|r| r.map_err(AppError::from))
+        .collect::<Result<Vec<_>, _>>()
+}
+
+pub fn delete_folder_context(conn: &Connection, id: &str) -> Result<(), AppError> {
+    let changed = conn.execute("DELETE FROM folder_contexts WHERE id = ?1", params![id])?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("Folder context '{id}' not found")));
+    }
+    Ok(())
+}
+
+pub fn update_folder_context(
+    conn: &Connection,
+    id: &str,
     included_files_json: Option<String>,
-    auto_refresh: bool,
     estimated_tokens: i64,
-) -> Result<FolderContext, AppError> {
-    tokio::task::spawn_blocking(move || {
-        let lock = conn.lock().unwrap();
-        let id = Uuid::new_v4().to_string();
-
-        lock.execute(
-            "INSERT INTO folder_contexts (id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            rusqlite::params![id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens],
-        )?;
-
-        lock.query_row(
-            "SELECT id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at
-             FROM folder_contexts WHERE id = ?1",
-            rusqlite::params![id],
-            |row| {
-                Ok(FolderContext {
-                    id: row.get(0)?,
-                    conversation_id: row.get(1)?,
-                    path: row.get(2)?,
-                    included_files_json: row.get(3)?,
-                    auto_refresh: row.get(4)?,
-                    estimated_tokens: row.get(5)?,
-                    created_at: row.get(6)?,
-                })
-            },
-        ).map_err(AppError::from)
-    })
-    .await?
-}
-
-pub async fn get_folder_contexts_for_conversation(
-    conn: DbConn,
-    conversation_id: String,
-) -> Result<Vec<FolderContext>, AppError> {
-    tokio::task::spawn_blocking(move || {
-        let lock = conn.lock().unwrap();
-        let mut stmt = lock.prepare(
-            "SELECT id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at
-             FROM folder_contexts WHERE conversation_id = ?1 ORDER BY created_at ASC",
-        )?;
-
-        let iter = stmt.query_map(rusqlite::params![conversation_id], |row| {
-            Ok(FolderContext {
-                id: row.get(0)?,
-                conversation_id: row.get(1)?,
-                path: row.get(2)?,
-                included_files_json: row.get(3)?,
-                auto_refresh: row.get(4)?,
-                estimated_tokens: row.get(5)?,
-                created_at: row.get(6)?,
-            })
-        })?;
-
-        let mut contexts = Vec::new();
-        for context_result in iter {
-            contexts.push(context_result?);
-        }
-        Ok(contexts)
-    })
-    .await?
-}
-
-pub async fn remove_folder_context(
-    conn: DbConn,
-    id: String,
 ) -> Result<(), AppError> {
-    tokio::task::spawn_blocking(move || {
-        let lock = conn.lock().unwrap();
-        lock.execute(
-            "DELETE FROM folder_contexts WHERE id = ?1",
-            rusqlite::params![id],
-        )?;
-        Ok(())
-    })
-    .await?
+    let changed = conn.execute(
+        "UPDATE folder_contexts SET included_files_json = ?1, estimated_tokens = ?2 WHERE id = ?3",
+        params![included_files_json, estimated_tokens, id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("Folder context '{id}' not found")));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::migrations;
+
+    fn in_memory_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA foreign_keys = ON;"
+        ).unwrap();
+        migrations::run(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_add_and_get_folder_context() {
+        let conn = in_memory_conn();
+        // Since conversation_id references conversations(id), we need a dummy conversation.
+        conn.execute("INSERT INTO conversations (id) VALUES ('dummy-conv')", []).unwrap();
+        
+        let new_ctx = NewFolderContext {
+            conversation_id: "dummy-conv".into(),
+            path: "/a/b/c".into(),
+            included_files_json: Some("[\"a.txt\"]".into()),
+            auto_refresh: true,
+            estimated_tokens: 1234,
+        };
+        
+        let ctx = add_folder_context(&conn, new_ctx.clone()).unwrap();
+        assert_eq!(ctx.conversation_id, "dummy-conv");
+        assert_eq!(ctx.path, "/a/b/c");
+        assert!(ctx.auto_refresh);
+        assert_eq!(ctx.estimated_tokens, 1234);
+        
+        let fetched = get_folder_context(&conn, &ctx.id).unwrap();
+        assert_eq!(fetched.id, ctx.id);
+    }
+    
+    #[test]
+    fn test_get_by_conversation() {
+        let conn = in_memory_conn();
+        conn.execute("INSERT INTO conversations (id) VALUES ('conv1'), ('conv2')", []).unwrap();
+        
+        add_folder_context(&conn, NewFolderContext {
+            conversation_id: "conv1".into(),
+            path: "/path/1".into(),
+            included_files_json: None,
+            auto_refresh: false,
+            estimated_tokens: 10,
+        }).unwrap();
+        add_folder_context(&conn, NewFolderContext {
+            conversation_id: "conv1".into(),
+            path: "/path/2".into(),
+            included_files_json: None,
+            auto_refresh: false,
+            estimated_tokens: 20,
+        }).unwrap();
+        
+        let list1 = get_by_conversation(&conn, "conv1").unwrap();
+        assert_eq!(list1.len(), 2);
+        
+        let list2 = get_by_conversation(&conn, "conv2").unwrap();
+        assert_eq!(list2.len(), 0);
+    }
 }

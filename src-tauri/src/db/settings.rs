@@ -32,6 +32,15 @@ pub fn get(conn: &Connection, key: &str) -> Result<Option<String>, AppError> {
     })
 }
 
+/// Async wrapper for `get` using `spawn_blocking`.
+pub async fn get_async(db: crate::db::DbConn, key: String) -> Result<Option<String>, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let conn = db.lock().unwrap();
+        get(&conn, &key)
+    })
+    .await?
+}
+
 /// Upsert a key-value pair.
 ///
 /// The value should be JSON-encoded by the caller so that type information
@@ -46,6 +55,15 @@ pub fn set(conn: &Connection, key: &str, value: &str) -> Result<(), AppError> {
     .map_err(AppError::from)
 }
 
+/// Async wrapper for `set` using `spawn_blocking`.
+pub async fn set_async(db: crate::db::DbConn, key: String, value: String) -> Result<(), AppError> {
+    tokio::task::spawn_blocking(move || {
+        let conn = db.lock().unwrap();
+        set(&conn, &key, &value)
+    })
+    .await?
+}
+
 /// Return all settings as a flat map of `key → raw JSON value`.
 pub fn get_all(conn: &Connection) -> Result<HashMap<String, String>, AppError> {
     let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
@@ -58,10 +76,28 @@ pub fn get_all(conn: &Connection) -> Result<HashMap<String, String>, AppError> {
         .collect::<Result<HashMap<_, _>, _>>()
 }
 
+/// Async wrapper for `get_all` using `spawn_blocking`.
+pub async fn get_all_async(db: crate::db::DbConn) -> Result<HashMap<String, String>, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let conn = db.lock().unwrap();
+        get_all(&conn)
+    })
+    .await?
+}
+
 /// Delete a single setting by key.
 pub fn delete(conn: &Connection, key: &str) -> Result<(), AppError> {
     conn.execute("DELETE FROM settings WHERE key = ?1", params![key])?;
     Ok(())
+}
+
+/// Async wrapper for `delete` using `spawn_blocking`.
+pub async fn delete_async(db: crate::db::DbConn, key: String) -> Result<(), AppError> {
+    tokio::task::spawn_blocking(move || {
+        let conn = db.lock().unwrap();
+        delete(&conn, &key)
+    })
+    .await?
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -69,6 +105,7 @@ pub fn delete(conn: &Connection, key: &str) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Mutex};
     use crate::db::migrations;
 
     fn in_memory_conn() -> Connection {
@@ -114,5 +151,28 @@ mod tests {
         assert_eq!(all.len(), 2);
         assert_eq!(all["a"], "1");
         assert_eq!(all["b"], "2");
+    }
+
+    #[tokio::test]
+    async fn test_async_crud() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrations::run(&conn).unwrap();
+        let db = Arc::new(Mutex::new(conn));
+
+        // Set
+        set_async(db.clone(), "theme".into(), "\"dark\"".into()).await.unwrap();
+
+        // Get
+        let val = get_async(db.clone(), "theme".into()).await.unwrap();
+        assert_eq!(val, Some("\"dark\"".to_owned()));
+
+        // Get All
+        let all = get_all_async(db.clone()).await.unwrap();
+        assert_eq!(all["theme"], "\"dark\"");
+
+        // Delete
+        delete_async(db.clone(), "theme".into()).await.unwrap();
+        let val_after = get_async(db.clone(), "theme".into()).await.unwrap();
+        assert_eq!(val_after, None);
     }
 }
