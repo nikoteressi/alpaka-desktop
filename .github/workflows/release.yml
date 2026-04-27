@@ -190,7 +190,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          printf '%s' "$AUR_SSH_KEY" > ~/.ssh/aur_id
+          # printf '%s\n' ensures trailing newline — OpenSSH libcrypto requires it
+          printf '%s\n' "$AUR_SSH_KEY" > ~/.ssh/aur_id
           chmod 600 ~/.ssh/aur_id
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
 
@@ -255,8 +256,17 @@ jobs:
           GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_ID: ${{ secrets.GPG_KEY_ID }}
         run: |
-          echo "$GPG_KEY" | base64 -d | gpg --batch --import
-          echo "$GPG_ID:6:" | gpg --import-ownertrust
+          # Support both raw armored key and base64-encoded key
+          if printf '%s' "$GPG_KEY" | grep -qE "^-+BEGIN"; then
+            printf '%s\n' "$GPG_KEY" | gpg --batch --import
+          else
+            printf '%s\n' "$GPG_KEY" | base64 -d | gpg --batch --import
+          fi
+          # --import-ownertrust needs the full 40-char fingerprint, not a key ID.
+          # Look it up from the just-imported key so GPG_KEY_ID can be any format.
+          FP=$(gpg --with-colons --fingerprint "$GPG_ID" 2>/dev/null \
+               | awk -F: '$1=="fpr"{print $10; exit}')
+          [[ -n "$FP" ]] && printf '%s:6:\n' "$FP" | gpg --import-ownertrust
 
       - name: Download .deb from release
         if: steps.guard.outputs.run == 'true'
