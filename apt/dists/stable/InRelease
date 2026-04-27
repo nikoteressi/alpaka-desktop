@@ -1,0 +1,27 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Origin: Alpaka Desktop
+Label: Alpaka Desktop
+Suite: stable
+Codename: stable
+Architectures: amd64
+Components: main
+Description: Alpaka Desktop APT repository
+Date: Mon, 27 Apr 2026 19:14:43 +0000
+MD5Sum:
+ 870ad12c3482ff38ca524e5f452759d8              501 main/binary-amd64/Packages
+ ec7118face6567d8c112a164dfe103a2              381 main/binary-amd64/Packages.gz
+SHA1:
+ da0ad026afc2bce3efdef15070b650d27d32bc9c              501 main/binary-amd64/Packages
+ b90637edafbb785bacc6ac252e9084caf6a8693d              381 main/binary-amd64/Packages.gz
+SHA256:
+ eb7a823e2771fec5d85c9285842a61cab69a8afbbaa8ab85b36219e45d538a5d              501 main/binary-amd64/Packages
+ eb1c9f293d02bfe7258a8f7da4764dc7c24ea6f79135622f9a48a357f4826d7d              381 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYKAB0WIQStEoWkF9flOZTmtjzVzwRnWoeisQUCae+1owAKCRDVzwRnWoei
+sTgKAQDXjuDZ0O/iDneUpe4B6XTCGQKW0yGAiERHo67qegiRSAEA8zmCmzKuviTo
+ra4KJiJ2/u0YGn4nogh/Y+IuvbJ0fAY=
+=JETB
+-----END PGP SIGNATURE-----
