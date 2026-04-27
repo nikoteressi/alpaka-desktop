@@ -50,7 +50,12 @@ package() {
     local _squash="${srcdir}/squashfs-root"
 
     # --- Binary ---
-    install -Dm755 "${_squash}/AppRun" "${pkgdir}/usr/bin/alpaka-desktop"
+    # Use the actual Tauri binary, not AppRun. AppRun is the AppImage launcher
+    # and expects apprun-hooks/ to be co-located — that path doesn't exist after
+    # extraction and installation to /usr/bin.
+    _bin="${_squash}/usr/bin/alpaka-desktop"
+    [[ ! -f "${_bin}" ]] && _bin="${_squash}/AppRun"
+    install -Dm755 "${_bin}" "${pkgdir}/usr/bin/alpaka-desktop"
 
     # --- Desktop entry ---
     # Use the .desktop shipped inside the AppImage if present, otherwise install
