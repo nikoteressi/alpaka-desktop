@@ -67,7 +67,6 @@ jobs:
             libssl-dev \
             librsvg2-dev \
             patchelf \
-            libappindicator3-dev \
             libayatana-appindicator3-dev \
             pkg-config
 
