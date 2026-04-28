@@ -7,6 +7,7 @@ Thank you for your interest in contributing! This guide covers everything you ne
 - [Development Setup](#development-setup)
 - [Project Structure](#project-structure)
 - [Writing Tests](#writing-tests)
+- [Branching Model](#branching-model)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [Code Style](#code-style)
 
@@ -135,11 +136,61 @@ pnpm exec playwright test
 
 ---
 
+## Branching Model
+
+This project uses **GitFlow**. Always branch from the correct base.
+
+```
+main          ← always matches the latest stable release tag
+develop       ← integration branch for the next release
+feature/xxx   ← new features  (branch from develop)
+bugfix/xxx    ← non-critical bug fixes  (branch from develop)
+hotfix/xxx    ← critical production fixes  (branch from main)
+release/x.y.z ← release stabilisation  (branch from develop)
+```
+
+### New feature or non-critical bugfix
+
+```bash
+git checkout develop
+git checkout -b feature/my-feature   # or bugfix/my-fix
+# ... work ...
+# open PR → develop
+```
+
+### Critical hotfix (bug in a released version)
+
+```bash
+git checkout main
+git checkout -b hotfix/crash-fix
+# ... fix ...
+# open PR → main  (gets tagged as PATCH release)
+# then back-merge main → develop so the fix is not lost
+```
+
+### Release cycle
+
+1. Cut `release/x.y.z` from `develop`
+2. Only bugfixes go into the release branch — no new features
+3. Merge to `main`, tag `vX.Y.Z`, build & publish
+4. Back-merge `release/x.y.z` → `develop`
+
+### Versioning (`MAJOR.MINOR.PATCH`)
+
+| Change | Version bump |
+|--------|-------------|
+| Hotfix | `PATCH` — 1.0.0 → 1.0.1 |
+| New feature | `MINOR` — 1.0.x → 1.1.0 |
+| Breaking change | `MAJOR` — 1.x.x → 2.0.0 |
+
+---
+
 ## Submitting a Pull Request
 
-1. **Fork** the repository and create a branch from `main`:
+1. **Create a branch from the correct base** (see Branching Model above):
    ```bash
-   git checkout -b feat/my-feature
+   git checkout develop
+   git checkout -b feature/my-feature
    ```
 
 2. **Make your changes.** Keep commits focused — one logical change per commit.
@@ -149,7 +200,7 @@ pnpm exec playwright test
    pnpm typecheck && pnpm test && cd src-tauri && cargo test
    ```
 
-4. **Open a PR** against `main`. Fill in the PR template:
+4. **Open a PR** against `develop` (or `main` for hotfixes). Fill in the PR template:
    - What does this change do?
    - How to test it?
    - Screenshots for UI changes.
@@ -161,6 +212,7 @@ pnpm exec playwright test
 - Keep PRs small and focused. Large refactors are harder to review.
 - Add tests for new behaviour.
 - Update `docs/ARCHITECTURE.md` if you change command signatures, events, or the DB schema.
+- Update `CHANGELOG.md` under `[Unreleased]` for every user-visible change.
 - Do not bump version numbers in PRs — releases are managed by maintainers.
 
 ---
