@@ -92,9 +92,10 @@ export const useModelStore = defineStore('models', {
     /**
      * Ensures a cloud model is available by pulling it if not already installed.
      */
-    async fetchLibraryTags(slug: string) {
+    async fetchLibraryTags(slug: string): Promise<string[]> {
       try {
-        return await invoke<string[]>('get_library_tags', { slug });
+        const tags = await invoke<LibraryTag[]>('get_library_tags', { slug });
+        return tags.map(t => t.name);
       } catch (e) {
         console.error(`Failed to fetch tags for ${slug}`, e);
         return [];
