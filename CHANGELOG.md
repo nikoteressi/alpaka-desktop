@@ -11,6 +11,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 - CI: Dependabot config grouping all `@tauri-apps/*` NPM and `tauri*` Rust crate updates into a single PR to prevent version mismatch build failures (#14)
+- CI: Add `test` job to CI pipeline — `cargo test --workspace` and `pnpm test --run` (Vitest) now gate every PR (#37)
+- CI: Add `cargo fmt --check` and `cargo clippy -D warnings` to `build-check` job (#42)
+- CI: Add `pnpm lint:check` and `pnpm format:check` to `build-check` job; add corresponding non-mutating scripts to `package.json` (#43)
+- CI: Add CodeQL workflow for static security analysis of TypeScript/Vue frontend, scheduled weekly (#49)
+- CI: Add `github-actions` ecosystem to Dependabot for automated action version updates (#45)
+- CI: Add concurrency cancellation blocks to `ci.yml` and `claude-code-review.yml` (#46)
+- CI: Extend CI push triggers to cover `release/*` and `hotfix/*` branches (#47)
+
+### Changed
+- CI: Pin all GitHub Actions in `ci.yml`, `claude-code-review.yml`, `claude.yml` to full commit SHAs to eliminate supply chain risk (#39)
+- CI: Replace `cargo install cargo-audit` with `taiki-e/install-action` (prebuilt binary, ~5s vs 4-5 min) (#44)
+- CI: Pin `build-check`, `security-audit`, and `test` jobs to `ubuntu-22.04` to match release build environment (#48)
+
+### Security
+- CI: Add `permissions: contents: read` to `ci.yml` — remove implicit write token (#40)
+- CI: Remove `id-token: write` from `claude-code-review.yml` and `claude.yml` — OIDC not required for OAuth token auth (#41)
+- CI: Skip Claude code review on Dependabot PRs to avoid unnecessary API calls (#52)
 
 ---
 

@@ -14,7 +14,9 @@
     "test:watch": "vitest",
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src --ext .ts,.vue --fix",
-    "format": "prettier --write \"src/**/*.{ts,vue,css}\""
+    "lint:check": "eslint src --ext .ts,.vue",
+    "format": "prettier --write \"src/**/*.{ts,vue,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css}\""
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
