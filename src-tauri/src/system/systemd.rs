@@ -7,7 +7,7 @@ fn override_dir() -> std::path::PathBuf {
     let base = std::env::var("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+            let home = std::env::var("HOME").unwrap_or_else(|_| String::new());
             std::path::PathBuf::from(home).join(".config")
         });
     base.join("systemd/user/ollama.service.d")
@@ -16,7 +16,8 @@ fn override_dir() -> std::path::PathBuf {
 /// Creates (or overwrites) the OLLAMA_MODELS override.conf in `dir`.
 pub(crate) fn write_override_file(dir: &std::path::Path, models_path: &str) -> Result<(), AppError> {
     std::fs::create_dir_all(dir)?;
-    let content = format!("[Service]\nEnvironment=OLLAMA_MODELS={}\n", models_path);
+    let escaped = models_path.replace('"', "\\\"");
+    let content = format!("[Service]\nEnvironment=\"OLLAMA_MODELS={}\"\n", escaped);
     std::fs::write(dir.join("override.conf"), content)?;
     Ok(())
 }
@@ -27,13 +28,13 @@ pub(crate) fn remove_override_file(dir: &std::path::Path) -> Result<(), AppError
     match std::fs::remove_file(&path) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(AppError::Io(e.to_string())),
+        Err(e) => Err(e.into()),
     }
 }
 
 /// Writes the OLLAMA_MODELS systemd user service override and reloads the daemon.
 /// Returns Err if the file write or daemon-reload fails.
-pub async fn write_model_path_override(models_path: &str) -> Result<(), AppError> {
+pub(crate) async fn write_model_path_override(models_path: &str) -> Result<(), AppError> {
     let dir = override_dir();
     write_override_file(&dir, models_path)?;
     let output = run_command("systemctl", &["--user", "daemon-reload"]).await?;
@@ -41,7 +42,7 @@ pub async fn write_model_path_override(models_path: &str) -> Result<(), AppError
 }
 
 /// Removes the OLLAMA_MODELS override and does a best-effort daemon-reload.
-pub async fn remove_model_path_override() -> Result<(), AppError> {
+pub(crate) async fn remove_model_path_override() -> Result<(), AppError> {
     let dir = override_dir();
     remove_override_file(&dir)?;
     // Best-effort: if daemon-reload fails (e.g. no user service), that's acceptable for a reset.
@@ -206,7 +207,7 @@ mod tests {
         let content = std::fs::read_to_string(dir.join("override.conf")).unwrap();
         assert!(content.contains("[Service]"), "missing [Service] section");
         assert!(
-            content.contains("Environment=OLLAMA_MODELS=/mnt/ssd/models"),
+            content.contains("Environment=\"OLLAMA_MODELS=/mnt/ssd/models\""),
             "missing OLLAMA_MODELS line"
         );
     }
@@ -241,5 +242,14 @@ mod tests {
         let dir = tmp.path().join("nonexistent-service.d");
         // Neither dir nor file exists — must return Ok
         remove_override_file(&dir).unwrap();
+    }
+
+    #[test]
+    fn write_override_file_quotes_path_with_spaces() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("ollama.service.d");
+        write_override_file(&dir, "/home/user/My Models").unwrap();
+        let content = std::fs::read_to_string(dir.join("override.conf")).unwrap();
+        assert!(content.contains("\"OLLAMA_MODELS=/home/user/My Models\""));
     }
 }
