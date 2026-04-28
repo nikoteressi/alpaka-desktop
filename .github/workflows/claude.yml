@@ -10,13 +10,13 @@ on:
   pull_request_review:
     types: [submitted]
 
-# Least-privilege token: @claude mentions need to read repo/issues/PRs and write responses.
-# id-token: write is NOT required -- authentication uses claude_code_oauth_token, not OIDC.
 permissions:
   contents: read
   pull-requests: read
   issues: read
   actions: read # Required for Claude to read CI results on PRs
+  # claude-code-action uses OIDC to mint a short-lived GitHub token for repo operations.
+  id-token: write
 
 # Do NOT cancel in-progress runs -- killing an active @claude response mid-execution is
 # disruptive. Group by issue/PR number so concurrent mentions on different issues are

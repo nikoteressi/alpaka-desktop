@@ -24,6 +24,8 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
 
       - name: Cache cargo registry
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -72,6 +74,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
         with:
+          toolchain: stable
           components: rustfmt, clippy
 
       - name: Install Linux system dependencies
@@ -137,6 +140,8 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
 
       - name: Install Linux system dependencies
         run: |

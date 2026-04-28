@@ -4,12 +4,12 @@ on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
 
-# Least-privilege token: review workflow needs to read repo and write PR comments only.
-# id-token: write is NOT required — authentication uses claude_code_oauth_token, not OIDC.
 permissions:
   contents: read
   pull-requests: write
   issues: read
+  # claude-code-action uses OIDC to mint a short-lived GitHub token for repo operations.
+  id-token: write
 
 # Cancel in-progress review runs when a new push arrives on the same PR.
 concurrency:
