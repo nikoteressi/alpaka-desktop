@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- CI: Dependabot config grouping all `@tauri-apps/*` NPM and `tauri*` Rust crate updates into a single PR to prevent version mismatch build failures (#14)
+
 ---
 
 ## [1.1.1] - 2026-04-28
