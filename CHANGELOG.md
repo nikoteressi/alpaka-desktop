@@ -9,12 +9,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.1.0] - 2026-04-28
+
+### Added
+- Performance: Shiki syntax highlighting preloaded asynchronously after mount — eliminates first-render blocking (#6)
+- Dev: resource profiling script (`scripts/profile.sh`) measuring binary size, cold start, PSS memory, idle CPU against architecture budgets (#6)
+
 ### Fixed
 - Chat: thinking block can now be collapsed/expanded while the LLM is still thinking (#7)
 - Chat: web search results are collapsed by default when search completes; user can expand manually (#8)
 - Chat: auto-scroll no longer freezes after manually scrolling up then back down (#9)
 - Chat: auto-scroll now works correctly when opening a saved conversation after restart (#9)
 - Chat: switching conversations always resets scroll to bottom (#9)
+- Models: cloud model "Run" button now correctly fetches tags and opens the tag selector (#5)
 
 ---
 
