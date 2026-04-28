@@ -114,6 +114,7 @@
       </div>
     </template>
   </div>
+  <ApiKeyPanel />
 </template>
 
 <script setup lang="ts">
@@ -122,6 +123,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "../../lib/urlOpener";
 import { useAuthStore } from "../../stores/auth";
 import { useHostStore } from "../../stores/hosts";
+import ApiKeyPanel from "./ApiKeyPanel.vue";
 
 const authStore = useAuthStore();
 const hostStore = useHostStore();
