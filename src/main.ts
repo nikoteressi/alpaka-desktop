@@ -24,12 +24,7 @@ app.use(router)
 app.use(createPinia())
 app.use(VueVirtualScroller)
 
-initMarkdown()
-  .then(() => {
-    app.mount('#app')
-  })
-  .catch((err) => {
-    console.error('[Critical] Failed to initialize markdown renderer:', err)
-    // Mount anyway — markdown will degrade gracefully (plain text fallback)
-    app.mount('#app')
-  })
+app.mount('#app')
+
+// Preload Shiki after mount — doesn't block render, ready before first code block
+setTimeout(() => initMarkdown().catch(() => {}), 0)
