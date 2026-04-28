@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
   ci-gate:
@@ -22,7 +24,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          REQUIRED=("Build Check" "Test" "Security Audit")
+          REQUIRED=("Build Check" "Test and Coverage" "Security Audit")
 
           echo "Checking CI status for commit ${SHA} in ${REPO}..."
           RESULT=$(gh api "repos/${REPO}/commits/${SHA}/check-runs?filter=latest&per_page=100")
@@ -71,7 +73,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: src-tauri -> target
 
@@ -149,6 +151,21 @@ jobs:
           cat "${CHECKSUM_FILE}"
           echo "checksum_file=${CHECKSUM_FILE}" >> "$GITHUB_OUTPUT"
 
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          artifact-name: alpaka-desktop-${{ github.ref_name }}.spdx.json
+          output-file: sbom.spdx.json
+          path: src-tauri/target/release/bundle
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: |
+            ${{ steps.artifacts.outputs.appimage }}
+            ${{ steps.artifacts.outputs.deb }}
+
       # ------------------------------------------------------------------ #
       # 9. Create GitHub Release and upload assets                          #
       # ------------------------------------------------------------------ #
@@ -163,6 +180,7 @@ jobs:
             ${{ steps.artifacts.outputs.appimage }}
             ${{ steps.artifacts.outputs.deb }}
             ${{ steps.checksums.outputs.checksum_file }}
+            sbom.spdx.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -176,7 +194,7 @@ jobs:
   publish-aur:
     name: Publish to AUR
     needs: [ci-gate, release-linux]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       # secrets context is not available in job-level if:, so guard here instead
@@ -283,7 +301,7 @@ jobs:
   publish-apt-repo:
     name: Publish APT Repository
     needs: [ci-gate, release-linux]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       # secrets context is not available in job-level if:, so guard here instead
