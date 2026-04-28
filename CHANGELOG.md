@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.1] - 2026-04-28
+
+### Fixed
+- Build: align `@tauri-apps/plugin-fs` (2.4.5→2.5.0) and `@tauri-apps/plugin-dialog` (2.6.0→2.7.0) NPM packages with Rust crate versions to fix release CI failure (#12)
+
+---
+
 ## [1.1.0] - 2026-04-28
 
 ### Added
