@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- CL-05: Ollama Cloud routing — stored API key is now injected as `Authorization: Bearer` on all requests to `api.ollama.com` hosts. Missing key surfaces a friendly error in the chat rather than a raw network failure. Saving a key for the first time auto-adds the Ollama Cloud host entry.
+
 ### Changed
 - CI: merge duplicate `test` + `coverage` jobs into single `test-and-coverage` (tests now run once with instrumentation instead of twice)
 - CI: add path-based job skipping — Rust-only PRs skip Vitest/TS checks; frontend-only PRs skip Rust compilation/testing

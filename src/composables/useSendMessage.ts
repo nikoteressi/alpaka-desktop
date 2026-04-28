@@ -89,10 +89,18 @@ export function useSendMessage() {
       });
     } catch (err: unknown) {
       console.error("Failed to send message:", err);
-      // Rollback: restore messages to pre-send state to avoid polluting history
-      store.messages[conversationId] = messagesBefore;
-      store.streaming.isStreaming = false;
-      throw new Error(`Failed to send message: ${err}`);
+      const currentMsgCount = store.messages[conversationId]?.length ?? 0;
+      // If messages grew beyond the optimistic user push, the backend already
+      // emitted a chat:error event and onError added an assistant error message —
+      // don't roll back or the error message would disappear.
+      if (currentMsgCount > messagesBefore.length + 1) {
+        store.streaming.isStreaming = false;
+      } else {
+        // Error occurred before message persistence — roll back the optimistic push.
+        store.messages[conversationId] = messagesBefore;
+        store.streaming.isStreaming = false;
+        throw new Error(`Failed to send message: ${err}`);
+      }
     }
   }
 

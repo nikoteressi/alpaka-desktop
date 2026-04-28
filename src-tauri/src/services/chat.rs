@@ -554,8 +554,24 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         options: Option<ChatOptions>,
         original_user_content: Option<&str>,
     ) -> Result<OrchestrationResult, AppError> {
-        let client =
-            OllamaClient::from_state(self.state.http_client.clone(), self.state.db.clone()).await?;
+        let client = match OllamaClient::from_state(
+            self.state.http_client.clone(),
+            self.state.db.clone(),
+        )
+        .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = self.app.emit(
+                    "chat:error",
+                    serde_json::json!({
+                        "conversation_id": conversation_id,
+                        "error": e.to_string(),
+                    }),
+                );
+                return Err(e);
+            }
+        };
         let search_service = WebSearchService::new(self.app.clone(), self.state.db.clone());
 
         // Setup cancellation token

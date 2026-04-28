@@ -158,10 +158,9 @@ pub async fn trigger_ollama_signin() -> Result<String, AppError> {
     ))
 }
 
-/// Stores an Ollama API key in the system keyring under the fixed
-/// [`API_KEY_ACCOUNT`] identifier, separate from per-host OAuth tokens.
-#[command]
-pub async fn set_api_key(key: String) -> Result<(), AppError> {
+/// Core logic for storing the API key, without side-effects.
+/// Extracted so tests can call it without a live Tauri `AppState`.
+pub async fn core_set_api_key(key: String) -> Result<(), AppError> {
     let key = key.trim().to_string();
     if key.is_empty() {
         return Err(AppError::Auth("API key must not be empty".into()));
@@ -172,6 +171,45 @@ pub async fn set_api_key(key: String) -> Result<(), AppError> {
         ));
     }
     tokio::task::spawn_blocking(move || keyring::set_token(API_KEY_ACCOUNT, &key)).await??;
+    Ok(())
+}
+
+/// Adds `https://api.ollama.com` as a host entry if no cloud host exists yet.
+/// Best-effort — errors are ignored so a keyring failure never blocks key storage.
+pub async fn ensure_cloud_host_exists(db: crate::db::DbConn) -> Result<(), AppError> {
+    tokio::task::spawn_blocking(move || {
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let hosts = crate::db::hosts::list_all(&conn)?;
+        let has_cloud = hosts
+            .iter()
+            .any(|h| crate::ollama::client::is_cloud_host(&h.url));
+        if !has_cloud {
+            crate::db::hosts::create(
+                &conn,
+                crate::db::hosts::NewHost {
+                    name: "Ollama Cloud".into(),
+                    url: "https://api.ollama.com".into(),
+                    is_default: Some(false),
+                },
+            )?;
+        }
+        Ok(())
+    })
+    .await?
+}
+
+/// Stores an Ollama API key in the system keyring under the fixed
+/// [`API_KEY_ACCOUNT`] identifier, separate from per-host OAuth tokens.
+/// Also auto-adds the Ollama Cloud host entry if it does not exist yet.
+#[command]
+pub async fn set_api_key(
+    state: tauri::State<'_, crate::state::AppState>,
+    key: String,
+) -> Result<(), AppError> {
+    core_set_api_key(key).await?;
+    let _ = ensure_cloud_host_exists(state.db.clone()).await;
     Ok(())
 }
 
@@ -334,7 +372,7 @@ mod tests {
     #[tokio::test]
     async fn test_set_api_key_validation() {
         // Empty key is rejected
-        let res = set_api_key("".to_string()).await;
+        let res = core_set_api_key("".to_string()).await;
         match res {
             Err(AppError::Auth(msg)) if msg.contains("empty") => (),
             Ok(_) => panic!("Empty key should be rejected"),
@@ -342,7 +380,7 @@ mod tests {
         }
 
         // Whitespace-only key is rejected
-        let res = set_api_key("   ".to_string()).await;
+        let res = core_set_api_key("   ".to_string()).await;
         match res {
             Err(AppError::Auth(msg)) if msg.contains("empty") => (),
             Ok(_) => panic!("Whitespace-only key should be rejected"),
@@ -357,7 +395,7 @@ mod tests {
         // execution without this guard.
         let _lock = API_KEY_TEST_LOCK.lock().unwrap();
 
-        let set_res = set_api_key("sk-test-cmd-key-abc".to_string()).await;
+        let set_res = core_set_api_key("sk-test-cmd-key-abc".to_string()).await;
         if let Err(ref e) = set_res {
             let msg = format!("{e:?}");
             if msg.contains("No secret-service")
@@ -448,6 +486,74 @@ mod tests {
             Err(AppError::NotFound(_)) => (), // Host not found in in-memory DB edge case
             Err(e) => panic!("Unexpected error from perform_validate_api_key: {:?}", e),
         }
+    }
+
+    #[tokio::test]
+    async fn test_ensure_cloud_host_exists_adds_host() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        let db: DbConn = Arc::new(Mutex::new(conn));
+
+        // No hosts yet — ensure_cloud_host_exists should add the cloud host.
+        ensure_cloud_host_exists(db.clone()).await.unwrap();
+
+        let conn = db.lock().unwrap();
+        let hosts = crate::db::hosts::list_all(&conn).unwrap();
+        assert_eq!(hosts.len(), 1);
+        assert!(crate::ollama::client::is_cloud_host(&hosts[0].url));
+        assert_eq!(hosts[0].name, "Ollama Cloud");
+    }
+
+    #[tokio::test]
+    async fn test_ensure_cloud_host_exists_is_idempotent() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        let db: DbConn = Arc::new(Mutex::new(conn));
+
+        // Call twice — should only add one cloud host.
+        ensure_cloud_host_exists(db.clone()).await.unwrap();
+        ensure_cloud_host_exists(db.clone()).await.unwrap();
+
+        let conn = db.lock().unwrap();
+        let hosts = crate::db::hosts::list_all(&conn).unwrap();
+        let cloud_count = hosts
+            .iter()
+            .filter(|h| crate::ollama::client::is_cloud_host(&h.url))
+            .count();
+        assert_eq!(cloud_count, 1, "should have exactly one cloud host");
+    }
+
+    #[tokio::test]
+    async fn test_ensure_cloud_host_exists_skips_if_already_present() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        crate::db::seed_default_host(&conn).unwrap();
+        let db: DbConn = Arc::new(Mutex::new(conn));
+
+        // Manually add a cloud host first.
+        {
+            let conn = db.lock().unwrap();
+            crate::db::hosts::create(
+                &conn,
+                crate::db::hosts::NewHost {
+                    name: "My Cloud".into(),
+                    url: "https://api.ollama.com".into(),
+                    is_default: Some(false),
+                },
+            )
+            .unwrap();
+        }
+
+        // ensure_cloud_host_exists must not add a second one.
+        ensure_cloud_host_exists(db.clone()).await.unwrap();
+
+        let conn = db.lock().unwrap();
+        let cloud_count = crate::db::hosts::list_all(&conn)
+            .unwrap()
+            .iter()
+            .filter(|h| crate::ollama::client::is_cloud_host(&h.url))
+            .count();
+        assert_eq!(cloud_count, 1, "should still have exactly one cloud host");
     }
 
     #[tokio::test]
