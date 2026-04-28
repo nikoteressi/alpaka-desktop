@@ -86,13 +86,16 @@ mod tests {
         // so we tolerate NoBackend errors gracefully in tests or assert explicitly.
         let set_res = set_token(&host_id, test_token);
 
-        if let Err(AppError::Auth(msg)) = &set_res {
+        if let Err(ref e) = set_res {
+            let msg = format!("{e:?}");
             if msg.contains("No secret-service")
                 || msg.contains("NoBackend")
                 || msg.contains("locked")
+                || msg.contains("Platform secure storage")
+                || msg.contains("ServiceUnknown")
+                || msg.contains("org.freedesktop")
             {
-                // CI environment without a valid keyring daemon, pass gracefully
-                return;
+                return; // No Secret Service daemon in this environment
             }
         }
 
