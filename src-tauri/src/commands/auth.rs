@@ -220,11 +220,39 @@ pub async fn get_api_key_status() -> Result<String, AppError> {
     Ok(if token.is_some() { "set" } else { "not_set" }.to_string())
 }
 
-/// Removes the API key from the system keyring. Idempotent — succeeds even if
-/// no key was stored.
-#[command]
-pub async fn delete_api_key() -> Result<(), AppError> {
+/// Core keyring-only deletion, without DB side-effects.
+/// Extracted so tests can call it without a live Tauri `AppState`.
+pub async fn core_delete_api_key() -> Result<(), AppError> {
     tokio::task::spawn_blocking(|| keyring::delete_token(API_KEY_ACCOUNT)).await??;
+    Ok(())
+}
+
+/// Removes all host entries whose URL matches the cloud host pattern.
+pub async fn remove_cloud_hosts(db: crate::db::DbConn) -> Result<(), AppError> {
+    tokio::task::spawn_blocking(move || {
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let hosts = crate::db::hosts::list_all(&conn)?;
+        for host in hosts
+            .iter()
+            .filter(|h| crate::ollama::client::is_cloud_host(&h.url))
+        {
+            crate::db::hosts::delete(&conn, &host.id)?;
+        }
+        Ok(())
+    })
+    .await?
+}
+
+/// Removes the API key from the system keyring and deletes any auto-added cloud
+/// host entries. Idempotent — succeeds even if no key or host was present.
+#[command]
+pub async fn delete_api_key(
+    state: tauri::State<'_, crate::state::AppState>,
+) -> Result<(), AppError> {
+    core_delete_api_key().await?;
+    let _ = remove_cloud_hosts(state.db.clone()).await;
     Ok(())
 }
 
@@ -418,7 +446,7 @@ mod tests {
         );
 
         // Delete and verify idempotency
-        assert!(delete_api_key().await.is_ok());
+        assert!(core_delete_api_key().await.is_ok());
         let status_after = get_api_key_status()
             .await
             .expect("get_api_key_status must succeed after delete");
@@ -433,7 +461,7 @@ mod tests {
 
         // delete_api_key must not error even when no key is present.
         // Call twice: first clears any existing entry, second proves idempotency.
-        let first = delete_api_key().await;
+        let first = core_delete_api_key().await;
         match first {
             Ok(_) => (),
             Err(AppError::Auth(ref msg))
@@ -447,7 +475,7 @@ mod tests {
             }
             Err(e) => panic!("Unexpected error on first delete: {:?}", e),
         }
-        let second = delete_api_key().await;
+        let second = core_delete_api_key().await;
         match second {
             Ok(_) => (),
             Err(AppError::Auth(ref msg))
@@ -554,6 +582,59 @@ mod tests {
             .filter(|h| crate::ollama::client::is_cloud_host(&h.url))
             .count();
         assert_eq!(cloud_count, 1, "should still have exactly one cloud host");
+    }
+
+    #[tokio::test]
+    async fn test_remove_cloud_hosts_deletes_cloud_entries() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        crate::db::seed_default_host(&conn).unwrap();
+        let db: DbConn = Arc::new(Mutex::new(conn));
+
+        // Add a cloud host.
+        ensure_cloud_host_exists(db.clone()).await.unwrap();
+        {
+            let conn = db.lock().unwrap();
+            assert_eq!(
+                crate::db::hosts::list_all(&conn)
+                    .unwrap()
+                    .iter()
+                    .filter(|h| crate::ollama::client::is_cloud_host(&h.url))
+                    .count(),
+                1
+            );
+        }
+
+        // remove_cloud_hosts should delete it.
+        remove_cloud_hosts(db.clone()).await.unwrap();
+
+        let conn = db.lock().unwrap();
+        let cloud_count = crate::db::hosts::list_all(&conn)
+            .unwrap()
+            .iter()
+            .filter(|h| crate::ollama::client::is_cloud_host(&h.url))
+            .count();
+        assert_eq!(cloud_count, 0, "cloud host should be removed");
+    }
+
+    #[tokio::test]
+    async fn test_remove_cloud_hosts_is_idempotent() {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        crate::db::seed_default_host(&conn).unwrap();
+        let db: DbConn = Arc::new(Mutex::new(conn));
+
+        // Call with no cloud hosts present — must not error.
+        remove_cloud_hosts(db.clone()).await.unwrap();
+        remove_cloud_hosts(db.clone()).await.unwrap();
+
+        let conn = db.lock().unwrap();
+        let cloud_count = crate::db::hosts::list_all(&conn)
+            .unwrap()
+            .iter()
+            .filter(|h| crate::ollama::client::is_cloud_host(&h.url))
+            .count();
+        assert_eq!(cloud_count, 0);
     }
 
     #[tokio::test]
