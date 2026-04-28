@@ -32,15 +32,37 @@
           class="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
         >
           <!-- Eye-off icon (visible when showing key) -->
-          <svg v-if="showKey" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-            <line x1="1" y1="1" x2="23" y2="23"/>
+          <svg
+            v-if="showKey"
+            class="w-3.5 h-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"
+            />
+            <path
+              d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"
+            />
+            <line x1="1" y1="1" x2="23" y2="23" />
           </svg>
           <!-- Eye icon (visible when hiding key) -->
-          <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-            <circle cx="12" cy="12" r="3"/>
+          <svg
+            v-else
+            class="w-3.5 h-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
           </svg>
         </button>
       </div>
@@ -55,11 +77,16 @@
 
     <!-- Action row: only when a key is stored -->
     <div
-      v-if="authStore.apiKeyStatus !== 'not_set' && authStore.apiKeyStatus !== 'unknown'"
+      v-if="
+        authStore.apiKeyStatus !== 'not_set' &&
+        authStore.apiKeyStatus !== 'unknown'
+      "
       class="flex items-center gap-2 mt-2"
     >
       <template v-if="confirmingRemove">
-        <span class="text-[12px] text-[var(--text-dim)]">Remove stored key?</span>
+        <span class="text-[12px] text-[var(--text-dim)]"
+          >Remove stored key?</span
+        >
         <button
           @click="confirmRemove"
           class="px-2.5 py-1 bg-[var(--danger)]/10 border border-[var(--danger)]/20 rounded-md text-[var(--danger)] text-[11px] font-bold hover:bg-[var(--danger)] hover:text-white transition-all"
@@ -79,7 +106,9 @@
           :disabled="isBusy"
           class="px-2.5 py-1 bg-[var(--bg-hover)] border border-[var(--border-strong)] rounded-md text-[var(--text)] text-[11px] cursor-pointer hover:bg-[var(--bg-active)] transition-colors disabled:opacity-40"
         >
-          {{ authStore.apiKeyStatus === "checking" ? "Checking..." : "Validate" }}
+          {{
+            authStore.apiKeyStatus === "checking" ? "Checking..." : "Validate"
+          }}
         </button>
         <button
           @click="confirmingRemove = true"
@@ -92,7 +121,9 @@
     </div>
 
     <!-- Error message: always visible when set, regardless of key status -->
-    <p v-if="errorMsg" class="text-[11px] text-[var(--danger)] mt-2">{{ errorMsg }}</p>
+    <p v-if="errorMsg" class="text-[11px] text-[var(--danger)] mt-2">
+      {{ errorMsg }}
+    </p>
   </div>
 </template>
 
@@ -111,7 +142,7 @@ const confirmingRemove = ref(false);
 const errorMsg = ref("");
 
 const isBusy = computed(
-  () => isSaving.value || authStore.apiKeyStatus === "checking"
+  () => isSaving.value || authStore.apiKeyStatus === "checking",
 );
 
 const statusLabel = computed(() => {
@@ -119,11 +150,16 @@ const statusLabel = computed(() => {
     case "not_set":
     case "unknown":
       return "Not set";
-    case "set":     return "Key saved";
-    case "valid":   return "Valid";
-    case "invalid": return "Invalid";
-    case "checking": return "Checking...";
-    default:        return "Not set";
+    case "set":
+      return "Key saved";
+    case "valid":
+      return "Valid";
+    case "invalid":
+      return "Invalid";
+    case "checking":
+      return "Checking...";
+    default:
+      return "Not set";
   }
 });
 

@@ -79,7 +79,9 @@ describe("API key management", () => {
     mockInvoke.mockResolvedValueOnce(undefined);
     const store = useAuthStore();
     await store.saveApiKey("sk-test-key-abc");
-    expect(mockInvoke).toHaveBeenCalledWith("set_api_key", { key: "sk-test-key-abc" });
+    expect(mockInvoke).toHaveBeenCalledWith("set_api_key", {
+      key: "sk-test-key-abc",
+    });
     expect(store.apiKeyStatus).toBe("set");
   });
 
@@ -94,7 +96,11 @@ describe("API key management", () => {
 
   it("validateApiKey sets checking then valid on true response", async () => {
     let resolve!: (v: boolean) => void;
-    mockInvoke.mockReturnValueOnce(new Promise<boolean>((r) => { resolve = r; }));
+    mockInvoke.mockReturnValueOnce(
+      new Promise<boolean>((r) => {
+        resolve = r;
+      }),
+    );
     const store = useAuthStore();
     const p = store.validateApiKey("host-uuid-1");
     expect(store.apiKeyStatus).toBe("checking");

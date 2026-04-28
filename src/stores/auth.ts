@@ -14,7 +14,9 @@ export const useAuthStore = defineStore("auth", {
     async checkAuthStatus(hostId: string): Promise<boolean> {
       this.isCheckingStatus = true;
       try {
-        const isAuthenticated = await invoke<boolean>("get_auth_status", { hostId });
+        const isAuthenticated = await invoke<boolean>("get_auth_status", {
+          hostId,
+        });
         this.authenticatedHosts[hostId] = isAuthenticated;
         if (isAuthenticated) {
           this.user = { id: hostId, username: "Local Device" };
