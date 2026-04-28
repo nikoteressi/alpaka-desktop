@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- Chat: thinking block can now be collapsed/expanded while the LLM is still thinking (#7)
+- Chat: web search results are collapsed by default when search completes; user can expand manually (#8)
+- Chat: auto-scroll no longer freezes after manually scrolling up then back down (#9)
+- Chat: auto-scroll now works correctly when opening a saved conversation after restart (#9)
+- Chat: switching conversations always resets scroll to bottom (#9)
+
 ---
 
 ## [1.0.1] - 2026-04-27

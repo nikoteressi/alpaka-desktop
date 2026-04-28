@@ -55,7 +55,7 @@ const { isOpen, toggle: _toggle, setOpen } = useCollapsibleState({
   initialOpen: props.isThinking,
 })
 
-const isExpanded = computed(() => props.isThinking ? true : isOpen.value)
+const isExpanded = computed(() => isOpen.value)
 const contentEl = ref<HTMLElement | null>(null)
 
 const label = computed(() => {
@@ -71,11 +71,11 @@ const renderedContent = computed(() => renderMarkdown(props.content))
 
 function toggle(event: MouseEvent) {
   event.stopPropagation()
-  if (!props.isThinking) _toggle()
+  _toggle()
 }
 
 watch(() => props.content, async () => {
-  if (!props.isThinking || !isExpanded.value) return
+  if (!props.isThinking || !isOpen.value) return
   await nextTick()
   if (contentEl.value) {
     contentEl.value.scrollTop = contentEl.value.scrollHeight

@@ -84,7 +84,7 @@ const props = defineProps<{
 const { isOpen, toggle: _toggle } = useCollapsibleState({
   messageKey: props.messageKey,
   suffix: 'search',
-  initialOpen: true, // Let's keep it open by default when a result comes in
+  initialOpen: false,
 })
 
 const toggleCollapse = (event: MouseEvent) => {
