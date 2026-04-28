@@ -1,7 +1,7 @@
 name: Feature Request
 description: Suggest a new feature or improvement for Alpaka Desktop.
 title: "[Feature]: "
-labels: ["enhancement", "needs-triage"]
+labels: ["type: feature", "needs-triage"]
 assignees: []
 
 body:
