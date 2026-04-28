@@ -16,5 +16,10 @@ export default defineConfig({
       '**/.{idea,git,cache,output,temp}/**',
       '**/.tabs/**',
     ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      reportsDirectory: 'coverage',
+    },
   }
 })

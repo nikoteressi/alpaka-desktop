@@ -28,3 +28,5 @@ CLAUDE.md
 test-results
 ollama-desktop-linux-mockup
 .playwright-mcp.worktrees/
+coverage/
+coverage-rust/
