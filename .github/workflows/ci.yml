@@ -70,6 +70,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust stable
         id: rust-toolchain
@@ -142,7 +144,7 @@ jobs:
           git fetch origin "${BASE_REF}" --depth=1
           CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD")
 
-          if echo "$CHANGED" | grep -q "^CHANGELOG.md$"; then
+          if echo "$CHANGED" | grep -Fxq "CHANGELOG.md"; then
             echo "CHANGELOG.md updated."
             exit 0
           fi
