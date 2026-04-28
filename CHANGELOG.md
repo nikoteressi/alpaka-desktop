@@ -9,7 +9,24 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- CI: merge duplicate `test` + `coverage` jobs into single `test-and-coverage` (tests now run once with instrumentation instead of twice)
+- CI: add path-based job skipping — Rust-only PRs skip Vitest/TS checks; frontend-only PRs skip Rust compilation/testing
+
+### Added
+- CI: CodeQL Rust SAST analysis (GA since CodeQL 2.23.3, October 2025)
+- CI: `dependency-review` workflow — blocks PRs introducing high-severity CVEs
+- CI: `cargo-deny` — enforces license compliance, banned crates, and registry source restrictions
+- CI: MSRV verification job — compiles with rust-version `1.77.2` declared in Cargo.toml
+- CI: E2E tests now run in CI via Playwright (browser-mode, Tauri IPC mocked)
+- CI: `typos` spell check on source code and docs
+- CI: `Swatinem/rust-cache` in all CI jobs for faster incremental Rust builds
+- Release: SBOM (`alpaka-desktop-vX.Y.Z.spdx.json`) attached to GitHub Releases
+- Release: SLSA Build L2 build attestations via `actions/attest-build-provenance`
+
 ### Fixed
+- Release: pin `publish-aur` and `publish-apt-repo` from `ubuntu-latest` to `ubuntu-22.04`
+- Release: SHA-pin `Swatinem/rust-cache@v2` in release workflow
 - Security: Downgrade keyring token-found log from `INFO` to `DEBUG` to prevent cleartext-logging CodeQL alert near credential retrieval (#56)
 
 ### Internal

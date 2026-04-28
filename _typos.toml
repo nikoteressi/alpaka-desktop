@@ -1,0 +1,19 @@
+# typos spell-check configuration for alpaka-desktop
+# https://github.com/crate-ci/typos
+
+[default.extend-words]
+# "PNGs" (plural of PNG) is parsed as "PN" by typos — suppress the false positive.
+PN = "PN"
+
+[files]
+extend-exclude = [
+    "pnpm-lock.yaml",
+    "Cargo.lock",
+    "*.png",
+    "*.ico",
+    "*.icns",
+    "dist/",
+    "node_modules/",
+    "target/",
+    "coverage/",
+]

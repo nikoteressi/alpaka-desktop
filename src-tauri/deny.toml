@@ -1,0 +1,55 @@
+# cargo-deny configuration for alpaka-desktop
+# Run: cargo deny check (from src-tauri/)
+
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+]
+
+[advisories]
+version = 2
+# Deny actual CVEs. "unmaintained" is warn-only because Tauri's GTK3
+# transitive dependencies (atk, gdk-sys, etc.) are unmaintained upstream
+# and cannot be updated until Tauri migrates to GTK4.
+unmaintained = "warn"
+ignore = []
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "MPL-2.0",
+    "OpenSSL",
+]
+# Copyleft licenses trigger a warning, not a build failure.
+# Tauri's GTK/WebKit system library linking does not constitute
+# distribution of those libraries under the LGPL.
+copyleft = "warn"
+unused-allowed-license = "allow"
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
