@@ -3,6 +3,12 @@ use keyring::Entry;
 
 pub const SERVICE_NAME: &str = "ollama-desktop";
 
+/// Fixed keyring account name for the Ollama Cloud API key.
+///
+/// Stored under [`SERVICE_NAME`] as the account identifier, keeping it separate
+/// from per-host OAuth bearer tokens, which use the host's UUID as the account name.
+pub const API_KEY_ACCOUNT: &str = "ollama-api-key";
+
 /// Sets a bearer token in the system's secure credential store (keyring).
 ///
 /// Under Linux, this uses the Secret Service API.
@@ -155,5 +161,39 @@ mod tests {
             }
             Err(e) => panic!("Unexpected error: {:?}", e),
         }
+    }
+
+    #[test]
+    fn test_api_key_account_is_distinct() {
+        assert_ne!(API_KEY_ACCOUNT, "cloud");
+        assert_ne!(API_KEY_ACCOUNT, SERVICE_NAME);
+        assert_eq!(API_KEY_ACCOUNT, "ollama-api-key");
+    }
+
+    #[test]
+    fn test_set_get_delete_via_api_key_account() {
+        // Use a unique account derived from the constant to avoid clobbering live data.
+        let test_account = format!("{}-test-{}", API_KEY_ACCOUNT, Uuid::new_v4());
+        let test_key = "sk-test-ollama-key-abc123";
+
+        let set_res = set_token(&test_account, test_key);
+        if let Err(ref e) = set_res {
+            let msg = format!("{e:?}");
+            if msg.contains("No secret-service")
+                || msg.contains("NoBackend")
+                || msg.contains("locked")
+                || msg.contains("Platform secure storage")
+                || msg.contains("ServiceUnknown")
+                || msg.contains("org.freedesktop")
+            {
+                return;
+            }
+        }
+        assert!(set_res.is_ok());
+        let retrieved = get_token(&test_account).expect("should retrieve");
+        assert_eq!(retrieved, Some(test_key.to_string()));
+        assert!(delete_token(&test_account).is_ok());
+        let after = get_token(&test_account).expect("should not error on missing");
+        assert_eq!(after, None);
     }
 }
