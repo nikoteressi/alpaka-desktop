@@ -270,6 +270,7 @@ jobs:
 
       - name: Run Rust coverage
         run: |
+          mkdir -p coverage-rust
           cargo llvm-cov --no-report --workspace --locked
           cargo llvm-cov report --lcov --output-path coverage-rust/lcov.info
           cargo llvm-cov report --html --output-dir coverage-rust/html
