@@ -216,6 +216,9 @@ jobs:
     name: Coverage
     runs-on: ubuntu-22.04
     needs: test
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -267,11 +270,13 @@ jobs:
 
       - name: Run Rust coverage
         run: |
-          cargo llvm-cov --workspace --lcov --output-path coverage-rust/lcov.info
-          cargo llvm-cov --workspace --html --output-dir coverage-rust/html
+          cargo llvm-cov --no-report --workspace
+          cargo llvm-cov report --lcov --output-path coverage-rust/lcov.info
+          cargo llvm-cov report --html --output-dir coverage-rust/html
         working-directory: src-tauri
 
       - name: SonarCloud scan
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: SonarSource/sonarcloud-github-action@383f7e52eae3ab0510c3cb0e7d9d150bbaeab838  # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
