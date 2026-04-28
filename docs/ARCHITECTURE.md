@@ -1,6 +1,6 @@
 # Alpaka Desktop — Architecture Document
 
-> **v1.0.0** — 2026-04-27
+> **v1.0.1** — 2026-04-27
 > Companion to [PRODUCT_SPEC.md](PRODUCT_SPEC.md)
 
 ---
@@ -870,14 +870,29 @@ Stop generation uses a `tokio::sync::broadcast` channel stored in `AppState::can
 
 ## 13. Performance Budget
 
-| Component | Budget | Strategy |
-|---|---|---|
-| App cold start | < 2s | Lazy-load non-critical routes; preload SQLite at setup |
-| Token event → DOM update | < 16ms (60fps) | `requestAnimationFrame` batching; minimal reactive overhead |
-| Message list (1000+) | Constant DOM size | Virtual scrolling; lazy markdown rendering |
-| SQLite queries | < 50ms | Indexed queries; connection reuse; WAL mode |
-| Memory (idle) | < 120 MB | Tauri + WebKitGTK baseline; no leaked event listeners |
-| Binary size | < 15 MB | Tauri bundle; tree-shaken frontend |
+| Component | Budget | Measured | Strategy |
+|---|---|---|---|
+| App cold start | < 2s | **0.21s** | Lazy-load non-critical routes; preload SQLite at setup |
+| Token event → DOM update | < 16ms (60fps) | — | `requestAnimationFrame` batching; minimal reactive overhead |
+| Message list (1000+) | Constant DOM size | — | Virtual scrolling; lazy markdown rendering |
+| SQLite queries | < 50ms | — | Indexed queries; connection reuse; WAL mode |
+| Memory (idle, PSS) | < 280 MB | **252 MB** | See breakdown below; no leaked event listeners |
+| Binary size | < 15 MB | **13.64 MB** | Tauri bundle; tree-shaken frontend |
+| CPU at idle | < 5% | **2.6%** | No polling loops on main thread |
+
+### Memory breakdown (PSS, idle, v1.0.1)
+
+RSS across all processes sums to ~747 MB but double-counts shared libraries. PSS (Proportional Set Size) divides shared pages fairly and is the correct metric:
+
+| Process | PSS |
+|---|---|
+| `alpaka-desktop` (Rust/Tauri) | 108.9 MB |
+| `WebKitWebProcess` (Vue app + Shiki) | 115.5 MB |
+| `WebKitNetworkProcess` | 27.3 MB |
+| `bwrap` sandboxes (×2) | 0.2 MB |
+| **Total** | **252 MB** |
+
+WebKitGTK2 is a full browser engine; its renderer alone costs ~100–120 MB PSS on an empty page. The 252 MB total is normal for a Tauri/WebKitGTK2 desktop app (VS Code/Electron idle: 350–600 MB). Measure with `scripts/profile.sh`.
 
 ---
 

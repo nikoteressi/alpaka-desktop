@@ -306,13 +306,18 @@ async function onStop() {
   await stopGeneration()
 }
 
+// Timer used to guard onScroll from re-disabling auto-scroll during a programmatic smooth scroll.
+// Cleared either by scrollend event (preferred) or a 500ms fallback.
+let _smoothScrollTimer: ReturnType<typeof setTimeout> | null = null
+
 function onScroll() {
   if (!scrollContainer.value) return
+  // Skip intermediate scroll events triggered by our own scrollToBottom('smooth') call.
+  if (_smoothScrollTimer !== null) return
 
   const el = scrollContainer.value
   const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
 
-  // Increased tolerance (100px) creates a less sensitive but still accurate auto-scroll pause
   if (distanceToBottom > 100) {
     isAutoScrollEnabled.value = false
   } else {
@@ -328,31 +333,55 @@ function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
   if (!scrollContainer.value) return
   isAutoScrollEnabled.value = true
 
+  // nextTick + rAF ensures DynamicScroller has completed its ResizeObserver-driven layout
+  // before we read scrollHeight, fixing the "0px scrollHeight on conversation open" bug.
   nextTick(() => {
-    if (!scrollContainer.value) return
-    const el = scrollContainer.value
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior,
+    requestAnimationFrame(() => {
+      if (!scrollContainer.value) return
+      const el = scrollContainer.value
+      el.scrollTo({ top: el.scrollHeight, behavior })
+
+      if (behavior === 'smooth') {
+        // Guard onScroll for the duration of the animation. scrollend fires when the
+        // browser finishes; the 500ms timer is a safety net for older WebKitGTK builds.
+        if (_smoothScrollTimer) clearTimeout(_smoothScrollTimer)
+        _smoothScrollTimer = setTimeout(() => {
+          _smoothScrollTimer = null
+          onScroll()
+        }, 500)
+        el.addEventListener('scrollend', () => {
+          if (_smoothScrollTimer) {
+            clearTimeout(_smoothScrollTimer)
+            _smoothScrollTimer = null
+          }
+          onScroll()
+        }, { once: true })
+      }
     })
   })
 }
 
-// Collapse system prompt when switching conversations
+// Reset scroll state and collapse system prompt when switching conversations.
+// Resetting isAutoScrollEnabled here ensures the itemsForScroller watcher below
+// will scroll to bottom once the new conversation's messages arrive.
 watch(
   () => chatStore.activeConversationId,
-  () => { isSystemPromptExpanded.value = false }
+  () => {
+    isSystemPromptExpanded.value = false
+    isAutoScrollEnabled.value = true
+  }
 )
 
-// Auto-scroll when new content arrives
+// Auto-scroll when new content arrives.
+// flush: 'post' ensures we read scrollHeight after the DOM (including DynamicScroller) has updated.
 watch(
   () => itemsForScroller.value,
   () => {
     if (isAutoScrollEnabled.value) {
-      // Use 'auto' behavior during content arrival (streaming) for maximum responsiveness
       scrollToBottom('auto')
     }
-  }
+  },
+  { flush: 'post' }
 )
 
 onMounted(async () => {
