@@ -9,9 +9,49 @@ permissions:
   contents: write
 
 jobs:
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-22.04
+    permissions:
+      checks: read
+    steps:
+      - name: Verify CI passed on tagged commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          REQUIRED=("Build Check" "Test" "Security Audit")
+
+          echo "Checking CI status for commit ${SHA} in ${REPO}..."
+          RESULT=$(gh api "repos/${REPO}/commits/${SHA}/check-runs" --paginate)
+
+          ALL_PASS=true
+          for CHECK in "${REQUIRED[@]}"; do
+            CONCLUSION=$(echo "$RESULT" | jq -r --arg name "$CHECK" \
+              '[.check_runs[] | select(.name == $name)] | last | .conclusion // "not found"')
+            if [[ "$CONCLUSION" == "success" ]]; then
+              echo "PASS: ${CHECK}"
+            else
+              echo "FAIL: ${CHECK} — conclusion=${CONCLUSION}"
+              ALL_PASS=false
+            fi
+          done
+
+          if [[ "$ALL_PASS" != "true" ]]; then
+            echo ""
+            echo "Release blocked: required CI checks did not all pass on ${SHA}."
+            echo "Fix the failing checks and re-tag from a green commit."
+            exit 1
+          fi
+
+          echo "All required checks passed. Proceeding with release."
+
   release-linux:
     name: Build and Release (Linux)
     runs-on: ubuntu-22.04
+    needs: ci-gate
 
     steps:
       # ------------------------------------------------------------------ #
@@ -129,7 +169,7 @@ jobs:
   # ======================================================================== #
   publish-aur:
     name: Publish to AUR
-    needs: release-linux
+    needs: [ci-gate, release-linux]
     runs-on: ubuntu-latest
 
     steps:
@@ -236,7 +276,7 @@ jobs:
   # ======================================================================== #
   publish-apt-repo:
     name: Publish APT Repository
-    needs: release-linux
+    needs: [ci-gate, release-linux]
     runs-on: ubuntu-latest
 
     steps:
