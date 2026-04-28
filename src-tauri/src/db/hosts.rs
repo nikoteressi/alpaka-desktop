@@ -61,7 +61,9 @@ pub struct NewHost {
 
 fn row_to_host(row: &rusqlite::Row<'_>) -> rusqlite::Result<Host> {
     let status_str: String = row.get(4)?;
-    let last_ping_status = status_str.parse::<PingStatus>().unwrap_or(PingStatus::Unknown);
+    let last_ping_status = status_str
+        .parse::<PingStatus>()
+        .unwrap_or(PingStatus::Unknown);
 
     Ok(Host {
         id: row.get(0)?,
@@ -97,7 +99,9 @@ pub fn get_by_id(conn: &Connection, id: &str) -> Result<Host, AppError> {
         row_to_host,
     )
     .map_err(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => AppError::NotFound(format!("Host '{id}' not found")),
+        rusqlite::Error::QueryReturnedNoRows => {
+            AppError::NotFound(format!("Host '{id}' not found"))
+        }
         other => AppError::from(other),
     })
 }
@@ -109,8 +113,7 @@ pub fn create(conn: &Connection, new: NewHost) -> Result<Host, AppError> {
     let is_default = new.is_default.unwrap_or(false);
 
     // If this is the first host, make it default + active.
-    let count: i64 =
-        conn.query_row("SELECT COUNT(*) FROM hosts", [], |r| r.get(0))?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM hosts", [], |r| r.get(0))?;
     let effective_default = is_default || count == 0;
 
     conn.execute(
@@ -144,10 +147,7 @@ pub fn update(conn: &Connection, id: &str, name: &str, url: &str) -> Result<(), 
 /// Set exactly one host as active (clears all others first).
 pub fn set_active(conn: &Connection, id: &str) -> Result<(), AppError> {
     conn.execute("UPDATE hosts SET is_active = 0", [])?;
-    let changed = conn.execute(
-        "UPDATE hosts SET is_active = 1 WHERE id = ?1",
-        params![id],
-    )?;
+    let changed = conn.execute("UPDATE hosts SET is_active = 1 WHERE id = ?1", params![id])?;
     if changed == 0 {
         return Err(AppError::NotFound(format!("Host '{id}' not found")));
     }

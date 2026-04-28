@@ -6,17 +6,26 @@ use crate::error::AppError;
 use crate::state::AppState;
 
 #[command]
-pub async fn get_setting(state: State<'_, AppState>, key: String) -> Result<Option<String>, AppError> {
+pub async fn get_setting(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<Option<String>, AppError> {
     db::settings::get_async(state.db.clone(), key).await
 }
 
 #[command]
-pub async fn set_setting(state: State<'_, AppState>, key: String, value: String) -> Result<(), AppError> {
+pub async fn set_setting(
+    state: State<'_, AppState>,
+    key: String,
+    value: String,
+) -> Result<(), AppError> {
     db::settings::set_async(state.db.clone(), key, value).await
 }
 
 #[command]
-pub async fn get_all_settings(state: State<'_, AppState>) -> Result<HashMap<String, String>, AppError> {
+pub async fn get_all_settings(
+    state: State<'_, AppState>,
+) -> Result<HashMap<String, String>, AppError> {
     db::settings::get_all_async(state.db.clone()).await
 }
 
@@ -33,9 +42,9 @@ pub async fn delete_all_settings(state: State<'_, AppState>) -> Result<(), AppEr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use rusqlite::Connection;
-    
+    use std::sync::{Arc, Mutex};
+
     use crate::db::migrations;
 
     // Helper to create an in-memory db with schema

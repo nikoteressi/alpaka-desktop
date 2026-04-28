@@ -28,3 +28,11 @@ updates:
         patterns:
           - "tauri"
           - "tauri-*"
+
+  # GitHub Actions — keep action versions and their SHA pins up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5

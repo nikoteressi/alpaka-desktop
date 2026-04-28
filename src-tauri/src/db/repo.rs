@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use crate::db::{conversations, messages, settings, DbConn};
 use crate::error::AppError;
-use crate::db::{DbConn, messages, conversations, settings};
+use std::collections::HashMap;
 
 /// A repository that encapsulates high-level database workflows for conversations.
 ///
@@ -26,10 +26,19 @@ impl ConversationRepository {
         conversation_id: String,
         content: String,
         images_json: Option<String>,
-    ) -> Result<(Vec<messages::Message>, conversations::Conversation, HashMap<String, String>), AppError> {
+    ) -> Result<
+        (
+            Vec<messages::Message>,
+            conversations::Conversation,
+            HashMap<String, String>,
+        ),
+        AppError,
+    > {
         let db = self.db.clone();
         tokio::task::spawn_blocking(move || {
-            let mut conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+            let mut conn = db
+                .lock()
+                .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
             let tx = conn.transaction().map_err(AppError::from)?;
 
             let new_user_msg = messages::NewMessage {
@@ -71,22 +80,27 @@ impl ConversationRepository {
     ) -> Result<(), AppError> {
         let db = self.db.clone();
         tokio::task::spawn_blocking(move || {
-            let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-            messages::create(&conn, messages::NewMessage {
-                conversation_id,
-                role: messages::MessageRole::Assistant,
-                content,
-                images_json: None,
-                files_json: None,
-                tokens_used: metrics.tokens_used,
-                generation_time_ms: metrics.generation_time_ms,
-                prompt_tokens: metrics.prompt_tokens,
-                tokens_per_sec: metrics.tokens_per_sec,
-                total_duration_ms: metrics.total_duration_ms,
-                load_duration_ms: metrics.load_duration_ms,
-                prompt_eval_duration_ms: metrics.prompt_eval_duration_ms,
-                eval_duration_ms: metrics.eval_duration_ms,
-            })?;
+            let conn = db
+                .lock()
+                .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+            messages::create(
+                &conn,
+                messages::NewMessage {
+                    conversation_id,
+                    role: messages::MessageRole::Assistant,
+                    content,
+                    images_json: None,
+                    files_json: None,
+                    tokens_used: metrics.tokens_used,
+                    generation_time_ms: metrics.generation_time_ms,
+                    prompt_tokens: metrics.prompt_tokens,
+                    tokens_per_sec: metrics.tokens_per_sec,
+                    total_duration_ms: metrics.total_duration_ms,
+                    load_duration_ms: metrics.load_duration_ms,
+                    prompt_eval_duration_ms: metrics.prompt_eval_duration_ms,
+                    eval_duration_ms: metrics.eval_duration_ms,
+                },
+            )?;
             Ok(())
         })
         .await?

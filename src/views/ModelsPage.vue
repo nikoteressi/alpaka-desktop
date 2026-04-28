@@ -1,21 +1,36 @@
 <template>
-  <div class="h-full overflow-y-auto bg-[var(--bg-base)] px-6 py-5 no-scrollbar">
+  <div
+    class="h-full overflow-y-auto bg-[var(--bg-base)] px-6 py-5 no-scrollbar"
+  >
     <div class="max-w-[900px] mx-auto">
-      
       <!-- Detail Sub-page Transition -->
       <Transition name="fade-subpage" mode="out-in">
         <div v-if="selectedModel" class="flex flex-col h-full">
           <!-- Breadcrumb / Back Navigation -->
-          <div class="flex items-center gap-2.5 mb-5 animate-in fade-in slide-in-from-left-2 duration-300">
-            <button 
-              @click="closeDetails" 
+          <div
+            class="flex items-center gap-2.5 mb-5 animate-in fade-in slide-in-from-left-2 duration-300"
+          >
+            <button
+              @click="closeDetails"
               class="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text)] transition-all py-1 px-2 rounded-md hover:bg-[var(--bg-hover)]"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
               <span>Library</span>
             </button>
             <span class="text-[var(--text-dim)] text-[12px] opacity-60">/</span>
-            <span class="text-[13px] text-[var(--text)] font-semibold">{{ selectedModel.name }}</span>
+            <span class="text-[13px] text-[var(--text)] font-semibold">{{
+              selectedModel.name
+            }}</span>
           </div>
 
           <LibraryModelDetails
@@ -29,7 +44,9 @@
         <div v-else class="flex flex-col h-full">
           <!-- Header row -->
           <div class="flex items-center gap-3 mb-1">
-            <h1 class="text-[17px] font-semibold text-[var(--text)]">Models Management</h1>
+            <h1 class="text-[17px] font-semibold text-[var(--text)]">
+              Models Management
+            </h1>
           </div>
 
           <!-- Glassy Horizontal Tabs -->
@@ -40,20 +57,34 @@
           />
 
           <div class="flex flex-col gap-4">
-            
             <!-- Global Active Pulls -->
-            <div v-if="Object.keys(modelStore.pulling).length > 0" class="flex flex-col gap-2 mb-2">
-              <p class="text-[11px] text-[var(--accent)] font-bold uppercase tracking-wider px-1">Active Downloads</p>
+            <div
+              v-if="Object.keys(modelStore.pulling).length > 0"
+              class="flex flex-col gap-2 mb-2"
+            >
+              <p
+                class="text-[11px] text-[var(--accent)] font-bold uppercase tracking-wider px-1"
+              >
+                Active Downloads
+              </p>
               <div
                 v-for="(prog, modelName) in modelStore.pulling"
                 :key="'pulling-' + modelName"
                 class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-[10px_14px]"
               >
                 <div class="flex items-center justify-between mb-1.5">
-                  <span class="text-[13px] text-[var(--text)] font-medium truncate">{{ modelName }}</span>
-                  <span class="text-[12px] text-[var(--text-muted)] ml-2 flex-shrink-0">{{ prog.status }}</span>
+                  <span
+                    class="text-[13px] text-[var(--text)] font-medium truncate"
+                    >{{ modelName }}</span
+                  >
+                  <span
+                    class="text-[12px] text-[var(--text-muted)] ml-2 flex-shrink-0"
+                    >{{ prog.status }}</span
+                  >
                 </div>
-                <div class="h-1 bg-[var(--bg-base)] rounded-sm overflow-hidden border border-white/5">
+                <div
+                  class="h-1 bg-[var(--bg-base)] rounded-sm overflow-hidden border border-white/5"
+                >
                   <div
                     class="bg-[#4a80d0] h-1 rounded-sm transition-all shadow-[0_0_8px_rgba(74,128,208,0.5)]"
                     :style="{ width: prog.percent + '%' }"
@@ -63,29 +94,53 @@
             </div>
 
             <Transition name="fade-slide" mode="out-in">
-              
               <!-- Library Section -->
-              <div v-if="activeTab === 'library'" key="library" class="flex flex-col gap-8" role="tabpanel">
+              <div
+                v-if="activeTab === 'library'"
+                key="library"
+                class="flex flex-col gap-8"
+                role="tabpanel"
+              >
                 <LibraryBrowser @select="openLibraryDetails" />
               </div>
 
               <!-- Local Models Section -->
-              <div v-else-if="activeTab === 'local'" key="local" class="flex flex-col gap-2" role="tabpanel">
-                <div v-if="modelStore.isLoading" class="text-[13px] text-[var(--text-dim)] py-12 text-center">
-                  <div class="inline-block w-5 h-5 border-2 border-[var(--border-strong)] border-t-[#4a80d0] rounded-full animate-spin mb-3"></div>
+              <div
+                v-else-if="activeTab === 'local'"
+                key="local"
+                class="flex flex-col gap-2"
+                role="tabpanel"
+              >
+                <div
+                  v-if="modelStore.isLoading"
+                  class="text-[13px] text-[var(--text-dim)] py-12 text-center"
+                >
+                  <div
+                    class="inline-block w-5 h-5 border-2 border-[var(--border-strong)] border-t-[#4a80d0] rounded-full animate-spin mb-3"
+                  ></div>
                   <p>Loading installed models...</p>
                 </div>
-                <div v-else-if="modelStore.models.length === 0" class="text-[13px] text-[var(--text-dim)] py-12 text-center bg-[var(--bg-input)] border border-dashed border-[var(--border-subtle)] rounded-xl">
+                <div
+                  v-else-if="modelStore.models.length === 0"
+                  class="text-[13px] text-[var(--text-dim)] py-12 text-center bg-[var(--bg-input)] border border-dashed border-[var(--border-subtle)] rounded-xl"
+                >
                   No models installed locally. Go to Library to pull one!
                 </div>
                 <div v-else class="flex flex-col gap-1.5">
-                  <p class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider px-1 mb-1">{{ modelStore.models.length }} Installed Models</p>
+                  <p
+                    class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider px-1 mb-1"
+                  >
+                    {{ modelStore.models.length }} Installed Models
+                  </p>
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <ModelCard
                       v-for="model in modelStore.models"
                       :key="'local-' + model.name"
                       :name="modelBaseName(model.name as string)"
-                      :tags="[model.details.parameter_size, ...getActiveCaps(model.name as string)]"
+                      :tags="[
+                        model.details.parameter_size,
+                        ...getActiveCaps(model.name as string),
+                      ]"
                       :file-size="formatSize(model.size)"
                       :date="formatDateShort(model.modified_at)"
                       :quant="model.details.quantization_level"
@@ -99,35 +154,80 @@
               </div>
 
               <!-- Cloud Models Section -->
-              <div v-else-if="activeTab === 'cloud'" key="cloud" class="flex flex-col gap-4" role="tabpanel">
-                <div class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-[14px_18px]">
+              <div
+                v-else-if="activeTab === 'cloud'"
+                key="cloud"
+                class="flex flex-col gap-4"
+                role="tabpanel"
+              >
+                <div
+                  class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-[14px_18px]"
+                >
                   <div class="flex items-center gap-2 mb-2">
-                    <svg class="w-3.5 h-3.5 text-[var(--accent)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M17.5 19a3.5 3.5 0 0 0 0-7h-1.5a7 7 0 1 0-11 6.5"/>
+                    <svg
+                      class="w-3.5 h-3.5 text-[var(--accent)]"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path
+                        d="M17.5 19a3.5 3.5 0 0 0 0-7h-1.5a7 7 0 1 0-11 6.5"
+                      />
                     </svg>
-                    <p class="text-[13px] font-semibold text-[var(--text)]">Ollama Cloud Models</p>
+                    <p class="text-[13px] font-semibold text-[var(--text)]">
+                      Ollama Cloud Models
+                    </p>
                   </div>
-                  <p class="text-[12px] text-[var(--text-muted)] leading-relaxed">
-                    Real-time discovery of models supporting Ollama Cloud execution directly from the official library.
+                  <p
+                    class="text-[12px] text-[var(--text-muted)] leading-relaxed"
+                  >
+                    Real-time discovery of models supporting Ollama Cloud
+                    execution directly from the official library.
                   </p>
                 </div>
 
                 <div class="relative min-h-[400px]">
                   <!-- Loading Overlay for Tag Discovery -->
-                  <div v-if="isTagFetching" class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-base)]/40 backdrop-blur-[2px] rounded-xl">
-                    <div class="flex flex-col items-center gap-3 bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-strong)] shadow-2xl animate-in fade-in zoom-in duration-200">
-                      <div class="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"></div>
-                      <p class="text-[13px] font-medium text-[var(--text)]">Resolving cloud versions...</p>
+                  <div
+                    v-if="isTagFetching"
+                    class="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-base)]/40 backdrop-blur-[2px] rounded-xl"
+                  >
+                    <div
+                      class="flex flex-col items-center gap-3 bg-[var(--bg-surface)] p-6 rounded-2xl border border-[var(--border-strong)] shadow-2xl animate-in fade-in zoom-in duration-200"
+                    >
+                      <div
+                        class="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin"
+                      ></div>
+                      <p class="text-[13px] font-medium text-[var(--text)]">
+                        Resolving cloud versions...
+                      </p>
                     </div>
                   </div>
 
-                  <div v-if="isCloudLoading" class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
-                    <div v-for="i in 4" :key="i" class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 h-40 animate-pulse" />
+                  <div
+                    v-if="isCloudLoading"
+                    class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"
+                  >
+                    <div
+                      v-for="i in 4"
+                      :key="i"
+                      class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-6 h-40 animate-pulse"
+                    />
                   </div>
-                  <div v-else-if="dynamicCloudModels.length === 0" class="text-[13px] text-[var(--text-dim)] py-12 text-center bg-[var(--bg-input)] border border-dashed border-[var(--border-subtle)] rounded-xl">
-                    No cloud models found. Try checking your internet connection.
+                  <div
+                    v-else-if="dynamicCloudModels.length === 0"
+                    class="text-[13px] text-[var(--text-dim)] py-12 text-center bg-[var(--bg-input)] border border-dashed border-[var(--border-subtle)] rounded-xl"
+                  >
+                    No cloud models found. Try checking your internet
+                    connection.
                   </div>
-                  <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                  <div
+                    v-else
+                    class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"
+                  >
                     <ModelCard
                       v-for="model in dynamicCloudModels"
                       :key="'cloud-' + model.name"
@@ -146,36 +246,90 @@
               </div>
 
               <!-- Hardware Section -->
-              <div v-else-if="activeTab === 'engine'" key="engine" class="flex flex-col gap-4" role="tabpanel">
+              <div
+                v-else-if="activeTab === 'engine'"
+                key="engine"
+                class="flex flex-col gap-4"
+                role="tabpanel"
+              >
                 <!-- Hardware Specs -->
-                <div class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-4 shadow-sm">
+                <div
+                  class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-4 shadow-sm"
+                >
                   <div class="flex items-center gap-2 mb-4">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                      <line x1="8" y1="21" x2="16" y2="21"/>
-                      <line x1="12" y1="17" x2="12" y2="21"/>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--accent)"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                      <line x1="8" y1="21" x2="16" y2="21" />
+                      <line x1="12" y1="17" x2="12" y2="21" />
                     </svg>
-                    <h3 class="text-[14px] font-bold text-[var(--text)]">Engine Status & Hardware</h3>
+                    <h3 class="text-[14px] font-bold text-[var(--text)]">
+                      Engine Status & Hardware
+                    </h3>
                   </div>
 
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="bg-[var(--bg-base)] p-3 rounded-lg border border-[var(--border-subtle)]">
-                      <p class="text-[10px] text-[var(--text-dim)] uppercase font-bold mb-1">Graphics (GPU)</p>
-                      <p class="text-[13px] text-[var(--text)] font-medium">{{ hardware?.gpu_name ?? 'Detecting...' }}</p>
-                      <p class="text-[11px] text-[var(--accent)] mt-1">{{ hardware?.vram_mb ? (hardware.vram_mb / 1024).toFixed(1) + ' GB VRAM Available' : 'No VRAM detected' }}</p>
+                    <div
+                      class="bg-[var(--bg-base)] p-3 rounded-lg border border-[var(--border-subtle)]"
+                    >
+                      <p
+                        class="text-[10px] text-[var(--text-dim)] uppercase font-bold mb-1"
+                      >
+                        Graphics (GPU)
+                      </p>
+                      <p class="text-[13px] text-[var(--text)] font-medium">
+                        {{ hardware?.gpu_name ?? "Detecting..." }}
+                      </p>
+                      <p class="text-[11px] text-[var(--accent)] mt-1">
+                        {{
+                          hardware?.vram_mb
+                            ? (hardware.vram_mb / 1024).toFixed(1) +
+                              " GB VRAM Available"
+                            : "No VRAM detected"
+                        }}
+                      </p>
                     </div>
-                    <div class="bg-[var(--bg-base)] p-3 rounded-lg border border-[var(--border-subtle)]">
-                      <p class="text-[10px] text-[var(--text-dim)] uppercase font-bold mb-1">Memory (RAM)</p>
-                      <p class="text-[13px] text-[var(--text)] font-medium">{{ hardware?.ram_mb ? (hardware.ram_mb / 1024).toFixed(0) + ' GB System RAM' : 'Detecting...' }}</p>
-                      <p class="text-[11px] text-[var(--text-muted)] mt-1">Shared with OS and other apps</p>
+                    <div
+                      class="bg-[var(--bg-base)] p-3 rounded-lg border border-[var(--border-subtle)]"
+                    >
+                      <p
+                        class="text-[10px] text-[var(--text-dim)] uppercase font-bold mb-1"
+                      >
+                        Memory (RAM)
+                      </p>
+                      <p class="text-[13px] text-[var(--text)] font-medium">
+                        {{
+                          hardware?.ram_mb
+                            ? (hardware.ram_mb / 1024).toFixed(0) +
+                              " GB System RAM"
+                            : "Detecting..."
+                        }}
+                      </p>
+                      <p class="text-[11px] text-[var(--text-muted)] mt-1">
+                        Shared with OS and other apps
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <!-- Suggestions -->
                 <div class="flex flex-col gap-3">
-                  <p class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider px-1">Recommended for Your Machine</p>
-                  <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                  <p
+                    class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider px-1"
+                  >
+                    Recommended for Your Machine
+                  </p>
+                  <div
+                    class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"
+                  >
                     <ModelCard
                       v-for="rec in recommendedModels"
                       :key="'rec-' + rec.name"
@@ -183,15 +337,20 @@
                       :tags="[rec.params]"
                       :file-size="rec.sizeGb.toFixed(1) + ' GB'"
                       :is-installed="modelStore.isInstalled(rec.name)"
-                      :action-label="modelStore.isInstalled(rec.name) ? 'Details' : 'Pull'"
-                      :on-action="() => modelStore.isInstalled(rec.name) ? openLibraryDetailsByName(rec.name) : doPullModel(rec.name as any)"
+                      :action-label="
+                        modelStore.isInstalled(rec.name) ? 'Details' : 'Pull'
+                      "
+                      :on-action="
+                        () =>
+                          modelStore.isInstalled(rec.name)
+                            ? openLibraryDetailsByName(rec.name)
+                            : doPullModel(rec.name as any)
+                      "
                     />
                   </div>
                 </div>
               </div>
-
             </Transition>
-
           </div>
         </div>
       </Transition>
@@ -220,219 +379,369 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, markRaw, h, watch, type Component } from 'vue'
-import { useRouter } from 'vue-router'
-import AppTabs from '../components/shared/AppTabs.vue'
-import ConfirmationModal from '../components/shared/ConfirmationModal.vue'
-import ModelCard from '../components/models/ModelCard.vue'
-import LibraryModelDetails from '../components/models/LibraryModelDetails.vue'
-import LibraryBrowser from '../components/models/LibraryBrowser.vue'
-import CloudTagSelector from '../components/models/CloudTagSelector.vue'
-import { useModelStore } from '../stores/models'
-import { useAppOrchestration } from '../composables/useAppOrchestration'
-import { useConfirmationModal } from '../composables/useConfirmationModal'
-import { useModelLibrary } from '../composables/useModelLibrary'
-import type { ModelName, LibraryModel } from '../types/models'
-import { storeToRefs } from 'pinia'
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  markRaw,
+  h,
+  watch,
+  type Component,
+} from "vue";
+import { useRouter } from "vue-router";
+import AppTabs from "../components/shared/AppTabs.vue";
+import ConfirmationModal from "../components/shared/ConfirmationModal.vue";
+import ModelCard from "../components/models/ModelCard.vue";
+import LibraryModelDetails from "../components/models/LibraryModelDetails.vue";
+import LibraryBrowser from "../components/models/LibraryBrowser.vue";
+import CloudTagSelector from "../components/models/CloudTagSelector.vue";
+import { useModelStore } from "../stores/models";
+import { useAppOrchestration } from "../composables/useAppOrchestration";
+import { useConfirmationModal } from "../composables/useConfirmationModal";
+import { useModelLibrary } from "../composables/useModelLibrary";
+import type { ModelName, LibraryModel } from "../types/models";
+import { storeToRefs } from "pinia";
 
-const modelStore = useModelStore()
-const { selectedModel } = storeToRefs(modelStore)
-const orchestration = useAppOrchestration()
-const router = useRouter()
-const { modal, openModal, onConfirm, onCancel } = useConfirmationModal()
+const modelStore = useModelStore();
+const { selectedModel } = storeToRefs(modelStore);
+const orchestration = useAppOrchestration();
+const router = useRouter();
+const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
 
-const activeTab = ref('local')
-const { dynamicCloudModels, isCloudLoading, hardware, fetchCloudModels, detectHardware, cancelSearch } = useModelLibrary()
+const activeTab = ref("local");
+const {
+  dynamicCloudModels,
+  isCloudLoading,
+  hardware,
+  fetchCloudModels,
+  detectHardware,
+  cancelSearch,
+} = useModelLibrary();
 
 // ---- Icons ----
-const IconLibrary = markRaw({ setup() { return () => h('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('path', { d: 'm16 6 4 14' }), h('path', { d: 'M12 6v14' }), h('path', { d: 'M8 8v12' }), h('path', { d: 'M4 4v16' })]) } })
-const IconLocal = markRaw({ setup() { return () => h('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('rect', { x: 2, y: 2, width: 20, height: 8, rx: 2 }), h('rect', { x: 2, y: 14, width: 20, height: 8, rx: 2 }), h('line', { x1: 6, y1: 6, x2: 6, y2: 6 }), h('line', { x1: 6, y1: 18, x2: 6, y2: 18 })]) } })
-const IconCloud = markRaw({ setup() { return () => h('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('path', { d: 'M17.5 19a3.5 3.5 0 0 0 0-7h-1.5a7 7 0 1 0-11 6.5' })]) } })
-const IconEngine = markRaw({ setup() { return () => h('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('path', { d: 'M12 2v4' }), h('path', { d: 'M12 18v4' }), h('path', { d: 'M4.93 4.93l2.83 2.83' }), h('path', { d: 'M16.24 16.24l2.83 2.83' }), h('path', { d: 'M2 12h4' }), h('path', { d: 'M18 12h4' }), h('path', { d: 'M4.93 19.07l2.83-2.83' }), h('path', { d: 'M16.24 7.76l2.83-2.83' })]) } })
+const IconLibrary = markRaw({
+  setup() {
+    return () =>
+      h(
+        "svg",
+        {
+          width: 14,
+          height: 14,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": 2,
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        },
+        [
+          h("path", { d: "m16 6 4 14" }),
+          h("path", { d: "M12 6v14" }),
+          h("path", { d: "M8 8v12" }),
+          h("path", { d: "M4 4v16" }),
+        ],
+      );
+  },
+});
+const IconLocal = markRaw({
+  setup() {
+    return () =>
+      h(
+        "svg",
+        {
+          width: 14,
+          height: 14,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": 2,
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        },
+        [
+          h("rect", { x: 2, y: 2, width: 20, height: 8, rx: 2 }),
+          h("rect", { x: 2, y: 14, width: 20, height: 8, rx: 2 }),
+          h("line", { x1: 6, y1: 6, x2: 6, y2: 6 }),
+          h("line", { x1: 6, y1: 18, x2: 6, y2: 18 }),
+        ],
+      );
+  },
+});
+const IconCloud = markRaw({
+  setup() {
+    return () =>
+      h(
+        "svg",
+        {
+          width: 14,
+          height: 14,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": 2,
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        },
+        [h("path", { d: "M17.5 19a3.5 3.5 0 0 0 0-7h-1.5a7 7 0 1 0-11 6.5" })],
+      );
+  },
+});
+const IconEngine = markRaw({
+  setup() {
+    return () =>
+      h(
+        "svg",
+        {
+          width: 14,
+          height: 14,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": 2,
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        },
+        [
+          h("path", { d: "M12 2v4" }),
+          h("path", { d: "M12 18v4" }),
+          h("path", { d: "M4.93 4.93l2.83 2.83" }),
+          h("path", { d: "M16.24 16.24l2.83 2.83" }),
+          h("path", { d: "M2 12h4" }),
+          h("path", { d: "M18 12h4" }),
+          h("path", { d: "M4.93 19.07l2.83-2.83" }),
+          h("path", { d: "M16.24 7.76l2.83-2.83" }),
+        ],
+      );
+  },
+});
 
 interface Tab {
-  id: string
-  name: string
-  icon?: Component
+  id: string;
+  name: string;
+  icon?: Component;
 }
 
 const tabs: Tab[] = [
-  { id: 'local', name: 'Pulled', icon: IconLocal },
-  { id: 'library', name: 'Library', icon: IconLibrary },
-  { id: 'cloud', name: 'Cloud', icon: IconCloud },
-  { id: 'engine', name: 'Engine', icon: IconEngine },
-]
+  { id: "local", name: "Pulled", icon: IconLocal },
+  { id: "library", name: "Library", icon: IconLibrary },
+  { id: "cloud", name: "Cloud", icon: IconCloud },
+  { id: "engine", name: "Engine", icon: IconEngine },
+];
 
 async function doPullModel(name: string) {
-  await modelStore.pullModel(name as ModelName)
-  activeTab.value = 'library'
+  await modelStore.pullModel(name as ModelName);
+  activeTab.value = "library";
 }
 
 function confirmDelete(name: string) {
   openModal({
-    title: 'Confirm Delete',
+    title: "Confirm Delete",
     message: `Remove model '${name}' from local storage?`,
-    confirmLabel: 'Delete',
-    kind: 'danger',
+    confirmLabel: "Delete",
+    kind: "danger",
     onConfirm: async () => {
-      await modelStore.deleteModel(name as ModelName)
-    }
-  })
+      await modelStore.deleteModel(name as ModelName);
+    },
+  });
 }
 
 function openLocalModel(name: string) {
-  orchestration.startNewChat(name as ModelName)
-  router.push('/chat')
+  orchestration.startNewChat(name as ModelName);
+  router.push("/chat");
 }
 
 // Subpage details
 function openLibraryDetails(model: LibraryModel) {
-  modelStore.selectedModel = model
-  modelStore.fetchLibraryModelDetails(model.slug)
-  modelStore.fetchLibraryTagsDetailed(model.slug)
+  modelStore.selectedModel = model;
+  modelStore.fetchLibraryModelDetails(model.slug);
+  modelStore.fetchLibraryTagsDetailed(model.slug);
 }
 
 function openLibraryDetailsByName(name: string) {
-  const slug = name.split(':')[0]
-  // We don't have the full LibraryModel object from just a name, 
+  const slug = name.split(":")[0];
+  // We don't have the full LibraryModel object from just a name,
   // so we create a placeholder and fetch details
   const placeholder: LibraryModel = {
     name: slug,
     slug: slug,
-    description: '',
+    description: "",
     tags: [],
-    pull_count: '',
-    updated_at: ''
-  }
-  openLibraryDetails(placeholder)
+    pull_count: "",
+    updated_at: "",
+  };
+  openLibraryDetails(placeholder);
 }
 
 function closeDetails() {
-  modelStore.selectedModel = null
-  modelStore.selectedModelTags = []
+  modelStore.selectedModel = null;
+  modelStore.selectedModelTags = [];
 }
 
 function getActiveCaps(name: string) {
-  const caps = modelStore.capabilities[name]
-  if (!caps) return []
-  const tags: string[] = []
-  if (caps.vision) tags.push('vision')
-  if (caps.tools) tags.push('tools')
-  if (caps.thinking) tags.push('thinking')
-  return tags
+  const caps = modelStore.capabilities[name];
+  if (!caps) return [];
+  const tags: string[] = [];
+  if (caps.vision) tags.push("vision");
+  if (caps.tools) tags.push("tools");
+  if (caps.thinking) tags.push("thinking");
+  return tags;
 }
 
 const tagSelector = ref({
   show: false,
-  modelSlug: '',
-  tags: [] as string[]
-})
+  modelSlug: "",
+  tags: [] as string[],
+});
 
-const isTagFetching = ref(false)
+const isTagFetching = ref(false);
 
 async function openCloudModel(name: string) {
-  const slug = name
-  isTagFetching.value = true
-  
+  const slug = name;
+  isTagFetching.value = true;
+
   try {
-    const allTags = await modelStore.fetchLibraryTags(slug)
-    const cloudTags = allTags.filter(t => t.toLowerCase().includes('cloud'))
-    
+    const allTags = await modelStore.fetchLibraryTags(slug);
+    const cloudTags = allTags.filter((t) => t.toLowerCase().includes("cloud"));
+
     if (cloudTags.length === 0) {
-      const fallback = slug.includes(':') ? slug : `${slug}:cloud`
-      startChat(fallback)
+      const fallback = slug.includes(":") ? slug : `${slug}:cloud`;
+      startChat(fallback);
     } else if (cloudTags.length === 1) {
-      startChat(cloudTags[0])
+      startChat(cloudTags[0]);
     } else {
       tagSelector.value = {
         show: true,
         modelSlug: slug,
-        tags: cloudTags
-      }
+        tags: cloudTags,
+      };
     }
   } finally {
-    isTagFetching.value = false
+    isTagFetching.value = false;
   }
 }
 
 async function onCloudTagSelected(fullTagName: string) {
-  tagSelector.value.show = false
-  await startChat(fullTagName)
+  tagSelector.value.show = false;
+  await startChat(fullTagName);
 }
 
 async function startChat(fullName: string) {
-  modelStore.addCloudModel(fullName)
-  orchestration.startNewChat(fullName as ModelName)
-  router.push('/chat')
+  modelStore.addCloudModel(fullName);
+  orchestration.startNewChat(fullName as ModelName);
+  router.push("/chat");
 }
 
 // Fetch cloud models when user switches to cloud tab
 watch(activeTab, (newTab) => {
-  if (newTab === 'cloud' && dynamicCloudModels.value.length === 0) {
-    fetchCloudModels()
+  if (newTab === "cloud" && dynamicCloudModels.value.length === 0) {
+    fetchCloudModels();
   }
-})
+});
 
 const LIBRARY_SIZES: Record<string, number> = {
-  'llama3.2:3b': 2.0, 'llama3.2:1b': 1.3, 'llama3.1:8b': 4.7, 'mistral:7b': 4.1,
-  'phi4:14b': 8.9, 'qwen2.5:7b': 4.7, 'deepseek-r1:7b': 4.7, 'nomic-embed-text': 0.274,
-}
+  "llama3.2:3b": 2.0,
+  "llama3.2:1b": 1.3,
+  "llama3.1:8b": 4.7,
+  "mistral:7b": 4.1,
+  "phi4:14b": 8.9,
+  "qwen2.5:7b": 4.7,
+  "deepseek-r1:7b": 4.7,
+  "nomic-embed-text": 0.274,
+};
 
 const recommendedModels = computed(() => {
-  const avail = (hardware.value?.vram_mb ? hardware.value.vram_mb / 1024 * 0.9 : hardware.value?.ram_mb ? hardware.value.ram_mb / 1024 * 0.6 : 0)
-  if (avail === 0) return []
+  const avail = hardware.value?.vram_mb
+    ? (hardware.value.vram_mb / 1024) * 0.9
+    : hardware.value?.ram_mb
+      ? (hardware.value.ram_mb / 1024) * 0.6
+      : 0;
+  if (avail === 0) return [];
 
   return Object.entries(LIBRARY_SIZES)
     .filter(([, size]) => size <= avail)
     .map(([name, size]) => ({
       name,
-      displayName: name.split(':')[0],
-      params: name.split(':')[1] ?? '8B',
+      displayName: name.split(":")[0],
+      params: name.split(":")[1] ?? "8B",
       sizeGb: size,
     }))
     .sort((a, b) => b.sizeGb - a.sizeGb)
-    .slice(0, 4)
-})
+    .slice(0, 4);
+});
 
 // ---- Helpers ----
-function modelBaseName(name: string) { return name.split(':')[0] }
+function modelBaseName(name: string) {
+  return name.split(":")[0];
+}
 function formatSize(bytes: number) {
-  if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB'
-  if (bytes >= 1e6) return (bytes / 1e6).toFixed(0) + ' MB'
-  return bytes + ' B'
+  if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + " GB";
+  if (bytes >= 1e6) return (bytes / 1e6).toFixed(0) + " MB";
+  return bytes + " B";
 }
 function formatDateShort(dateStr: string) {
-  if (!dateStr) return 'Unknown'
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  if (!dateStr) return "Unknown";
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 onMounted(async () => {
-  await modelStore.fetchModels()
-  modelStore.initListeners()
-  await detectHardware()
-})
+  await modelStore.fetchModels();
+  modelStore.initListeners();
+  await detectHardware();
+});
 
 onUnmounted(() => {
-  cancelSearch()
-})
-
+  cancelSearch();
+});
 </script>
 
 <style scoped>
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
-.fade-slide-enter-active, .fade-slide-leave-active { transition: all 0.2s ease; }
-.fade-slide-enter-from { opacity: 0; transform: translateY(6px); }
-.fade-slide-leave-to { opacity: 0; transform: translateY(-6px); }
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.2s ease;
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
 
-.fade-subpage-enter-active, .fade-subpage-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-.fade-subpage-enter-from { opacity: 0; transform: scale(0.98) translateY(10px); }
-.fade-subpage-leave-to { opacity: 0; transform: scale(1.02) translateY(-10px); }
+.fade-subpage-enter-active,
+.fade-subpage-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fade-subpage-enter-from {
+  opacity: 0;
+  transform: scale(0.98) translateY(10px);
+}
+.fade-subpage-leave-to {
+  opacity: 0;
+  transform: scale(1.02) translateY(-10px);
+}
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
-.animate-spin { animation: spin 1s linear infinite; }
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
 </style>

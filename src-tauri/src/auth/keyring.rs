@@ -13,8 +13,8 @@ pub fn set_token(host_id: &str, token: &str) -> Result<(), AppError> {
 }
 
 /// Retrieves a bearer token from the system's secure credential store.
-/// 
-/// We first check our own service 'ollama-desktop'. 
+///
+/// We first check our own service 'ollama-desktop'.
 /// If not found, we check the official client's service 'ollama' (account 'cloud').
 pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
     // 1. Try our own service/identifier first
@@ -85,14 +85,20 @@ mod tests {
         // In headless CI/environments, keyring might not be available,
         // so we tolerate NoBackend errors gracefully in tests or assert explicitly.
         let set_res = set_token(&host_id, test_token);
-        
-        if let Err(AppError::Auth(msg)) = &set_res {
-            if msg.contains("No secret-service") || msg.contains("NoBackend") || msg.contains("locked") {
-                // CI environment without a valid keyring daemon, pass gracefully
-                return;
+
+        if let Err(ref e) = set_res {
+            let msg = format!("{e:?}");
+            if msg.contains("No secret-service")
+                || msg.contains("NoBackend")
+                || msg.contains("locked")
+                || msg.contains("Platform secure storage")
+                || msg.contains("ServiceUnknown")
+                || msg.contains("org.freedesktop")
+            {
+                return; // No Secret Service daemon in this environment
             }
         }
-        
+
         // Assert we could set it
         assert!(set_res.is_ok(), "Setting token should succeed");
 
@@ -105,31 +111,48 @@ mod tests {
         assert!(del_res.is_ok(), "Deleting token should succeed");
 
         // Assert it's gone
-        let retrieved_after = get_token(&host_id).expect("Should not fail when querying missing token");
+        let retrieved_after =
+            get_token(&host_id).expect("Should not fail when querying missing token");
         assert_eq!(retrieved_after, None);
     }
 
     #[test]
     fn test_get_nonexistent_token() {
         let host_id = Uuid::new_v4().to_string();
-        
+
         let retrieved = get_token(&host_id);
         match retrieved {
             Ok(None) => (), // Expected
-            Err(AppError::Auth(msg)) if msg.contains("No secret-service") || msg.contains("NoBackend") || msg.contains("locked") => (),
+            Err(AppError::Auth(msg))
+                if msg.contains("No secret-service")
+                    || msg.contains("NoBackend")
+                    || msg.contains("locked")
+                    || msg.contains("Platform secure storage")
+                    || msg.contains("ServiceUnknown") =>
+            {
+                ()
+            }
             Ok(Some(_)) => panic!("Token shouldn't exist"),
             Err(e) => panic!("Unexpected error: {:?}", e),
         }
     }
-    
+
     #[test]
     fn test_delete_nonexistent_token() {
         let host_id = Uuid::new_v4().to_string();
-        
+
         let del_res = delete_token(&host_id);
         match del_res {
             Ok(_) => (), // Expected, should silently succeed
-            Err(AppError::Auth(msg)) if msg.contains("No secret-service") || msg.contains("NoBackend") || msg.contains("locked") => (),
+            Err(AppError::Auth(msg))
+                if msg.contains("No secret-service")
+                    || msg.contains("NoBackend")
+                    || msg.contains("locked")
+                    || msg.contains("Platform secure storage")
+                    || msg.contains("ServiceUnknown") =>
+            {
+                ()
+            }
             Err(e) => panic!("Unexpected error: {:?}", e),
         }
     }

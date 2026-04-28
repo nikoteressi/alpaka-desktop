@@ -1,7 +1,7 @@
 // ---- Branded Types for Nominal Typing ----
-export type Brand<T, K> = T & { __brand: K }
-export type ModelName = Brand<string, 'ModelName'>
-export type ModelSlug = Brand<string, 'ModelSlug'>
+export type Brand<T, K> = T & { __brand: K };
+export type ModelName = Brand<string, "ModelName">;
+export type ModelSlug = Brand<string, "ModelSlug">;
 
 export interface ModelDetails {
   parent_model: string;

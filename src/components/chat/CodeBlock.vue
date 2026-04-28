@@ -2,18 +2,30 @@
   <div class="code-block-wrapper">
     <!-- Header -->
     <div class="code-header">
-      <span class="lang-label">{{ language || 'plaintext' }}</span>
+      <span class="lang-label">{{ language || "plaintext" }}</span>
       <button @click="copyCode" class="copy-button">
         <template v-if="copied">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-            <polyline points="20 6 9 17 4 12"/>
+          <svg
+            class="icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+          >
+            <polyline points="20 6 9 17 4 12" />
           </svg>
           <span class="status-text">Copied!</span>
         </template>
         <template v-else>
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          <svg
+            class="icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
           <span>Copy</span>
         </template>
@@ -21,10 +33,20 @@
     </div>
 
     <!-- Code body -->
-    <div class="code-body" :class="{ 'code-body--collapsed': shouldCollapse && isCollapsed }">
+    <div
+      class="code-body"
+      :class="{ 'code-body--collapsed': shouldCollapse && isCollapsed }"
+    >
       <div class="code-scroll scrollbar-custom">
-        <div v-if="highlightedHtml" v-html="highlightedHtml" class="shiki-render"></div>
-        <pre v-else class="fallback-code"><code>{{ code || '// No content' }}</code></pre>
+        <div
+          v-if="highlightedHtml"
+          v-html="highlightedHtml"
+          class="shiki-render"
+        ></div>
+        <pre
+          v-else
+          class="fallback-code"
+        ><code>{{ code || '// No content' }}</code></pre>
       </div>
       <div v-if="shouldCollapse && isCollapsed" class="collapse-fade"></div>
     </div>
@@ -35,61 +57,67 @@
       class="collapse-button"
       @click="isCollapsed = !isCollapsed"
     >
-      {{ isCollapsed ? `Show ${hiddenLineCount} more lines ↓` : 'Show less ↑' }}
+      {{ isCollapsed ? `Show ${hiddenLineCount} more lines ↓` : "Show less ↑" }}
     </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from 'vue'
-import { highlight } from '../../lib/markdown'
-import { useCopyToClipboard } from '../../composables/useCopyToClipboard'
+import { ref, watch, onMounted, computed } from "vue";
+import { highlight } from "../../lib/markdown";
+import { useCopyToClipboard } from "../../composables/useCopyToClipboard";
 
-const COLLAPSE_THRESHOLD = 40
-const COLLAPSED_LINE_COUNT = 25
+const COLLAPSE_THRESHOLD = 40;
+const COLLAPSED_LINE_COUNT = 25;
 
 const props = defineProps<{
-  code: string
-  language: string
-  isStreaming?: boolean
-}>()
+  code: string;
+  language: string;
+  isStreaming?: boolean;
+}>();
 
-const highlightedHtml = ref('')
-const { copied, copy } = useCopyToClipboard(2000)
-const isCollapsed = ref(true)
+const highlightedHtml = ref("");
+const { copied, copy } = useCopyToClipboard(2000);
+const isCollapsed = ref(true);
 
-const lineCount = computed(() => props.code.split('\n').length)
-const shouldCollapse = computed(() => lineCount.value > COLLAPSE_THRESHOLD && !props.isStreaming)
-const hiddenLineCount = computed(() => Math.max(0, lineCount.value - COLLAPSED_LINE_COUNT))
+const lineCount = computed(() => props.code.split("\n").length);
+const shouldCollapse = computed(
+  () => lineCount.value > COLLAPSE_THRESHOLD && !props.isStreaming,
+);
+const hiddenLineCount = computed(() =>
+  Math.max(0, lineCount.value - COLLAPSED_LINE_COUNT),
+);
 
 watch(shouldCollapse, (nowShouldCollapse) => {
-  if (nowShouldCollapse) isCollapsed.value = true
-})
+  if (nowShouldCollapse) isCollapsed.value = true;
+});
 
-let highlightTimeout: ReturnType<typeof setTimeout> | null = null
+let highlightTimeout: ReturnType<typeof setTimeout> | null = null;
 
 async function updateHighlight() {
-  if (highlightTimeout) clearTimeout(highlightTimeout)
+  if (highlightTimeout) clearTimeout(highlightTimeout);
   highlightTimeout = setTimeout(async () => {
     if (props.code) {
       try {
-        highlightedHtml.value = await highlight(props.code, props.language)
+        highlightedHtml.value = await highlight(props.code, props.language);
       } catch (err) {
-        console.error('Failed to highlight code:', err)
-        highlightedHtml.value = ''
+        console.error("Failed to highlight code:", err);
+        highlightedHtml.value = "";
       }
     } else {
-      highlightedHtml.value = ''
+      highlightedHtml.value = "";
     }
-  }, 30)
+  }, 30);
 }
 
 async function copyCode() {
-  await copy(props.code)
+  await copy(props.code);
 }
 
-watch([() => props.code, () => props.language], updateHighlight, { immediate: false })
-onMounted(() => updateHighlight())
+watch([() => props.code, () => props.language], updateHighlight, {
+  immediate: false,
+});
+onMounted(() => updateHighlight());
 </script>
 
 <style scoped>

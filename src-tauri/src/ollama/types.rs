@@ -121,7 +121,6 @@ pub struct StreamResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_message_serialization_with_images() {
@@ -142,10 +141,7 @@ mod tests {
         };
 
         let val = serde_json::to_value(&req).unwrap();
-        assert_eq!(
-            val["messages"][0]["images"][0],
-            "base64encodedstr"
-        );
+        assert_eq!(val["messages"][0]["images"][0], "base64encodedstr");
     }
 
     #[test]
@@ -168,7 +164,10 @@ mod tests {
 
         let val = serde_json::to_value(&req).unwrap();
         // Should omit "images" entirely rather than outputting `"images": null`
-        assert!(val["messages"][0].get("images").is_none(), "images field should be completely omitted when None");
+        assert!(
+            val["messages"][0].get("images").is_none(),
+            "images field should be completely omitted when None"
+        );
     }
 
     #[test]
@@ -182,7 +181,10 @@ mod tests {
             name: None,
         };
         let val = serde_json::to_value(&msg).unwrap();
-        assert!(val.get("thinking").is_none(), "thinking field should be omitted when None");
+        assert!(
+            val.get("thinking").is_none(),
+            "thinking field should be omitted when None"
+        );
     }
 
     #[test]

@@ -1,10 +1,10 @@
-import { describe, it, expectTypeOf } from 'vitest'
-import type { ModelCapabilities } from '../models'
+import { describe, it, expectTypeOf } from "vitest";
+import type { ModelCapabilities } from "../models";
 
-describe('ModelCapabilities', () => {
-  it('has optional context_length field', () => {
+describe("ModelCapabilities", () => {
+  it("has optional context_length field", () => {
     const caps: ModelCapabilities = {
-      name: 'llama3',
+      name: "llama3",
       thinking: false,
       thinking_toggleable: false,
       thinking_levels: [],
@@ -14,7 +14,7 @@ describe('ModelCapabilities', () => {
       audio: false,
       cloud: false,
       context_length: 32768,
-    }
-    expectTypeOf(caps.context_length).toMatchTypeOf<number | undefined>()
-  })
-})
+    };
+    expectTypeOf(caps.context_length).toMatchTypeOf<number | undefined>();
+  });
+});

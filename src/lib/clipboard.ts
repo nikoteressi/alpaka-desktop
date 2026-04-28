@@ -10,7 +10,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     // Fallback? Browsers generally require secure context for clipboard API.
     return false;
   } catch (err) {
-    console.error('Failed to copy to clipboard:', err);
+    console.error("Failed to copy to clipboard:", err);
     return false;
   }
 }

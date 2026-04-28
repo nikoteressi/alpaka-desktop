@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  alpaka_desktop_lib::run();
+    alpaka_desktop_lib::run();
 }

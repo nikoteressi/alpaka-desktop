@@ -1,7 +1,7 @@
+use crate::auth::keyring;
+use crate::error::AppError;
 use std::path::PathBuf;
 use tauri::command;
-use crate::error::AppError;
-use crate::auth::keyring;
 
 /// Returns the path to the Ollama ed25519 private key used for cloud auth.
 fn ollama_key_path() -> PathBuf {
@@ -24,8 +24,9 @@ pub async fn logout(host_id: String) -> Result<(), AppError> {
             .arg("signout")
             .stdin(std::process::Stdio::null())
             .output()
-    }).await;
-    
+    })
+    .await;
+
     // 2. Delete our own keyring token
     tokio::task::spawn_blocking(move || keyring::delete_token(&host_id)).await??;
     Ok(())
@@ -62,9 +63,14 @@ pub async fn perform_auth_status_check(
         let db = db.clone();
         let host_id_clone = host_id.clone();
         tokio::task::spawn_blocking(move || {
-            let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+            let conn = db
+                .lock()
+                .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
             crate::db::hosts::get_by_id(&conn, &host_id_clone)
-        }).await.map_err(|e| AppError::Internal(e.to_string()))??.url
+        })
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??
+        .url
     };
 
     // 2. Initial credential check (passive)
@@ -82,8 +88,8 @@ pub async fn perform_auth_status_check(
         // fall through to the ed25519 check below.
         Some(_) => {
             let host_id_cleanup = host_id.clone();
-            let _ = tokio::task::spawn_blocking(move || keyring::delete_token(&host_id_cleanup))
-                .await;
+            let _ =
+                tokio::task::spawn_blocking(move || keyring::delete_token(&host_id_cleanup)).await;
             ollama_key_path().exists()
         }
 
@@ -97,8 +103,12 @@ pub async fn perform_auth_status_check(
 
     // 3. Active Probe: Verify if the daemon itself is signed in.
     // This catches cases where the daemon session has expired but keys remain on disk.
-    let probe_url = format!("{}/api/experimental/web_search", host_url.trim_end_matches('/'));
-    let resp = http_client.post(&probe_url)
+    let probe_url = format!(
+        "{}/api/experimental/web_search",
+        host_url.trim_end_matches('/')
+    );
+    let resp = http_client
+        .post(&probe_url)
         .header("User-Agent", "OllamaDesktop-AuthProbe/0.1.0")
         .json(&serde_json::json!({ "query": "auth_probe" }))
         .timeout(std::time::Duration::from_millis(1500))
@@ -109,7 +119,7 @@ pub async fn perform_auth_status_check(
         // Definitively logged out.
         Ok(r) if r.status() == 401 => Ok(false),
         // Otherwise, trust the local credentials (could be offline or 404 on old builds)
-        _ => Ok(true)
+        _ => Ok(true),
     }
 }
 
@@ -150,7 +160,7 @@ pub async fn trigger_ollama_signin() -> Result<String, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{DbConn, migrations, seed_default_host};
+    use crate::db::{migrations, seed_default_host, DbConn};
     use rusqlite::Connection;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
@@ -192,6 +202,8 @@ mod tests {
             if msg.contains("No secret-service")
                 || msg.contains("NoBackend")
                 || msg.contains("locked")
+                || msg.contains("Platform secure storage")
+                || msg.contains("ServiceUnknown")
             {
                 return; // Gracefully pass in headless environments without mocked DBus
             }
@@ -205,7 +217,8 @@ mod tests {
         assert!(login_res.is_ok());
 
         // Verify status after login
-        let status_after_login = perform_auth_status_check(&client, db.clone(), host_id.clone()).await;
+        let status_after_login =
+            perform_auth_status_check(&client, db.clone(), host_id.clone()).await;
         // In CI this might be false due to no real network/daemon, or true if fallback works.
         // We just assert it doesn't panic.
         assert!(status_after_login.is_ok());
@@ -216,7 +229,11 @@ mod tests {
 
         // After logout the result depends on whether id_ed25519 exists — both
         // true and false are valid; just assert no error.
-        assert!(perform_auth_status_check(&client, db.clone(), host_id.clone()).await.is_ok());
+        assert!(
+            perform_auth_status_check(&client, db.clone(), host_id.clone())
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -234,6 +251,8 @@ mod tests {
             if msg.contains("No secret-service")
                 || msg.contains("NoBackend")
                 || msg.contains("locked")
+                || msg.contains("Platform secure storage")
+                || msg.contains("ServiceUnknown")
             {
                 return; // No keyring in this environment — skip.
             }
@@ -245,15 +264,19 @@ mod tests {
         assert!(status.is_ok());
 
         // The keyring entry must have been deleted.
-        let remaining =
-            tokio::task::spawn_blocking(move || keyring::get_token(&host_id)).await.unwrap();
+        let remaining = tokio::task::spawn_blocking(move || keyring::get_token(&host_id))
+            .await
+            .unwrap();
         match remaining {
             Ok(None) => (),
             Ok(Some(t)) => panic!("Sentinel token was not cleaned up, found: {}", t),
             Err(AppError::Auth(ref msg))
                 if msg.contains("No secret-service")
                     || msg.contains("NoBackend")
-                    || msg.contains("locked") => {}
+                    || msg.contains("locked")
+                    || msg.contains("Platform secure storage")
+                    || msg.contains("ServiceUnknown")
+                    || msg.contains("org.freedesktop") => {}
             Err(e) => panic!("Unexpected keyring error: {:?}", e),
         }
     }

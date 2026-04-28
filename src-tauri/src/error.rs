@@ -93,7 +93,9 @@ impl From<reqwest::Error> for AppError {
 impl From<keyring::Error> for AppError {
     fn from(e: keyring::Error) -> Self {
         match e {
-            keyring::Error::NoEntry => AppError::NotFound("Credentials not found in keyring".to_string()),
+            keyring::Error::NoEntry => {
+                AppError::NotFound("Credentials not found in keyring".to_string())
+            }
             _ => AppError::Auth(format!("Keyring error: {}", e)),
         }
     }

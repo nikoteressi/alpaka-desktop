@@ -2,17 +2,17 @@
 // sliding-window truncation, agent orchestration loop, and assistant message persistence.
 // commands/chat.rs::send_message and compact_conversation are thin adapters that delegate here.
 
-use std::time::Duration;
-use chrono::Local;
-use tauri::{AppHandle, Runtime, Emitter};
-use serde_json::json;
+use crate::db::{conversations, messages, repo::AssistantMetrics};
 use crate::error::AppError;
-use crate::state::AppState;
 use crate::ollama::client::OllamaClient;
-use crate::ollama::types::{ChatRequest, Message, ThinkParam, Tool, ChatOptions, StreamResponse};
 use crate::ollama::streaming;
+use crate::ollama::types::{ChatOptions, ChatRequest, Message, StreamResponse, ThinkParam, Tool};
 use crate::services::search::WebSearchService;
-use crate::db::{messages, conversations, repo::AssistantMetrics};
+use crate::state::AppState;
+use chrono::Local;
+use serde_json::json;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Runtime};
 
 /// Parameters for the full `ChatService::send()` lifecycle.
 pub struct SendParams {
@@ -37,7 +37,10 @@ pub struct CompactParams {
 
 /// Trims the oldest non-system messages from `messages` so the total estimated token count
 /// fits within `budget`. System messages (at the head of the list) are always preserved.
-pub(crate) fn apply_sliding_window(messages: &mut Vec<crate::ollama::types::Message>, budget: usize) {
+pub(crate) fn apply_sliding_window(
+    messages: &mut Vec<crate::ollama::types::Message>,
+    budget: usize,
+) {
     let system_count = messages.iter().take_while(|m| m.role == "system").count();
     let history = &messages[system_count..];
     let mut accumulated = 0usize;
@@ -56,7 +59,8 @@ pub(crate) fn apply_sliding_window(messages: &mut Vec<crate::ollama::types::Mess
         *messages = trimmed;
         log::info!(
             "Context sliding window: trimmed {} history messages to fit budget={}",
-            keep_from, budget
+            keep_from,
+            budget
         );
     }
 }
@@ -94,7 +98,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         } = params;
 
         if conversation_id.is_empty() {
-            return Err(AppError::Internal("conversation_id must not be empty".into()));
+            return Err(AppError::Internal(
+                "conversation_id must not be empty".into(),
+            ));
         }
 
         // 1. Persist user message and load history from DB
@@ -104,33 +110,37 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let imgs = base64_images.clone();
 
         let history = tokio::task::spawn_blocking(move || {
-            let conn = db.lock().map_err(|_| AppError::Db("DB lock poisoned".into()))?;
+            let conn = db
+                .lock()
+                .map_err(|_| AppError::Db("DB lock poisoned".into()))?;
 
             let images_json = imgs
                 .map(|i| serde_json::to_string(&i).map_err(AppError::from))
                 .transpose()?;
 
-            messages::create(&conn, messages::NewMessage {
-                conversation_id: conv_id.clone(),
-                role: messages::MessageRole::User,
-                content: msg_content,
-                images_json,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-            })?;
+            messages::create(
+                &conn,
+                messages::NewMessage {
+                    conversation_id: conv_id.clone(),
+                    role: messages::MessageRole::User,
+                    content: msg_content,
+                    images_json,
+                    files_json: None,
+                    tokens_used: None,
+                    generation_time_ms: None,
+                    prompt_tokens: None,
+                    tokens_per_sec: None,
+                    total_duration_ms: None,
+                    load_duration_ms: None,
+                    prompt_eval_duration_ms: None,
+                    eval_duration_ms: None,
+                },
+            )?;
 
             messages::list_for_conversation(&conn, &conv_id)
         })
         .await
-        .map_err(|e| AppError::Internal(format!("DB task panicked: {e}")))?
-        ?;
+        .map_err(|e| AppError::Internal(format!("DB task panicked: {e}")))??;
 
         // 2. Build initial messages (system prompt injections + history)
         let mut initial_messages: Vec<Message> = Vec::new();
@@ -170,12 +180,14 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         }
 
         for msg in history {
-            let msg_imgs: Option<Vec<String>> = if msg.images_json != "[]" && !msg.images_json.is_empty() {
-                serde_json::from_str(&msg.images_json)
-                    .map_err(|e| AppError::Serialization(format!("Failed to parse image JSON: {e}")))?
-            } else {
-                None
-            };
+            let msg_imgs: Option<Vec<String>> =
+                if msg.images_json != "[]" && !msg.images_json.is_empty() {
+                    serde_json::from_str(&msg.images_json).map_err(|e| {
+                        AppError::Serialization(format!("Failed to parse image JSON: {e}"))
+                    })?
+                } else {
+                    None
+                };
             initial_messages.push(Message {
                 role: msg.role.as_str().to_string(),
                 content: msg.content,
@@ -189,8 +201,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         // 3. Build think param
         let think = think_mode.as_ref().map(|s| match s.as_str() {
             "false" => ThinkParam::Bool(false),
-            "true"  => ThinkParam::Bool(true),
-            level   => ThinkParam::Level(level.to_string()),
+            "true" => ThinkParam::Bool(true),
+            level => ThinkParam::Level(level.to_string()),
         });
 
         // 4. Build tools + options
@@ -221,7 +233,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     .flatten()
                     .and_then(|json| serde_json::from_str::<ChatOptions>(&json).ok())
                     .unwrap_or_default()
-            }).await.unwrap_or_default();
+            })
+            .await
+            .unwrap_or_default();
 
             let mut final_options = if let Some(custom) = chat_options {
                 custom.merge_with_fallback(&global_options)
@@ -231,11 +245,13 @@ impl<'a, R: Runtime> ChatService<'a, R> {
 
             if web_search_enabled {
                 final_options.temperature = Some(0.2); // Lower temp for search accuracy
-                final_options.top_p = Some(0.1);      // Narrower focus for search
+                final_options.top_p = Some(0.1); // Narrower focus for search
             }
 
             // Fallback for critical missing fields
-            if final_options.temperature.is_none() { final_options.temperature = Some(0.8); }
+            if final_options.temperature.is_none() {
+                final_options.temperature = Some(0.8);
+            }
 
             Some(final_options)
         };
@@ -265,10 +281,13 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         .await
         .map_err(|_| {
             log::error!("Agent loop timed out for conversation {}", conversation_id);
-            let _ = self.app.emit("chat:error", serde_json::json!({
-                "conversation_id": conversation_id,
-                "error": "Request timed out after 5 minutes"
-            }));
+            let _ = self.app.emit(
+                "chat:error",
+                serde_json::json!({
+                    "conversation_id": conversation_id,
+                    "error": "Request timed out after 5 minutes"
+                }),
+            );
             AppError::Internal("Agent loop timed out after 300s".into())
         })??;
 
@@ -279,26 +298,30 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             let m = result.metrics;
             let final_content = result.content;
             tokio::task::spawn_blocking(move || {
-                let conn = db.lock().map_err(|_| AppError::Db("DB lock poisoned".into()))?;
-                messages::create(&conn, messages::NewMessage {
-                    conversation_id: conv_id,
-                    role: messages::MessageRole::Assistant,
-                    content: final_content,
-                    images_json: None,
-                    files_json: None,
-                    tokens_used: m.tokens_used,
-                    generation_time_ms: m.generation_time_ms,
-                    prompt_tokens: m.prompt_tokens,
-                    tokens_per_sec: m.tokens_per_sec,
-                    total_duration_ms: m.total_duration_ms,
-                    load_duration_ms: m.load_duration_ms,
-                    prompt_eval_duration_ms: m.prompt_eval_duration_ms,
-                    eval_duration_ms: m.eval_duration_ms,
-                })
+                let conn = db
+                    .lock()
+                    .map_err(|_| AppError::Db("DB lock poisoned".into()))?;
+                messages::create(
+                    &conn,
+                    messages::NewMessage {
+                        conversation_id: conv_id,
+                        role: messages::MessageRole::Assistant,
+                        content: final_content,
+                        images_json: None,
+                        files_json: None,
+                        tokens_used: m.tokens_used,
+                        generation_time_ms: m.generation_time_ms,
+                        prompt_tokens: m.prompt_tokens,
+                        tokens_per_sec: m.tokens_per_sec,
+                        total_duration_ms: m.total_duration_ms,
+                        load_duration_ms: m.load_duration_ms,
+                        prompt_eval_duration_ms: m.prompt_eval_duration_ms,
+                        eval_duration_ms: m.eval_duration_ms,
+                    },
+                )
             })
             .await
-            .map_err(|e| AppError::Internal(format!("DB task panicked: {e}")))?
-            ?;
+            .map_err(|e| AppError::Internal(format!("DB task panicked: {e}")))??;
         }
 
         Ok(())
@@ -337,17 +360,25 @@ impl<'a, R: Runtime> ChatService<'a, R> {
     /// as the system prompt, and copy the last 4 messages across.
     /// Returns the new conversation ID.
     pub async fn compact(&self, params: CompactParams) -> Result<String, AppError> {
-        let CompactParams { conversation_id, model, title } = params;
+        let CompactParams {
+            conversation_id,
+            model,
+            title,
+        } = params;
 
         if conversation_id.is_empty() {
-            return Err(AppError::Internal("conversation_id must not be empty".into()));
+            return Err(AppError::Internal(
+                "conversation_id must not be empty".into(),
+            ));
         }
 
         // 1. Load full conversation history and source title from DB
         let db = self.state.db.clone();
         let conv_id = conversation_id.clone();
         let (history, conv_title) = tokio::task::spawn_blocking(move || {
-            let conn = db.lock().map_err(|_| AppError::Db("DB lock poisoned".into()))?;
+            let conn = db
+                .lock()
+                .map_err(|_| AppError::Db("DB lock poisoned".into()))?;
             let msgs = messages::list_for_conversation(&conn, &conv_id)?;
             let conv = conversations::get_by_id(&conn, &conv_id)?;
             Ok::<_, AppError>((msgs, conv.title))
@@ -357,7 +388,12 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         // 2. Build summarization prompt from user+assistant turns only
         let dialogue: String = history
             .iter()
-            .filter(|m| matches!(m.role, messages::MessageRole::User | messages::MessageRole::Assistant))
+            .filter(|m| {
+                matches!(
+                    m.role,
+                    messages::MessageRole::User | messages::MessageRole::Assistant
+                )
+            })
             .map(|m| format!("{}: {}", m.role.as_str().to_uppercase(), m.content))
             .collect::<Vec<_>>()
             .join("\n\n");
@@ -377,7 +413,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         );
 
         // 3. Call Ollama non-streaming for summary
-        let client = OllamaClient::from_state(self.state.http_client.clone(), self.state.db.clone()).await?;
+        let client =
+            OllamaClient::from_state(self.state.http_client.clone(), self.state.db.clone()).await?;
         let req = ChatRequest {
             model: model.clone(),
             messages: vec![Message {
@@ -391,7 +428,10 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             stream: false,
             think: None,
             tools: None,
-            options: Some(ChatOptions { temperature: Some(0.3), ..Default::default() }),
+            options: Some(ChatOptions {
+                temperature: Some(0.3),
+                ..Default::default()
+            }),
         };
 
         let resp = client
@@ -402,10 +442,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             .map_err(|e| AppError::Http(e.to_string()))?;
 
         if !resp.status().is_success() {
-            return Err(AppError::Http(format!(
-                "Ollama returned {}",
-                resp.status()
-            )));
+            return Err(AppError::Http(format!("Ollama returned {}", resp.status())));
         }
 
         let chat_resp = resp
@@ -422,7 +459,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let new_title = title.unwrap_or_else(|| format!("Compact: {}", conv_title));
         let db_create = self.state.db.clone();
         let new_conv = tokio::task::spawn_blocking(move || {
-            let conn = db_create.lock().map_err(|_| AppError::Db("DB lock poisoned".into()))?;
+            let conn = db_create
+                .lock()
+                .map_err(|_| AppError::Db("DB lock poisoned".into()))?;
             conversations::create(
                 &conn,
                 conversations::NewConversation {
@@ -443,7 +482,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             {summary}\n\nContinue from this context."
         );
         tokio::task::spawn_blocking(move || {
-            let conn = db_system_prompt.lock().map_err(|_| AppError::Db("DB lock poisoned".into()))?;
+            let conn = db_system_prompt
+                .lock()
+                .map_err(|_| AppError::Db("DB lock poisoned".into()))?;
             conversations::update_system_prompt(&conn, &new_conv_id, &system_content)
         })
         .await??;
@@ -451,7 +492,12 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         // 6. Copy last 4 user+assistant messages from the old conversation
         let tail: Vec<_> = history
             .iter()
-            .filter(|m| matches!(m.role, messages::MessageRole::User | messages::MessageRole::Assistant))
+            .filter(|m| {
+                matches!(
+                    m.role,
+                    messages::MessageRole::User | messages::MessageRole::Assistant
+                )
+            })
             .rev()
             .take(4)
             .collect::<Vec<_>>()
@@ -463,7 +509,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let db_copy_msgs = self.state.db.clone();
         let new_conv_id_for_msgs = new_conv.id.clone();
         tokio::task::spawn_blocking(move || {
-            let conn = db_copy_msgs.lock().map_err(|_| AppError::Db("DB lock poisoned".into()))?;
+            let conn = db_copy_msgs
+                .lock()
+                .map_err(|_| AppError::Db("DB lock poisoned".into()))?;
             for msg in tail {
                 messages::create(
                     &conn,
@@ -495,6 +543,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
 
     /// Like `orchestrate_stream`, but passes `original_user_content` into tool call handling
     /// so the LLM is steered to answer the user's original question after a web search.
+    #[allow(clippy::too_many_arguments)] // all params are distinct concerns; a struct would obscure call sites
     async fn orchestrate_stream_with_context(
         &self,
         conversation_id: String,
@@ -505,12 +554,18 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         options: Option<ChatOptions>,
         original_user_content: Option<&str>,
     ) -> Result<OrchestrationResult, AppError> {
-        let client = OllamaClient::from_state(self.state.http_client.clone(), self.state.db.clone()).await?;
+        let client =
+            OllamaClient::from_state(self.state.http_client.clone(), self.state.db.clone()).await?;
         let search_service = WebSearchService::new(self.app.clone(), self.state.db.clone());
 
         // Setup cancellation token
         let (cancel_tx, _cancel_keep_alive) = tokio::sync::broadcast::channel(1);
-        *self.state.cancel_tx.lock().map_err(|_| AppError::Internal("Cancel lock poisoned".into()))? = Some(cancel_tx.clone());
+        *self
+            .state
+            .cancel_tx
+            .lock()
+            .map_err(|_| AppError::Internal("Cancel lock poisoned".into()))? =
+            Some(cancel_tx.clone());
 
         let mut current_messages = initial_messages;
         let mut final_content = String::new();
@@ -534,18 +589,26 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             };
 
             let cancel_rx = cancel_tx.subscribe();
-            let result = match streaming::stream_chat(&self.app, &client, req, &conversation_id, cancel_rx).await {
-                Ok(r) => r,
-                Err(e) => {
-                    let err_msg = e.to_string();
-                    crate::system::notifications::notify_generation_failed(&self.app, &err_msg, &conversation_id);
-                    return Err(e);
-                }
-            };
+            let result =
+                match streaming::stream_chat(&self.app, &client, req, &conversation_id, cancel_rx)
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        let err_msg = e.to_string();
+                        crate::system::notifications::notify_generation_failed(
+                            &self.app,
+                            &err_msg,
+                            &conversation_id,
+                        );
+                        return Err(e);
+                    }
+                };
 
             // Aggregate results
             final_content.push_str(&result.content);
-            metrics.tokens_used = Some(metrics.tokens_used.unwrap_or(0) + result.tokens_used.unwrap_or(0));
+            metrics.tokens_used =
+                Some(metrics.tokens_used.unwrap_or(0) + result.tokens_used.unwrap_or(0));
 
             if let Some(t) = result.generation_time_ms {
                 metrics.generation_time_ms = Some(metrics.generation_time_ms.unwrap_or(0) + t);
@@ -565,7 +628,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 metrics.load_duration_ms = Some(metrics.load_duration_ms.unwrap_or(0) + ld);
             }
             if let Some(ped) = result.prompt_eval_duration_ms {
-                metrics.prompt_eval_duration_ms = Some(metrics.prompt_eval_duration_ms.unwrap_or(0) + ped);
+                metrics.prompt_eval_duration_ms =
+                    Some(metrics.prompt_eval_duration_ms.unwrap_or(0) + ped);
             }
             if let Some(ed) = result.eval_duration_ms {
                 metrics.eval_duration_ms = Some(metrics.eval_duration_ms.unwrap_or(0) + ed);
@@ -585,19 +649,39 @@ impl<'a, R: Runtime> ChatService<'a, R> {
 
                 let (mut tool_responses, any_succeeded, tool_results) =
                     if let Some(user_content) = original_user_content {
-                        search_service.handle_tool_calls_with_context(&conversation_id, tool_calls, &client, user_content).await?
+                        search_service
+                            .handle_tool_calls_with_context(
+                                &conversation_id,
+                                tool_calls,
+                                &client,
+                                user_content,
+                            )
+                            .await?
                     } else {
-                        search_service.handle_tool_calls(&conversation_id, tool_calls, &client).await?
+                        search_service
+                            .handle_tool_calls(&conversation_id, tool_calls, &client)
+                            .await?
                     };
 
                 for (tc, result_text) in tool_results {
-                    let query = tc.function.arguments.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                    final_content.push_str(&format!("\n<tool_call name=\"{}\" query=\"{}\">{}</tool_call>\n", tc.function.name, query, result_text));
+                    let query = tc
+                        .function
+                        .arguments
+                        .get("query")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    final_content.push_str(&format!(
+                        "\n<tool_call name=\"{}\" query=\"{}\">{}</tool_call>\n",
+                        tc.function.name, query, result_text
+                    ));
                 }
 
                 // If every tool call in this iteration failed, break immediately
                 if !any_succeeded && !tool_responses.is_empty() {
-                    log::warn!("All tool calls failed in agent iteration {}; aborting loop", iteration);
+                    log::warn!(
+                        "All tool calls failed in agent iteration {}; aborting loop",
+                        iteration
+                    );
                     break;
                 }
 
@@ -615,19 +699,26 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         }
 
         // Emit final done event after all agent turns are complete
-        let _ = self.app.emit("chat:done", json!({
-            "conversation_id": conversation_id,
-            "total_tokens": metrics.tokens_used,
-            "duration_ms": metrics.generation_time_ms,
-            "prompt_tokens": metrics.prompt_tokens,
-            "tokens_per_sec": metrics.tokens_per_sec,
-            "total_duration_ms": metrics.total_duration_ms,
-            "load_duration_ms": metrics.load_duration_ms,
-            "prompt_eval_duration_ms": metrics.prompt_eval_duration_ms,
-            "eval_duration_ms": metrics.eval_duration_ms,
-        }));
-        
-        crate::system::notifications::notify_generation_complete(&self.app, &model, &conversation_id);
+        let _ = self.app.emit(
+            "chat:done",
+            json!({
+                "conversation_id": conversation_id,
+                "total_tokens": metrics.tokens_used,
+                "duration_ms": metrics.generation_time_ms,
+                "prompt_tokens": metrics.prompt_tokens,
+                "tokens_per_sec": metrics.tokens_per_sec,
+                "total_duration_ms": metrics.total_duration_ms,
+                "load_duration_ms": metrics.load_duration_ms,
+                "prompt_eval_duration_ms": metrics.prompt_eval_duration_ms,
+                "eval_duration_ms": metrics.eval_duration_ms,
+            }),
+        );
+
+        crate::system::notifications::notify_generation_complete(
+            &self.app,
+            &model,
+            &conversation_id,
+        );
 
         Ok(OrchestrationResult {
             content: final_content,
@@ -665,8 +756,10 @@ mod tests {
             model: "llama3".to_string(),
             title: None,
         };
-        assert!(params.conversation_id.is_empty(),
-            "empty conversation_id should be caught by compact()");
+        assert!(
+            params.conversation_id.is_empty(),
+            "empty conversation_id should be caught by compact()"
+        );
     }
 
     #[test]
@@ -674,7 +767,10 @@ mod tests {
         let global = crate::ollama::types::ChatOptions::default();
         let custom = crate::ollama::types::ChatOptions::default();
         let merged = custom.merge_with_fallback(&global);
-        assert!(merged.num_ctx.is_none(), "num_ctx must not be forced when neither side sets it");
+        assert!(
+            merged.num_ctx.is_none(),
+            "num_ctx must not be forced when neither side sets it"
+        );
     }
 
     #[test]
@@ -704,7 +800,16 @@ mod tests {
         super::apply_sliding_window(&mut messages, budget);
 
         assert_eq!(messages[0].role, "system", "system message always kept");
-        assert_eq!(messages.len(), 3, "expected 1 system + 2 history messages after trim, got {}", messages.len());
-        assert_eq!(messages.last().unwrap().content, "x".repeat(400), "most recent kept");
+        assert_eq!(
+            messages.len(),
+            3,
+            "expected 1 system + 2 history messages after trim, got {}",
+            messages.len()
+        );
+        assert_eq!(
+            messages.last().unwrap().content,
+            "x".repeat(400),
+            "most recent kept"
+        );
     }
 }

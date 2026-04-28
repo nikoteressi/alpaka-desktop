@@ -1,19 +1,19 @@
+use crate::db;
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_notification::NotificationExt;
-use crate::db;
 
 /// Generic helper to send notifications with optional focus check.
 pub fn send_notification<R: Runtime>(
-    app: &AppHandle<R>, 
-    title: &str, 
-    body: &str, 
-    relevant_conversation_id: Option<&str>
+    app: &AppHandle<R>,
+    title: &str,
+    body: &str,
+    relevant_conversation_id: Option<&str>,
 ) {
     let state = match app.try_state::<crate::state::AppState>() {
         Some(s) => s,
         None => return,
     };
-    
+
     // 1. Check if notifications are enabled in settings
     let enabled = {
         let db_conn = state.db.clone();
@@ -21,7 +21,7 @@ pub fn send_notification<R: Runtime>(
             Ok(c) => c,
             Err(_) => return,
         };
-        
+
         match db::settings::get(&conn, "notificationsEnabled") {
             Ok(Some(val)) => val == "true" || val == "\"true\"",
             _ => true,
@@ -47,7 +47,10 @@ pub fn send_notification<R: Runtime>(
             };
 
             if should_skip {
-                log::debug!("Skipping notification '{}' because user is already looking at it", title);
+                log::debug!(
+                    "Skipping notification '{}' because user is already looking at it",
+                    title
+                );
                 return;
             }
         }
@@ -55,7 +58,8 @@ pub fn send_notification<R: Runtime>(
 
     // 3. Show notification
     log::debug!("Triggering OS notification: {} - {}", title, body);
-    let _ = app.notification()
+    let _ = app
+        .notification()
         .builder()
         .title(title)
         .body(body)
@@ -64,48 +68,81 @@ pub fn send_notification<R: Runtime>(
 }
 
 pub fn notify_model_pulled<R: Runtime>(app: &AppHandle<R>, name: &str) {
-    send_notification(app, "Model Downloaded", &format!("Model '{}' is ready to use.", name), None);
+    send_notification(
+        app,
+        "Model Downloaded",
+        &format!("Model '{}' is ready to use.", name),
+        None,
+    );
 }
 
 pub fn notify_model_pull_failed<R: Runtime>(app: &AppHandle<R>, name: &str, error: &str) {
-    send_notification(app, "Download Failed", &format!("Failed to download '{}': {}", name, error), None);
+    send_notification(
+        app,
+        "Download Failed",
+        &format!("Failed to download '{}': {}", name, error),
+        None,
+    );
 }
 
 pub fn notify_host_offline<R: Runtime>(app: &AppHandle<R>, name: &str) {
-    send_notification(app, "Host Offline", &format!("Host '{}' is currently unreachable.", name), None);
+    send_notification(
+        app,
+        "Host Offline",
+        &format!("Host '{}' is currently unreachable.", name),
+        None,
+    );
 }
 
 pub fn notify_backup_success<R: Runtime>(app: &AppHandle<R>, path: &str) {
     send_notification(
-        app, 
-        "Backup Success", 
-        &format!("Database backup saved to {}", path), 
-        None
+        app,
+        "Backup Success",
+        &format!("Database backup saved to {}", path),
+        None,
     );
 }
 
 pub fn notify_restore_success<R: Runtime>(app: &AppHandle<R>) {
     send_notification(
-        app, 
-        "Database Restored", 
-        "Chat history and settings have been successfully restored.", 
-        None
+        app,
+        "Database Restored",
+        "Chat history and settings have been successfully restored.",
+        None,
     );
 }
 
 pub fn notify_db_operation_failed<R: Runtime>(app: &AppHandle<R>, operation: &str, error: &str) {
     send_notification(
-        app, 
-        "Database Error", 
-        &format!("Failed to {}: {}", operation, error), 
-        None
+        app,
+        "Database Error",
+        &format!("Failed to {}: {}", operation, error),
+        None,
     );
 }
 
-pub fn notify_generation_complete<R: Runtime>(app: &AppHandle<R>, model_name: &str, conversation_id: &str) {
-    send_notification(app, "Generation Complete", &format!("Model '{}' has finished the response.", model_name), Some(conversation_id));
+pub fn notify_generation_complete<R: Runtime>(
+    app: &AppHandle<R>,
+    model_name: &str,
+    conversation_id: &str,
+) {
+    send_notification(
+        app,
+        "Generation Complete",
+        &format!("Model '{}' has finished the response.", model_name),
+        Some(conversation_id),
+    );
 }
 
-pub fn notify_generation_failed<R: Runtime>(app: &AppHandle<R>, error: &str, conversation_id: &str) {
-    send_notification(app, "Generation Failed", &format!("Error: {}", error), Some(conversation_id));
+pub fn notify_generation_failed<R: Runtime>(
+    app: &AppHandle<R>,
+    error: &str,
+    conversation_id: &str,
+) {
+    send_notification(
+        app,
+        "Generation Failed",
+        &format!("Error: {}", error),
+        Some(conversation_id),
+    );
 }

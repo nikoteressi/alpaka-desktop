@@ -1,13 +1,13 @@
+use alpaka_desktop_lib::db;
+use alpaka_desktop_lib::db::folders::{
+    add_folder_context, delete_folder_context, get_by_conversation, update_folder_context,
+    NewFolderContext,
+};
+use rusqlite::Connection;
 /// Integration tests for the folders command module and db/folders.rs layer.
 use std::fs;
 use std::io::Write;
 use tempfile::tempdir;
-use rusqlite::Connection;
-use alpaka_desktop_lib::db;
-use alpaka_desktop_lib::db::folders::{
-    NewFolderContext, add_folder_context, get_by_conversation,
-    update_folder_context, delete_folder_context,
-};
 
 // ── DB layer helpers ───────────────────────────────────────────────────────────
 
@@ -39,13 +39,16 @@ fn test_update_folder_context_changes_files_and_tokens() {
     let conn = in_memory_db();
     seed_conversation(&conn, "conv-upd-1");
 
-    let ctx = add_folder_context(&conn, NewFolderContext {
-        conversation_id: "conv-upd-1".into(),
-        path: "/tmp/test-project".into(),
-        included_files_json: None,
-        auto_refresh: false,
-        estimated_tokens: 100,
-    })
+    let ctx = add_folder_context(
+        &conn,
+        NewFolderContext {
+            conversation_id: "conv-upd-1".into(),
+            path: "/tmp/test-project".into(),
+            included_files_json: None,
+            auto_refresh: false,
+            estimated_tokens: 100,
+        },
+    )
     .unwrap();
 
     let new_files = Some("[\"src/main.rs\",\"Cargo.toml\"]".to_string());
@@ -53,11 +56,13 @@ fn test_update_folder_context_changes_files_and_tokens() {
 
     let updated = db::folders::get_folder_context(&conn, &ctx.id).unwrap();
     assert_eq!(
-        updated.included_files_json,
-        new_files,
+        updated.included_files_json, new_files,
         "included_files_json should have been updated"
     );
-    assert_eq!(updated.estimated_tokens, 500, "estimated_tokens should have been updated");
+    assert_eq!(
+        updated.estimated_tokens, 500,
+        "estimated_tokens should have been updated"
+    );
 }
 
 #[test]
@@ -80,19 +85,25 @@ fn test_delete_folder_context_removes_record() {
     let conn = in_memory_db();
     seed_conversation(&conn, "conv-del-1");
 
-    let ctx = add_folder_context(&conn, NewFolderContext {
-        conversation_id: "conv-del-1".into(),
-        path: "/tmp/delete-me".into(),
-        included_files_json: None,
-        auto_refresh: false,
-        estimated_tokens: 10,
-    })
+    let ctx = add_folder_context(
+        &conn,
+        NewFolderContext {
+            conversation_id: "conv-del-1".into(),
+            path: "/tmp/delete-me".into(),
+            included_files_json: None,
+            auto_refresh: false,
+            estimated_tokens: 10,
+        },
+    )
     .unwrap();
 
     delete_folder_context(&conn, &ctx.id).unwrap();
 
     let remaining = get_by_conversation(&conn, "conv-del-1").unwrap();
-    assert!(remaining.is_empty(), "Expected no folder contexts after deletion");
+    assert!(
+        remaining.is_empty(),
+        "Expected no folder contexts after deletion"
+    );
 }
 
 #[test]
@@ -100,7 +111,10 @@ fn test_delete_folder_context_not_found() {
     let conn = in_memory_db();
 
     let result = delete_folder_context(&conn, "no-such-id");
-    assert!(result.is_err(), "Should error when deleting a non-existent context");
+    assert!(
+        result.is_err(),
+        "Should error when deleting a non-existent context"
+    );
 }
 
 #[test]
@@ -108,22 +122,28 @@ fn test_delete_only_removes_targeted_context() {
     let conn = in_memory_db();
     seed_conversation(&conn, "conv-del-2");
 
-    let ctx1 = add_folder_context(&conn, NewFolderContext {
-        conversation_id: "conv-del-2".into(),
-        path: "/tmp/folder-a".into(),
-        included_files_json: None,
-        auto_refresh: false,
-        estimated_tokens: 10,
-    })
+    let ctx1 = add_folder_context(
+        &conn,
+        NewFolderContext {
+            conversation_id: "conv-del-2".into(),
+            path: "/tmp/folder-a".into(),
+            included_files_json: None,
+            auto_refresh: false,
+            estimated_tokens: 10,
+        },
+    )
     .unwrap();
 
-    let ctx2 = add_folder_context(&conn, NewFolderContext {
-        conversation_id: "conv-del-2".into(),
-        path: "/tmp/folder-b".into(),
-        included_files_json: None,
-        auto_refresh: false,
-        estimated_tokens: 20,
-    })
+    let ctx2 = add_folder_context(
+        &conn,
+        NewFolderContext {
+            conversation_id: "conv-del-2".into(),
+            path: "/tmp/folder-b".into(),
+            included_files_json: None,
+            auto_refresh: false,
+            estimated_tokens: 20,
+        },
+    )
     .unwrap();
 
     delete_folder_context(&conn, &ctx1.id).unwrap();
@@ -183,7 +203,11 @@ async fn test_list_folder_files_empty_directory() {
         .await
         .unwrap();
 
-    assert!(files.is_empty(), "Expected empty list for empty directory, got: {:?}", files);
+    assert!(
+        files.is_empty(),
+        "Expected empty list for empty directory, got: {:?}",
+        files
+    );
 }
 
 // ── Command layer: estimate_tokens ────────────────────────────────────────────
@@ -205,7 +229,10 @@ async fn test_estimate_tokens_whole_folder() {
     // The formula is total_chars / 4; chars per file wrapped in header:
     // "\n--- File: content.txt ---\n{400 chars}\n" = 400 + some overhead
     // We just verify it's non-zero and proportional.
-    assert!(tokens > 0, "Token estimate should be > 0 for non-empty file");
+    assert!(
+        tokens > 0,
+        "Token estimate should be > 0 for non-empty file"
+    );
 }
 
 #[tokio::test]
@@ -281,13 +308,16 @@ fn test_update_folder_context_roundtrip_with_real_conversation() {
     .unwrap();
 
     // Add a folder context
-    let ctx = add_folder_context(&conn, NewFolderContext {
-        conversation_id: conv.id.clone(),
-        path: "/home/user/project".into(),
-        included_files_json: Some("[\"README.md\"]".into()),
-        auto_refresh: true,
-        estimated_tokens: 200,
-    })
+    let ctx = add_folder_context(
+        &conn,
+        NewFolderContext {
+            conversation_id: conv.id.clone(),
+            path: "/home/user/project".into(),
+            included_files_json: Some("[\"README.md\"]".into()),
+            auto_refresh: true,
+            estimated_tokens: 200,
+        },
+    )
     .unwrap();
 
     assert_eq!(ctx.conversation_id, conv.id);
@@ -308,7 +338,11 @@ fn test_update_folder_context_roundtrip_with_real_conversation() {
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].estimated_tokens, 350);
     assert!(
-        list[0].included_files_json.as_deref().unwrap_or("").contains("src/main.rs"),
+        list[0]
+            .included_files_json
+            .as_deref()
+            .unwrap_or("")
+            .contains("src/main.rs"),
         "included_files_json should contain src/main.rs"
     );
 }

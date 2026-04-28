@@ -1,10 +1,10 @@
-use tauri::{AppHandle, Runtime, Emitter};
-use serde_json::json;
-use crate::error::AppError;
-use crate::ollama::search;
-use crate::ollama::types::{ToolCall, Message};
-use crate::ollama::client::OllamaClient;
 use crate::db::DbConn;
+use crate::error::AppError;
+use crate::ollama::client::OllamaClient;
+use crate::ollama::search;
+use crate::ollama::types::{Message, ToolCall};
+use serde_json::json;
+use tauri::{AppHandle, Emitter, Runtime};
 
 /// A service for handling web search tool calls.
 pub struct WebSearchService<R: Runtime> {
@@ -27,7 +27,8 @@ impl<R: Runtime> WebSearchService<R> {
         tool_calls: Vec<ToolCall>,
         client: &OllamaClient,
     ) -> Result<(Vec<Message>, bool, Vec<(ToolCall, String)>), AppError> {
-        self.handle_tool_calls_inner(conversation_id, tool_calls, client, None).await
+        self.handle_tool_calls_inner(conversation_id, tool_calls, client, None)
+            .await
     }
 
     /// Like `handle_tool_calls`, but also injects the original user question into the
@@ -39,7 +40,13 @@ impl<R: Runtime> WebSearchService<R> {
         client: &OllamaClient,
         original_user_content: &str,
     ) -> Result<(Vec<Message>, bool, Vec<(ToolCall, String)>), AppError> {
-        self.handle_tool_calls_inner(conversation_id, tool_calls, client, Some(original_user_content)).await
+        self.handle_tool_calls_inner(
+            conversation_id,
+            tool_calls,
+            client,
+            Some(original_user_content),
+        )
+        .await
     }
 
     async fn handle_tool_calls_inner(
@@ -55,31 +62,43 @@ impl<R: Runtime> WebSearchService<R> {
 
         for tc in tool_calls {
             if tc.function.name == "web_search" {
-                let query = tc.function.arguments.get("query").and_then(|v| v.as_str()).unwrap_or("");
+                let query = tc
+                    .function
+                    .arguments
+                    .get("query")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
 
                 // Notify frontend that we are about to call a tool
-                let _ = self.app.emit("chat:tool-call", json!({
-                    "conversation_id": conversation_id,
-                    "tool_name": "web_search",
-                    "query": query,
-                }));
+                let _ = self.app.emit(
+                    "chat:tool-call",
+                    json!({
+                        "conversation_id": conversation_id,
+                        "tool_name": "web_search",
+                        "query": query,
+                    }),
+                );
 
-                let search_result_text = match search::execute_web_search(query, &client.http, &self.db).await {
-                    Ok(data) => {
-                        any_tool_succeeded = true;
-                        data
-                    }
-                    // Wrap error in JSON to avoid malformed output if error contains quotes
-                    Err(e) => json!({"error": e.to_string()}).to_string(),
-                };
+                let search_result_text =
+                    match search::execute_web_search(query, &client.http, &self.db).await {
+                        Ok(data) => {
+                            any_tool_succeeded = true;
+                            data
+                        }
+                        // Wrap error in JSON to avoid malformed output if error contains quotes
+                        Err(e) => json!({"error": e.to_string()}).to_string(),
+                    };
 
                 // Notify frontend of the results
-                let _ = self.app.emit("chat:tool-result", json!({
-                    "conversation_id": conversation_id,
-                    "tool_name": "web_search",
-                    "query": query,
-                    "result": search_result_text,
-                }));
+                let _ = self.app.emit(
+                    "chat:tool-result",
+                    json!({
+                        "conversation_id": conversation_id,
+                        "tool_name": "web_search",
+                        "query": query,
+                        "result": search_result_text,
+                    }),
+                );
 
                 tool_results.push((tc.clone(), search_result_text.clone()));
 

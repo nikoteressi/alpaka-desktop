@@ -1,10 +1,10 @@
-pub mod service;
-pub mod models;
-pub mod library;
 pub mod auth;
-pub mod hosts;
 pub mod chat;
 pub mod folders;
+pub mod hosts;
+pub mod library;
+pub mod models;
+pub mod service;
 pub mod settings;
-pub mod system_info;
 pub mod system;
+pub mod system_info;

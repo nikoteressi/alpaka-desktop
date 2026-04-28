@@ -1,7 +1,7 @@
 use crate::error::AppError;
+use crate::ollama::client::OllamaClient;
 use crate::ollama::types::{ChatRequest, StreamResponse};
 use futures_util::StreamExt;
-use crate::ollama::client::OllamaClient;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Runtime};
 use tokio::sync::broadcast;
@@ -47,25 +47,31 @@ async fn stream_once<R: Runtime>(
     conversation_id: &str,
     cancel_rx: &mut broadcast::Receiver<()>,
 ) -> Result<StreamResult, AppError> {
-    let response = client.post("/api/chat")
-        .json(&request)
-        .send()
-        .await?;
+    let response = client.post("/api/chat").json(&request).send().await?;
 
     if !response.status().is_success() {
         let status = response.status();
-        let body = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Unknown error".to_string());
         let err_msg = if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
-            val.get("error").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or(format!("Error {}", status))
+            val.get("error")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .unwrap_or(format!("Error {}", status))
         } else {
             format!("Error {}: {}", status, body)
         };
-        
+
         log::error!("Ollama API returned error: {}", err_msg);
-        let _ = app.emit("chat:error", json!({
-            "conversation_id": conversation_id,
-            "error": err_msg
-        }));
+        let _ = app.emit(
+            "chat:error",
+            json!({
+                "conversation_id": conversation_id,
+                "error": err_msg
+            }),
+        );
         return Err(AppError::Http(err_msg));
     }
 
@@ -76,7 +82,6 @@ async fn stream_once<R: Runtime>(
     let mut thinking_assembled = String::new();
     let mut think_start: Option<std::time::Instant> = None;
     let mut collected_tool_calls: Vec<crate::ollama::types::ToolCall> = Vec::new();
-    
 
     loop {
         tokio::select! {
@@ -196,7 +201,7 @@ async fn stream_once<R: Runtime>(
                                                 let duration_ms = think_start.take()
                                                     .map(|s| s.elapsed().as_millis() as u64)
                                                     .unwrap_or(0);
-                                                
+
                                                 let time_secs = (duration_ms as f64) / 1000.0;
                                                 assembled = assembled.replacen("<think>", &format!("<think time={:.1}>", time_secs), 1);
                                                 assembled.push_str("</think>\n\n");
@@ -307,7 +312,11 @@ async fn stream_once<R: Runtime>(
 
     Ok(StreamResult {
         content: assembled,
-        thinking: if thinking_assembled.is_empty() { None } else { Some(thinking_assembled) },
+        thinking: if thinking_assembled.is_empty() {
+            None
+        } else {
+            Some(thinking_assembled)
+        },
         tokens_used: None,
         generation_time_ms: None,
         prompt_tokens: None,

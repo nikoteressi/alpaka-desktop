@@ -1,4 +1,4 @@
-export type ColorTheme = 'light' | 'dark' | 'system';
+export type ColorTheme = "light" | "dark" | "system";
 
 export interface ChatOptions {
   temperature?: number;
@@ -16,7 +16,7 @@ export interface SettingsState {
   sidebarCollapsed: boolean;
   fontSize: number;
   compactMode: boolean;
-  chatOptions: Required<Omit<ChatOptions, 'seed' | 'stop'>> & ChatOptions;
+  chatOptions: Required<Omit<ChatOptions, "seed" | "stop">> & ChatOptions;
   cloud: boolean;
   autoUpdate: boolean;
   exposeNetwork: boolean;

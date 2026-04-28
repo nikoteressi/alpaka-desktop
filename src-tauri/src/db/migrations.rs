@@ -12,13 +12,11 @@ struct Migration {
 
 /// All migrations in ascending version order.
 /// Add a new `Migration` entry here for every future schema change.
-const MIGRATIONS: &[Migration] = &[
-    Migration {
-        version: 1,
-        description: "v1.0.0 baseline schema",
-        sql: include_str!("sql/001_init_v1.sql"),
-    },
-];
+const MIGRATIONS: &[Migration] = &[Migration {
+    version: 1,
+    description: "v1.0.0 baseline schema",
+    sql: include_str!("sql/001_init_v1.sql"),
+}];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────
 

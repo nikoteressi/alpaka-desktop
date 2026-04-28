@@ -1,15 +1,15 @@
-import { invoke } from '@tauri-apps/api/core'
-import { useChatStore } from '../stores/chat'
-import { useDraftManager } from './useDraftManager'
-import { useConversationLifecycle } from './useConversationLifecycle'
-import type { ChatOptions } from '../types/settings'
+import { invoke } from "@tauri-apps/api/core";
+import { useChatStore } from "../stores/chat";
+import { useDraftManager } from "./useDraftManager";
+import { useConversationLifecycle } from "./useConversationLifecycle";
+import type { ChatOptions } from "../types/settings";
 
-const DRAFT_ID_PREFIX = '__draft__'
+const DRAFT_ID_PREFIX = "__draft__";
 
 export function useSendMessage() {
-  const store = useChatStore()
-  const { persistDraft, clearDraft } = useDraftManager()
-  const { updateTitle } = useConversationLifecycle()
+  const store = useChatStore();
+  const { persistDraft, clearDraft } = useDraftManager();
+  const { updateTitle } = useConversationLifecycle();
 
   async function sendMessage(
     content: string,
@@ -19,61 +19,65 @@ export function useSendMessage() {
     chatOptions?: ChatOptions,
   ) {
     // If we're in a draft conversation, persist it first
-    if (store.draftConversation && store.activeConversationId?.startsWith(DRAFT_ID_PREFIX)) {
-      await persistDraft()
+    if (
+      store.draftConversation &&
+      store.activeConversationId?.startsWith(DRAFT_ID_PREFIX)
+    ) {
+      await persistDraft();
     }
 
     if (!store.activeConversationId) {
-      throw new Error('No active conversation')
+      throw new Error("No active conversation");
     }
 
-    const conversationId = store.activeConversationId
+    const conversationId = store.activeConversationId;
 
     // Fire-and-forget — must not await here or it blocks optimistic UI update
     // (clearDraft internally calls invoke which may be slow)
-    void clearDraft(conversationId)
+    void clearDraft(conversationId);
 
     store.streaming = {
       isStreaming: true,
       currentConversationId: conversationId,
-      buffer: '',
-      thinkingBuffer: '',
+      buffer: "",
+      thinkingBuffer: "",
       isThinking: false,
       tokensPerSec: null,
       thinkTime: null,
       toolCalls: [],
       promptTokens: store.totalActiveTokens,
       evalTokens: 0,
-    }
+    };
 
     // Snapshot message state before push — used for rollback on invoke failure
-    const messagesBefore = [...(store.messages[conversationId] ?? [])]
+    const messagesBefore = [...(store.messages[conversationId] ?? [])];
 
     store.messages[conversationId].push({
-      role: 'user',
+      role: "user",
       content,
       images: images ?? [],
-    })
+    });
 
     // Auto-rename "New Chat" based on the first message snippet
-    const currentTitle = store.activeConversation?.title || ''
+    const currentTitle = store.activeConversation?.title || "";
     if (
-      currentTitle.trim().toLowerCase() === 'new chat' &&
+      currentTitle.trim().toLowerCase() === "new chat" &&
       store.messages[conversationId].length === 1
     ) {
-      const snippet = content.trim().split('\n')[0].substring(0, 200).trim()
+      const snippet = content.trim().split("\n")[0].substring(0, 200).trim();
       if (snippet) {
-        updateTitle(conversationId, snippet).catch(() => {})
+        updateTitle(conversationId, snippet).catch(() => {});
       }
     }
 
     try {
-      const contexts = store.folderContexts[conversationId] ?? []
-      const folderContextString = contexts.length > 0
-        ? contexts.map(c => c.content).join('\n\n')
-        : null
+      const contexts = store.folderContexts[conversationId] ?? [];
+      const folderContextString =
+        contexts.length > 0
+          ? contexts.map((c) => c.content).join("\n\n")
+          : null;
 
-      await invoke('send_message', {
+      await invoke("send_message", {
         conversationId,
         content,
         images: images ?? null,
@@ -82,25 +86,25 @@ export function useSendMessage() {
         webSearchEnabled: webSearchEnabled ?? null,
         thinkMode: thinkMode ?? null,
         chatOptions: chatOptions ?? null,
-      })
+      });
     } catch (err: unknown) {
-      console.error('Failed to send message:', err)
+      console.error("Failed to send message:", err);
       // Rollback: restore messages to pre-send state to avoid polluting history
-      store.messages[conversationId] = messagesBefore
-      store.streaming.isStreaming = false
-      throw new Error(`Failed to send message: ${err}`)
+      store.messages[conversationId] = messagesBefore;
+      store.streaming.isStreaming = false;
+      throw new Error(`Failed to send message: ${err}`);
     }
   }
 
   async function stopGeneration() {
     try {
-      await invoke('stop_generation')
+      await invoke("stop_generation");
     } catch (err) {
-      console.warn('Failed to stop generation:', err)
+      console.warn("Failed to stop generation:", err);
     } finally {
-      store.streaming.isStreaming = false
+      store.streaming.isStreaming = false;
     }
   }
 
-  return { sendMessage, stopGeneration }
+  return { sendMessage, stopGeneration };
 }

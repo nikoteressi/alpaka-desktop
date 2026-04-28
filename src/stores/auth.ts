@@ -1,8 +1,8 @@
-import { defineStore } from 'pinia';
-import { invoke } from '@tauri-apps/api/core';
-import type { AuthState } from '../types/auth';
+import { defineStore } from "pinia";
+import { invoke } from "@tauri-apps/api/core";
+import type { AuthState } from "../types/auth";
 
-export const useAuthStore = defineStore('auth', {
+export const useAuthStore = defineStore("auth", {
   state: (): AuthState => ({
     user: null,
     authenticatedHosts: {},
@@ -14,17 +14,19 @@ export const useAuthStore = defineStore('auth', {
     async checkAuthStatus(hostId: string): Promise<boolean> {
       this.isCheckingStatus = true;
       try {
-        const isAuthenticated = await invoke<boolean>('get_auth_status', { hostId });
+        const isAuthenticated = await invoke<boolean>("get_auth_status", {
+          hostId,
+        });
         this.authenticatedHosts[hostId] = isAuthenticated;
-        
+
         // Update user profile based on auth status
         if (isAuthenticated) {
           // For now we use a dummy profile, but we could fetch more info here
-          this.user = { id: hostId, username: 'Local Device' };
-        } else if (Object.values(this.authenticatedHosts).every(v => !v)) {
+          this.user = { id: hostId, username: "Local Device" };
+        } else if (Object.values(this.authenticatedHosts).every((v) => !v)) {
           this.user = null;
         }
-        
+
         return isAuthenticated;
       } catch (error) {
         console.error(`Failed to check auth status for host ${hostId}:`, error);
@@ -36,24 +38,24 @@ export const useAuthStore = defineStore('auth', {
 
     async checkOllamaSignedIn(): Promise<boolean> {
       try {
-        const isSignedIn = await invoke<boolean>('check_ollama_signed_in')
-        return isSignedIn
+        const isSignedIn = await invoke<boolean>("check_ollama_signed_in");
+        return isSignedIn;
       } catch {
-        return false
+        return false;
       }
     },
 
     async login(hostId: string, token: string) {
       try {
-        await invoke('login', { hostId, token });
+        await invoke("login", { hostId, token });
         // Since backend login currently returns void, we manually trigger a status check
         await this.checkAuthStatus(hostId);
-        
+
         // Mock user profile for now if authenticated, as backend doesn't return user yet
         if (this.authenticatedHosts[hostId]) {
           this.user = {
-            id: 'local-user',
-            username: 'Ollama User',
+            id: "local-user",
+            username: "Ollama User",
           };
         }
       } catch (error) {
@@ -64,9 +66,9 @@ export const useAuthStore = defineStore('auth', {
 
     async logout(hostId: string) {
       try {
-        await invoke('logout', { hostId });
+        await invoke("logout", { hostId });
         this.authenticatedHosts[hostId] = false;
-        if (Object.values(this.authenticatedHosts).every(v => !v)) {
+        if (Object.values(this.authenticatedHosts).every((v) => !v)) {
           this.user = null;
         }
       } catch (error) {
@@ -77,21 +79,21 @@ export const useAuthStore = defineStore('auth', {
 
     // API Key management is currently placeholder until backend supports it
     async fetchApiKeys() {
-      console.warn('fetchApiKeys is not yet implemented in backend');
+      console.warn("fetchApiKeys is not yet implemented in backend");
     },
 
     async createApiKey(_name: string) {
-      console.warn('createApiKey is not yet implemented in backend');
-      throw new Error('Not implemented');
+      console.warn("createApiKey is not yet implemented in backend");
+      throw new Error("Not implemented");
     },
 
     async revokeApiKey(_id: string) {
-      console.warn('revokeApiKey is not yet implemented in backend');
-      throw new Error('Not implemented');
+      console.warn("revokeApiKey is not yet implemented in backend");
+      throw new Error("Not implemented");
     },
 
     isHostAuthenticated(hostId: string): boolean {
       return !!this.authenticatedHosts[hostId];
-    }
-  }
+    },
+  },
 });

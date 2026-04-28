@@ -1,7 +1,7 @@
+use chrono::Utc;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::Utc;
 
 use crate::error::AppError;
 
@@ -37,10 +37,13 @@ fn row_to_folder_context(row: &rusqlite::Row<'_>) -> rusqlite::Result<FolderCont
     })
 }
 
-pub fn add_folder_context(conn: &Connection, new: NewFolderContext) -> Result<FolderContext, AppError> {
+pub fn add_folder_context(
+    conn: &Connection,
+    new: NewFolderContext,
+) -> Result<FolderContext, AppError> {
     let id = Uuid::new_v4().to_string();
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    
+
     conn.execute(
         "INSERT INTO folder_contexts (id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -71,23 +74,30 @@ pub fn get_folder_context(conn: &Connection, id: &str) -> Result<FolderContext, 
     })
 }
 
-pub fn get_by_conversation(conn: &Connection, conversation_id: &str) -> Result<Vec<FolderContext>, AppError> {
+pub fn get_by_conversation(
+    conn: &Connection,
+    conversation_id: &str,
+) -> Result<Vec<FolderContext>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at 
          FROM folder_contexts WHERE conversation_id = ?1 ORDER BY created_at ASC"
     )?;
-    
+
     let rows = stmt.query_map(params![conversation_id], row_to_folder_context)?;
     rows.map(|r| r.map_err(AppError::from))
         .collect::<Result<Vec<_>, _>>()
 }
 
-pub fn get_by_conversation_and_path(conn: &Connection, conversation_id: &str, path: &str) -> Result<Option<FolderContext>, AppError> {
+pub fn get_by_conversation_and_path(
+    conn: &Connection,
+    conversation_id: &str,
+    path: &str,
+) -> Result<Option<FolderContext>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at 
          FROM folder_contexts WHERE conversation_id = ?1 AND path = ?2"
     )?;
-    
+
     let mut rows = stmt.query_map(params![conversation_id, path], row_to_folder_context)?;
     if let Some(result) = rows.next() {
         return Ok(Some(result.map_err(AppError::from)?));
@@ -98,7 +108,9 @@ pub fn get_by_conversation_and_path(conn: &Connection, conversation_id: &str, pa
 pub fn delete_folder_context(conn: &Connection, id: &str) -> Result<(), AppError> {
     let changed = conn.execute("DELETE FROM folder_contexts WHERE id = ?1", params![id])?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!("Folder context '{id}' not found")));
+        return Err(AppError::NotFound(format!(
+            "Folder context '{id}' not found"
+        )));
     }
     Ok(())
 }
@@ -114,7 +126,9 @@ pub fn update_folder_context(
         params![included_files_json, estimated_tokens, id],
     )?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!("Folder context '{id}' not found")));
+        return Err(AppError::NotFound(format!(
+            "Folder context '{id}' not found"
+        )));
     }
     Ok(())
 }
@@ -128,8 +142,9 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
-             PRAGMA foreign_keys = ON;"
-        ).unwrap();
+             PRAGMA foreign_keys = ON;",
+        )
+        .unwrap();
         migrations::run(&conn).unwrap();
         conn
     }
@@ -138,8 +153,9 @@ mod tests {
     fn test_add_and_get_folder_context() {
         let conn = in_memory_conn();
         // Since conversation_id references conversations(id), we need a dummy conversation.
-        conn.execute("INSERT INTO conversations (id) VALUES ('dummy-conv')", []).unwrap();
-        
+        conn.execute("INSERT INTO conversations (id) VALUES ('dummy-conv')", [])
+            .unwrap();
+
         let new_ctx = NewFolderContext {
             conversation_id: "dummy-conv".into(),
             path: "/a/b/c".into(),
@@ -147,40 +163,52 @@ mod tests {
             auto_refresh: true,
             estimated_tokens: 1234,
         };
-        
+
         let ctx = add_folder_context(&conn, new_ctx.clone()).unwrap();
         assert_eq!(ctx.conversation_id, "dummy-conv");
         assert_eq!(ctx.path, "/a/b/c");
         assert!(ctx.auto_refresh);
         assert_eq!(ctx.estimated_tokens, 1234);
-        
+
         let fetched = get_folder_context(&conn, &ctx.id).unwrap();
         assert_eq!(fetched.id, ctx.id);
     }
-    
+
     #[test]
     fn test_get_by_conversation() {
         let conn = in_memory_conn();
-        conn.execute("INSERT INTO conversations (id) VALUES ('conv1'), ('conv2')", []).unwrap();
-        
-        add_folder_context(&conn, NewFolderContext {
-            conversation_id: "conv1".into(),
-            path: "/path/1".into(),
-            included_files_json: None,
-            auto_refresh: false,
-            estimated_tokens: 10,
-        }).unwrap();
-        add_folder_context(&conn, NewFolderContext {
-            conversation_id: "conv1".into(),
-            path: "/path/2".into(),
-            included_files_json: None,
-            auto_refresh: false,
-            estimated_tokens: 20,
-        }).unwrap();
-        
+        conn.execute(
+            "INSERT INTO conversations (id) VALUES ('conv1'), ('conv2')",
+            [],
+        )
+        .unwrap();
+
+        add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "conv1".into(),
+                path: "/path/1".into(),
+                included_files_json: None,
+                auto_refresh: false,
+                estimated_tokens: 10,
+            },
+        )
+        .unwrap();
+        add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "conv1".into(),
+                path: "/path/2".into(),
+                included_files_json: None,
+                auto_refresh: false,
+                estimated_tokens: 20,
+            },
+        )
+        .unwrap();
+
         let list1 = get_by_conversation(&conn, "conv1").unwrap();
         assert_eq!(list1.len(), 2);
-        
+
         let list2 = get_by_conversation(&conn, "conv2").unwrap();
         assert_eq!(list2.len(), 0);
     }

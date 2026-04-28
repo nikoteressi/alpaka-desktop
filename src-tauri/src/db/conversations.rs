@@ -125,9 +125,7 @@ pub fn update_title(conn: &Connection, id: &str, title: &str) -> Result<(), AppE
         params![title, now, id],
     )?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!(
-            "Conversation '{id}' not found"
-        )));
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
     }
     Ok(())
 }
@@ -140,16 +138,17 @@ pub fn set_pinned(conn: &Connection, id: &str, pinned: bool) -> Result<(), AppEr
         params![pinned as i64, now, id],
     )?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!(
-            "Conversation '{id}' not found"
-        )));
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
     }
     Ok(())
 }
 
 /// Update (or create) the system prompt for a conversation by modifying the first 'system' message.
-pub fn update_system_prompt(conn: &Connection, id: &str, system_prompt: &str) -> Result<(), AppError> {
-
+pub fn update_system_prompt(
+    conn: &Connection,
+    id: &str,
+    system_prompt: &str,
+) -> Result<(), AppError> {
     // Check if a system message already exists for this conversation
     let existing_id: Option<String> = conn.query_row(
         "SELECT id FROM messages WHERE conversation_id = ?1 AND role = 'system' ORDER BY created_at ASC LIMIT 1",
@@ -161,25 +160,28 @@ pub fn update_system_prompt(conn: &Connection, id: &str, system_prompt: &str) ->
         // Update existing
         conn.execute(
             "UPDATE messages SET content = ?1 WHERE id = ?2",
-            params![system_prompt, msg_id]
+            params![system_prompt, msg_id],
         )?;
     } else {
         // Create new
-        crate::db::messages::create(conn, crate::db::messages::NewMessage {
-            conversation_id: id.to_string(),
-            role: crate::db::messages::MessageRole::System,
-            content: system_prompt.to_string(),
-            images_json: None,
-            files_json: None,
-            tokens_used: None,
-            generation_time_ms: None,
-            prompt_tokens: None,
-            tokens_per_sec: None,
-            total_duration_ms: None,
-            load_duration_ms: None,
-            prompt_eval_duration_ms: None,
-            eval_duration_ms: None,
-        })?;
+        crate::db::messages::create(
+            conn,
+            crate::db::messages::NewMessage {
+                conversation_id: id.to_string(),
+                role: crate::db::messages::MessageRole::System,
+                content: system_prompt.to_string(),
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+            },
+        )?;
     }
 
     // Touch conversation's updated_at
@@ -213,9 +215,7 @@ pub fn touch_updated_at(conn: &Connection, id: &str) -> Result<(), AppError> {
 pub fn delete(conn: &Connection, id: &str) -> Result<(), AppError> {
     let changed = conn.execute("DELETE FROM conversations WHERE id = ?1", params![id])?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!(
-            "Conversation '{id}' not found"
-        )));
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
     }
     Ok(())
 }
@@ -243,7 +243,11 @@ pub fn search(conn: &Connection, query: &str) -> Result<Vec<Conversation>, AppEr
 }
 
 /// Export a conversation and all its messages to a JSON file.
-pub fn export_to_path(conn: &Connection, conversation_id: &str, path: &std::path::Path) -> Result<(), AppError> {
+pub fn export_to_path(
+    conn: &Connection,
+    conversation_id: &str,
+    path: &std::path::Path,
+) -> Result<(), AppError> {
     let conv = get_by_id(conn, conversation_id)?;
     let msgs = crate::db::messages::list_for_conversation(conn, conversation_id)?;
 
@@ -252,7 +256,8 @@ pub fn export_to_path(conn: &Connection, conversation_id: &str, path: &std::path
         "messages": msgs,
     });
 
-    let json_str = serde_json::to_string_pretty(&export_data).map_err(|e| AppError::Serialization(e.to_string()))?;
+    let json_str = serde_json::to_string_pretty(&export_data)
+        .map_err(|e| AppError::Serialization(e.to_string()))?;
     std::fs::write(path, json_str).map_err(|e| AppError::Io(e.to_string()))?;
     Ok(())
 }

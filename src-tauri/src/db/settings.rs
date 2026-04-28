@@ -35,7 +35,9 @@ pub fn get(conn: &Connection, key: &str) -> Result<Option<String>, AppError> {
 /// Async wrapper for `get` using `spawn_blocking`.
 pub async fn get_async(db: crate::db::DbConn, key: String) -> Result<Option<String>, AppError> {
     tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         get(&conn, &key)
     })
     .await?
@@ -58,7 +60,9 @@ pub fn set(conn: &Connection, key: &str, value: &str) -> Result<(), AppError> {
 /// Async wrapper for `set` using `spawn_blocking`.
 pub async fn set_async(db: crate::db::DbConn, key: String, value: String) -> Result<(), AppError> {
     tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         set(&conn, &key, &value)
     })
     .await?
@@ -79,7 +83,9 @@ pub fn get_all(conn: &Connection) -> Result<HashMap<String, String>, AppError> {
 /// Async wrapper for `get_all` using `spawn_blocking`.
 pub async fn get_all_async(db: crate::db::DbConn) -> Result<HashMap<String, String>, AppError> {
     tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         get_all(&conn)
     })
     .await?
@@ -100,7 +106,9 @@ pub fn clear_all(conn: &Connection) -> Result<(), AppError> {
 /// Async wrapper for `delete` using `spawn_blocking`.
 pub async fn delete_async(db: crate::db::DbConn, key: String) -> Result<(), AppError> {
     tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         delete(&conn, &key)
     })
     .await?
@@ -109,7 +117,9 @@ pub async fn delete_async(db: crate::db::DbConn, key: String) -> Result<(), AppE
 /// Async wrapper for `clear_all` using `spawn_blocking`.
 pub async fn clear_all_async(db: crate::db::DbConn) -> Result<(), AppError> {
     tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         clear_all(&conn)
     })
     .await?
@@ -120,8 +130,8 @@ pub async fn clear_all_async(db: crate::db::DbConn) -> Result<(), AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use crate::db::migrations;
+    use std::sync::{Arc, Mutex};
 
     fn in_memory_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
@@ -175,7 +185,9 @@ mod tests {
         let db = Arc::new(Mutex::new(conn));
 
         // Set
-        set_async(db.clone(), "theme".into(), "\"dark\"".into()).await.unwrap();
+        set_async(db.clone(), "theme".into(), "\"dark\"".into())
+            .await
+            .unwrap();
 
         // Get
         let val = get_async(db.clone(), "theme".into()).await.unwrap();

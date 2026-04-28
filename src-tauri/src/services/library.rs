@@ -1,6 +1,6 @@
+use html_escape::decode_html_entities;
 use once_cell::sync::Lazy;
 use serde::Serialize;
-use html_escape::decode_html_entities;
 
 use crate::error::AppError;
 
@@ -43,14 +43,20 @@ pub struct LibraryModelDetails {
 // ── Regex statics ─────────────────────────────────────────────────────────────
 
 static RE_MODEL: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<a\b[^>]*?href="/library/(?P<slug>[^"]+)"[^>]*?class="group[^"]*"[^>]*?>.*?</a>"#)
-        .expect("RE_MODEL")
+    regex::Regex::new(
+        r#"(?si)<a\b[^>]*?href="/library/(?P<slug>[^"]+)"[^>]*?class="group[^"]*"[^>]*?>.*?</a>"#,
+    )
+    .expect("RE_MODEL")
 });
 static RE_NAME: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<span\b[^>]*?x-test-search-response-title[^>]*?>(?P<name>.*?)</span>"#).expect("RE_NAME")
+    regex::Regex::new(
+        r#"(?si)<span\b[^>]*?x-test-search-response-title[^>]*?>(?P<name>.*?)</span>"#,
+    )
+    .expect("RE_NAME")
 });
 static RE_DESC: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<p\b[^>]*?class="[^"]*text-md[^"]*"[^>]*?>(?P<desc>.*?)</p>"#).expect("RE_DESC")
+    regex::Regex::new(r#"(?si)<p\b[^>]*?class="[^"]*text-md[^"]*"[^>]*?>(?P<desc>.*?)</p>"#)
+        .expect("RE_DESC")
 });
 static RE_TAGS: Lazy<regex::Regex> = Lazy::new(|| {
     regex::Regex::new(
@@ -59,13 +65,16 @@ static RE_TAGS: Lazy<regex::Regex> = Lazy::new(|| {
     .expect("RE_TAGS")
 });
 static RE_PULLS: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<span\b[^>]*?x-test-pull-count[^>]*?>(?P<pulls>.*?)</span>"#).expect("RE_PULLS")
+    regex::Regex::new(r#"(?si)<span\b[^>]*?x-test-pull-count[^>]*?>(?P<pulls>.*?)</span>"#)
+        .expect("RE_PULLS")
 });
 static RE_UPDATED: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<span\b[^>]*?x-test-updated[^>]*?>(?P<updated>.*?)</span>"#).expect("RE_UPDATED")
+    regex::Regex::new(r#"(?si)<span\b[^>]*?x-test-updated[^>]*?>(?P<updated>.*?)</span>"#)
+        .expect("RE_UPDATED")
 });
 static RE_TAG_COUNT: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<span\b[^>]*?x-test-tag-count[^>]*?>(?P<count>.*?)</span>"#).expect("RE_TAG_COUNT")
+    regex::Regex::new(r#"(?si)<span\b[^>]*?x-test-tag-count[^>]*?>(?P<count>.*?)</span>"#)
+        .expect("RE_TAG_COUNT")
 });
 static RE_TAG_NAME: Lazy<regex::Regex> = Lazy::new(|| {
     regex::Regex::new(r#"href="/library/[^" ]+:(?P<tag>[^" ]+)""#).expect("RE_TAG_NAME")
@@ -77,23 +86,30 @@ static RE_TAG_DETAILS: Lazy<regex::Regex> = Lazy::new(|| {
     .expect("RE_TAG_DETAILS")
 });
 static RE_TAG_HASH: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<span\b[^>]*?class="font-mono[^"]*"[^>]*?>(?P<hash>[a-f0-9]{7,12})</span>"#)
-        .expect("RE_TAG_HASH")
+    regex::Regex::new(
+        r#"(?si)<span\b[^>]*?class="font-mono[^"]*"[^>]*?>(?P<hash>[a-f0-9]{7,12})</span>"#,
+    )
+    .expect("RE_TAG_HASH")
 });
 static RE_TAG_UPDATED: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)(?:</span>|·|&nbsp;)\s*(?P<updated>(?:\d+|a|an)\s+\w+\s+ago)"#).expect("RE_TAG_UPDATED")
+    regex::Regex::new(r#"(?si)(?:</span>|·|&nbsp;)\s*(?P<updated>(?:\d+|a|an)\s+\w+\s+ago)"#)
+        .expect("RE_TAG_UPDATED")
 });
 static RE_DESKTOP_BLOCK: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<div\b[^>]*?class="hidden md:flex[^"]*"[^>]*?>(?P<block>.*?)</div>\s*</div>"#).expect("RE_DESKTOP_BLOCK")
+    regex::Regex::new(
+        r#"(?si)<div\b[^>]*?class="hidden md:flex[^"]*"[^>]*?>(?P<block>.*?)</div>\s*</div>"#,
+    )
+    .expect("RE_DESKTOP_BLOCK")
 });
 static RE_README: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(
-        r#"(?si)id=["']editor["'][^>]*?>(?P<readme>.*?)</textarea\s*>"#,
-    )
-    .expect("RE_README")
+    regex::Regex::new(r#"(?si)id=["']editor["'][^>]*?>(?P<readme>.*?)</textarea\s*>"#)
+        .expect("RE_README")
 });
 static RE_META_DESC: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r#"(?si)<meta\b[^>]*?name=["']description["'][^>]*?content=["'](?P<desc>.*?)["']"#).expect("RE_META_DESC")
+    regex::Regex::new(
+        r#"(?si)<meta\b[^>]*?name=["']description["'][^>]*?content=["'](?P<desc>.*?)["']"#,
+    )
+    .expect("RE_META_DESC")
 });
 static RE_LAUNCH_APP: Lazy<regex::Regex> = Lazy::new(|| {
     regex::Regex::new(r#"(?si)<div\b[^>]*?class="[^"]*group flex items-center[^"]*"[^>]*?>.*?<img\b[^>]*?src="(?P<icon>[^"]+)"[^>]*?>.*?<span\b[^>]*?>(?P<name>.*?)</span>.*?<code\b[^>]*?>(?P<command>.*?)</code>"#).expect("RE_LAUNCH_APP")
@@ -206,10 +222,7 @@ pub async fn search(
     Ok(all_models)
 }
 
-pub async fn get_tags(
-    client: &reqwest::Client,
-    slug: &str,
-) -> Result<Vec<LibraryTag>, AppError> {
+pub async fn get_tags(client: &reqwest::Client, slug: &str) -> Result<Vec<LibraryTag>, AppError> {
     let url = format!("https://ollama.com/library/{}/tags", slug);
     let resp = client
         .get(&url)
@@ -231,7 +244,8 @@ pub async fn get_tags(
     let parts: Vec<&str> = html.split("class=\"group px-4 py-3\"").collect();
     for row in parts.iter().skip(1) {
         // Only parse the desktop block to avoid mobile-only hidden elements
-        let target_content = RE_DESKTOP_BLOCK.captures(row)
+        let target_content = RE_DESKTOP_BLOCK
+            .captures(row)
             .map(|c| c["block"].to_string())
             .unwrap_or_else(|| row.to_string());
 
@@ -250,7 +264,7 @@ pub async fn get_tags(
                 }
             }
 
-            let size = details.get(0).cloned().unwrap_or_else(|| "--".to_string());
+            let size = details.first().cloned().unwrap_or_else(|| "--".to_string());
             let context = details.get(1).cloned();
             let input = details.get(2).cloned();
 
@@ -258,7 +272,7 @@ pub async fn get_tags(
                 .captures(&target_content)
                 .map(|c| c["hash"].to_string())
                 .unwrap_or_default();
-            
+
             let updated_at = RE_TAG_UPDATED
                 .captures(&target_content)
                 .map(|c| c["updated"].to_string())
@@ -318,10 +332,10 @@ pub async fn get_readme(
     if let Some(cap) = RE_README.captures(&html) {
         let content = cap["readme"].trim().to_owned();
         if !content.is_empty() {
-             return Ok(LibraryModelDetails {
-                 readme: decode_html_entities(&content).into_owned(),
-                 launch_apps,
-             });
+            return Ok(LibraryModelDetails {
+                readme: decode_html_entities(&content).into_owned(),
+                launch_apps,
+            });
         }
     }
 
@@ -329,10 +343,10 @@ pub async fn get_readme(
     if let Some(cap) = RE_META_DESC.captures(&html) {
         let content = cap["desc"].trim().to_owned();
         if !content.is_empty() {
-             return Ok(LibraryModelDetails {
-                 readme: decode_html_entities(&content).into_owned(),
-                 launch_apps,
-             });
+            return Ok(LibraryModelDetails {
+                readme: decode_html_entities(&content).into_owned(),
+                launch_apps,
+            });
         }
     }
 
@@ -423,7 +437,9 @@ Actual README Content
 Multiple Lines
 </textarea>
             </div>"#;
-        let cap = RE_README.captures(html).expect("Should match complex textarea");
+        let cap = RE_README
+            .captures(html)
+            .expect("Should match complex textarea");
         let readme = cap["readme"].trim();
         assert_eq!(readme, "Actual README Content\nMultiple Lines");
     }

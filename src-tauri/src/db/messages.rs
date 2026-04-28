@@ -79,9 +79,7 @@ pub struct NewMessage {
 
 fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     let role_str: String = row.get(2)?;
-    let role = role_str
-        .parse::<MessageRole>()
-        .unwrap_or(MessageRole::User);
+    let role = role_str.parse::<MessageRole>().unwrap_or(MessageRole::User);
 
     Ok(Message {
         id: row.get(0)?,

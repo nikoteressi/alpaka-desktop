@@ -1,4 +1,4 @@
-import { tauriApi } from './tauri'
+import { tauriApi } from "./tauri";
 
 /**
  * Opens a URL in the system's default browser.
@@ -6,8 +6,8 @@ import { tauriApi } from './tauri'
  */
 export async function openUrl(url: string): Promise<void> {
   try {
-    await tauriApi.openBrowser(url)
+    await tauriApi.openBrowser(url);
   } catch {
-    window.open(url, '_blank', 'noopener,noreferrer')
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 }

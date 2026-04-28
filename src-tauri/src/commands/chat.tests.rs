@@ -1,10 +1,10 @@
 use super::*;
 use crate::db;
 use crate::db::conversations::NewConversation;
-use crate::db::messages::{NewMessage, MessageRole};
+use crate::db::messages::{MessageRole, NewMessage};
 use rusqlite::Connection;
-use std::fs;
 use serde_json::json;
+use std::fs;
 use uuid::Uuid;
 
 #[test]
@@ -15,28 +15,36 @@ fn test_export_conversation_to_path_red() {
     let conn = Connection::open(&db_path).unwrap();
     db::migrations::run(&conn).unwrap();
 
-    let conv = db::conversations::create(&conn, NewConversation {
-        title: "Test".into(),
-        model: "llama3".into(),
-        settings_json: None,
-        tags: None,
-    }).unwrap();
+    let conv = db::conversations::create(
+        &conn,
+        NewConversation {
+            title: "Test".into(),
+            model: "llama3".into(),
+            settings_json: None,
+            tags: None,
+        },
+    )
+    .unwrap();
 
-    db::messages::create(&conn, NewMessage {
-        conversation_id: conv.id.clone(),
-        role: MessageRole::User,
-        content: "Hello from test".into(),
-        images_json: None,
-        files_json: None,
-        tokens_used: None,
-        generation_time_ms: None,
-        prompt_tokens: None,
-        tokens_per_sec: None,
-        total_duration_ms: None,
-        load_duration_ms: None,
-        prompt_eval_duration_ms: None,
-        eval_duration_ms: None,
-    }).unwrap();
+    db::messages::create(
+        &conn,
+        NewMessage {
+            conversation_id: conv.id.clone(),
+            role: MessageRole::User,
+            content: "Hello from test".into(),
+            images_json: None,
+            files_json: None,
+            tokens_used: None,
+            generation_time_ms: None,
+            prompt_tokens: None,
+            tokens_per_sec: None,
+            total_duration_ms: None,
+            load_duration_ms: None,
+            prompt_eval_duration_ms: None,
+            eval_duration_ms: None,
+        },
+    )
+    .unwrap();
 
     let export_path = dir.join("export.json");
     // Updated to new function name
@@ -45,7 +53,10 @@ fn test_export_conversation_to_path_red() {
     // Should have created a file
     assert!(export_path.exists(), "Export file was not created");
     let content = fs::read_to_string(&export_path).unwrap();
-    assert!(content.contains("Hello from test"), "Exported JSON does not contain the message");
+    assert!(
+        content.contains("Hello from test"),
+        "Exported JSON does not contain the message"
+    );
 }
 
 #[test]
@@ -55,12 +66,16 @@ fn test_backup_database_red() {
     // the SQLite copy mechanism itself.
     let src = Connection::open_in_memory().unwrap();
     db::migrations::run(&src).unwrap();
-    db::conversations::create(&src, NewConversation {
-        title: "BackupTest".into(),
-        model: "test-model".into(),
-        settings_json: None,
-        tags: None,
-    }).unwrap();
+    db::conversations::create(
+        &src,
+        NewConversation {
+            title: "BackupTest".into(),
+            model: "test-model".into(),
+            settings_json: None,
+            tags: None,
+        },
+    )
+    .unwrap();
 
     let mut dst = Connection::open_in_memory().unwrap();
     db::backup_connections(&src, &mut dst).unwrap();
@@ -85,7 +100,8 @@ fn test_format_search_results_red() {
                 "content": "Description 2"
             }
         ]
-    }).to_string();
+    })
+    .to_string();
 
     // Updated to new module location
     let formatted = crate::ollama::search::format_search_results_for_llm(&raw);

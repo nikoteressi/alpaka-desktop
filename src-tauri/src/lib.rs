@@ -1,11 +1,11 @@
+pub mod auth;
+pub mod commands;
 pub mod db;
 pub mod error;
+pub mod ollama;
+pub mod services;
 pub mod state;
 mod system;
-pub mod auth;
-pub mod ollama;
-pub mod commands;
-pub mod services;
 
 use tauri::Manager;
 
@@ -96,17 +96,19 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)?;
 
             let db_path = app_data_dir.join("alpaka-desktop.db");
-            let db_conn = db::open(&app_data_dir)
-                .expect("Failed to open SQLite database");
+            let db_conn = db::open(&app_data_dir).expect("Failed to open SQLite database");
 
             // ── Shared state ───────────────────────────────────────────────────
             let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-            let state = AppState::new(db_conn, db_path)
-                .map_err(|e| tauri::Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to build HTTP client: {e}"),
-                )))?;
-            *state.health_loop_shutdown.lock().expect("health_loop_shutdown lock") = Some(shutdown_tx);
+            let state = AppState::new(db_conn, db_path).map_err(|e| {
+                tauri::Error::Io(std::io::Error::other(format!(
+                    "Failed to build HTTP client: {e}"
+                )))
+            })?;
+            *state
+                .health_loop_shutdown
+                .lock()
+                .expect("health_loop_shutdown lock") = Some(shutdown_tx);
             app.manage(state);
 
             // ── System Tray ────────────────────────────────────────────────────
@@ -124,7 +126,8 @@ pub fn run() {
             }
 
             // ── Hosts Manager ──────────────────────────────────────────────────
-            let health_handle = commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
+            let health_handle =
+                commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
             *app.state::<AppState>().health_loop_handle.lock().unwrap() = Some(health_handle);
 
             Ok(())

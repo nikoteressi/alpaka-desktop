@@ -1,24 +1,30 @@
 <script setup lang="ts">
-
 defineProps<{
   isOpen: boolean;
   systemPromptDraft: string;
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:systemPromptDraft', val: string): void;
-  (e: 'save'): void;
-  (e: 'cancel'): void;
+  (e: "update:systemPromptDraft", val: string): void;
+  (e: "save"): void;
+  (e: "cancel"): void;
 }>();
 
 function onInput(e: Event) {
-  emit('update:systemPromptDraft', (e.target as HTMLTextAreaElement).value);
+  emit("update:systemPromptDraft", (e.target as HTMLTextAreaElement).value);
 }
 </script>
 
 <template>
-  <div v-if="isOpen" class="mb-1.5 px-3.5 py-2.5 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)]">
-    <div class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider font-semibold mb-1.5">System Prompt</div>
+  <div
+    v-if="isOpen"
+    class="mb-1.5 px-3.5 py-2.5 bg-[var(--bg-surface)] rounded-xl border border-[var(--border)]"
+  >
+    <div
+      class="text-[10px] text-[var(--text-dim)] uppercase tracking-wider font-semibold mb-1.5"
+    >
+      System Prompt
+    </div>
     <textarea
       :value="systemPromptDraft"
       @input="onInput"
@@ -30,11 +36,15 @@ function onInput(e: Event) {
       <button
         @click="emit('save')"
         class="px-3 py-1 bg-[var(--bg-user-msg)] border border-[var(--border-strong)] rounded-md text-[var(--text)] text-[12px] cursor-pointer hover:bg-[var(--bg-active)] transition-colors"
-      >Save</button>
+      >
+        Save
+      </button>
       <button
         @click="emit('cancel')"
         class="px-3 py-1 text-[var(--text-muted)] text-[12px] cursor-pointer bg-transparent border-none hover:text-[var(--text-muted)] transition-colors"
-      >Cancel</button>
+      >
+        Cancel
+      </button>
     </div>
   </div>
 </template>

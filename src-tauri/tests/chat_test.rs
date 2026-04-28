@@ -1,14 +1,14 @@
-use mockito::Server;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tauri::test::{mock_builder, mock_context, MockRuntime, noop_assets};
-use tauri::{AppHandle, Manager, Listener};
-use alpaka_desktop_lib::state::AppState;
-use alpaka_desktop_lib::db;
 use alpaka_desktop_lib::commands::chat::{send_message, stop_generation};
+use alpaka_desktop_lib::db;
 use alpaka_desktop_lib::db::conversations::NewConversation;
 use alpaka_desktop_lib::db::hosts::NewHost;
+use alpaka_desktop_lib::state::AppState;
+use mockito::Server;
 use rusqlite::Connection;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
+use tauri::{AppHandle, Listener, Manager};
 
 fn build_app_with_state(url: &str) -> tauri::App<MockRuntime> {
     let app = mock_builder()
@@ -18,27 +18,36 @@ fn build_app_with_state(url: &str) -> tauri::App<MockRuntime> {
 
     let direct_conn = Connection::open_in_memory().unwrap();
     db::migrations::run(&direct_conn).unwrap();
-    db::hosts::create(&direct_conn, NewHost {
-        name: "Test Host".into(),
-        url: url.to_string(),
-        is_default: Some(true),
-    }).unwrap();
+    db::hosts::create(
+        &direct_conn,
+        NewHost {
+            name: "Test Host".into(),
+            url: url.to_string(),
+            is_default: Some(true),
+        },
+    )
+    .unwrap();
 
     let conn = Arc::new(Mutex::new(direct_conn));
-    app.handle().manage(AppState::new(conn, std::path::PathBuf::new()).unwrap());
+    app.handle()
+        .manage(AppState::new(conn, std::path::PathBuf::new()).unwrap());
     app
 }
 
 fn make_conv(app: &tauri::App<MockRuntime>) -> alpaka_desktop_lib::db::conversations::Conversation {
     let state = app.handle().state::<AppState>();
     let conn = state.db.lock().unwrap();
-    db::conversations::create(&conn, NewConversation {
-        title: "Test".into(),
-        model: "llama3".into(),
+    db::conversations::create(
+        &conn,
+        NewConversation {
+            title: "Test".into(),
+            model: "llama3".into(),
 
-        settings_json: None,
-        tags: None,
-    }).unwrap()
+            settings_json: None,
+            tags: None,
+        },
+    )
+    .unwrap()
 }
 
 #[tokio::test]
@@ -68,19 +77,27 @@ async fn test_send_message_emits_events() {
     let direct_conn = Connection::open_in_memory().unwrap();
     db::migrations::run(&direct_conn).unwrap();
 
-    let _host = db::hosts::create(&direct_conn, NewHost {
-        name: "Test Host".into(),
-        url: url.clone(),
-        is_default: Some(true),
-    }).unwrap();
+    let _host = db::hosts::create(
+        &direct_conn,
+        NewHost {
+            name: "Test Host".into(),
+            url: url.clone(),
+            is_default: Some(true),
+        },
+    )
+    .unwrap();
 
-    let conv = db::conversations::create(&direct_conn, NewConversation {
-        title: "Test".into(),
-        model: "llama3".into(),
+    let conv = db::conversations::create(
+        &direct_conn,
+        NewConversation {
+            title: "Test".into(),
+            model: "llama3".into(),
 
-        settings_json: None,
-        tags: None,
-    }).unwrap();
+            settings_json: None,
+            tags: None,
+        },
+    )
+    .unwrap();
 
     let conn = std::sync::Arc::new(std::sync::Mutex::new(direct_conn));
     let app_state = AppState::new(conn, std::path::PathBuf::new()).unwrap();
@@ -92,17 +109,26 @@ async fn test_send_message_emits_events() {
     let events = Arc::new(Mutex::new(Vec::new()));
     let events_clone1 = events.clone();
     app_handle.listen("chat:token", move |event| {
-        events_clone1.lock().unwrap().push(format!("chat:token: {}", event.payload()));
+        events_clone1
+            .lock()
+            .unwrap()
+            .push(format!("chat:token: {}", event.payload()));
     });
 
     let events_clone2 = events.clone();
     app_handle.listen("chat:thinking-start", move |_event| {
-        events_clone2.lock().unwrap().push("thinking-start".to_string());
+        events_clone2
+            .lock()
+            .unwrap()
+            .push("thinking-start".to_string());
     });
 
     let events_clone3 = events.clone();
     app_handle.listen("chat:thinking-end", move |_event| {
-        events_clone3.lock().unwrap().push("thinking-end".to_string());
+        events_clone3
+            .lock()
+            .unwrap()
+            .push("thinking-end".to_string());
     });
 
     // Invoke command
@@ -117,7 +143,8 @@ async fn test_send_message_emits_events() {
         None,
         None,
         None,
-    ).await;
+    )
+    .await;
 
     assert!(res.is_ok(), "send_message failed: {:?}", res);
 
@@ -127,10 +154,17 @@ async fn test_send_message_emits_events() {
     mock.assert_async().await;
 
     let emitted = events.lock().unwrap();
-    assert!(emitted.contains(&"thinking-start".to_string()), "Did not emit chat:thinking-start");
-    assert!(emitted.contains(&"thinking-end".to_string()), "Did not emit chat:thinking-end");
+    assert!(
+        emitted.contains(&"thinking-start".to_string()),
+        "Did not emit chat:thinking-start"
+    );
+    assert!(
+        emitted.contains(&"thinking-end".to_string()),
+        "Did not emit chat:thinking-end"
+    );
 
-    let tokens: Vec<&String> = emitted.iter()
+    let tokens: Vec<&String> = emitted
+        .iter()
         .filter(|s| s.contains("chat:token"))
         .collect();
 
@@ -152,7 +186,8 @@ async fn test_streaming_multi_chunk() {
         "{\"model\":\"llama3\",\"created_at\":\"\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"total_duration\":1000,\"load_duration\":10,\"prompt_eval_count\":5,\"eval_count\":5,\"eval_duration\":1000}\n",
     );
 
-    let _mock = server.mock("POST", "/api/chat")
+    let _mock = server
+        .mock("POST", "/api/chat")
         .with_status(200)
         .with_header("content-type", "application/x-ndjson")
         .with_body(body)
@@ -177,12 +212,28 @@ async fn test_streaming_multi_chunk() {
         *dr.lock().unwrap() = true;
     });
 
-    let res = send_message(state, app_handle.clone(), conv.id.clone(), "Hi".into(), None, "llama3".into(), None, None, None, None).await;
+    let res = send_message(
+        state,
+        app_handle.clone(),
+        conv.id.clone(),
+        "Hi".into(),
+        None,
+        "llama3".into(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
     assert!(res.is_ok(), "send_message failed: {:?}", res);
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    assert_eq!(*token_count.lock().unwrap(), 5, "Expected exactly 5 chat:token events");
+    assert_eq!(
+        *token_count.lock().unwrap(),
+        5,
+        "Expected exactly 5 chat:token events"
+    );
     assert!(*done_received.lock().unwrap(), "chat:done was not emitted");
 }
 
@@ -198,7 +249,8 @@ async fn test_stop_generation_cancels_stream() {
         // done:true line omitted — stream just ends without completing
     );
 
-    let _mock = server.mock("POST", "/api/chat")
+    let _mock = server
+        .mock("POST", "/api/chat")
         .with_status(200)
         .with_header("content-type", "application/x-ndjson")
         .with_body(body)
@@ -226,7 +278,19 @@ async fn test_stop_generation_cancels_stream() {
     let conv_id = conv.id.clone();
     let handle = tokio::spawn(async move {
         let st = app_handle2.state::<AppState>();
-        let _ = send_message(st, app_handle2.clone(), conv_id, "Hi".into(), None, "llama3".into(), None, None, None, None).await;
+        let _ = send_message(
+            st,
+            app_handle2.clone(),
+            conv_id,
+            "Hi".into(),
+            None,
+            "llama3".into(),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await;
     });
 
     // Wait for at least the first token then cancel
@@ -236,12 +300,23 @@ async fn test_stop_generation_cancels_stream() {
     assert!(res.is_ok(), "stop_generation failed: {:?}", res);
 
     // cancel_tx should be cleared
-    assert!(app_handle.state::<AppState>().cancel_tx.lock().unwrap().is_none(), "cancel_tx should be None after cancellation");
+    assert!(
+        app_handle
+            .state::<AppState>()
+            .cancel_tx
+            .lock()
+            .unwrap()
+            .is_none(),
+        "cancel_tx should be None after cancellation"
+    );
 
     let _ = handle.await;
 
     tokio::time::sleep(Duration::from_millis(50)).await;
-    assert!(!*done_received.lock().unwrap(), "chat:done should NOT be emitted after cancellation");
+    assert!(
+        !*done_received.lock().unwrap(),
+        "chat:done should NOT be emitted after cancellation"
+    );
 }
 
 #[tokio::test]
@@ -258,7 +333,8 @@ async fn test_stream_error_emits_chat_error() {
         "not-valid-json\n",
     );
 
-    let _mock = server.mock("POST", "/api/chat")
+    let _mock = server
+        .mock("POST", "/api/chat")
         .with_status(200)
         .with_header("content-type", "application/x-ndjson")
         .with_body(body)
@@ -276,13 +352,31 @@ async fn test_stream_error_emits_chat_error() {
         *dr.lock().unwrap() = true;
     });
 
-    let res = send_message(state, app_handle.clone(), conv.id.clone(), "Hi".into(), None, "llama3".into(), None, None, None, None).await;
-    assert!(res.is_err(), "send_message should hard-error on malformed stream");
+    let res = send_message(
+        state,
+        app_handle.clone(),
+        conv.id.clone(),
+        "Hi".into(),
+        None,
+        "llama3".into(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
+    assert!(
+        res.is_err(),
+        "send_message should hard-error on malformed stream"
+    );
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Stream ended without done:true — chat:done must NOT have fired
-    assert!(!*done_received.lock().unwrap(), "chat:done should not be emitted when stream ends without done:true");
+    assert!(
+        !*done_received.lock().unwrap(),
+        "chat:done should not be emitted when stream ends without done:true"
+    );
 }
 
 // ── Additional tests ───────────────────────────────────────────────────────────
@@ -293,49 +387,66 @@ async fn test_create_conversation_and_get_messages() {
     let direct_conn = Connection::open_in_memory().unwrap();
     db::migrations::run(&direct_conn).unwrap();
 
-    let conv = db::conversations::create(&direct_conn, NewConversation {
-        title: "Test conv".into(),
-        model: "llama3".into(),
+    let conv = db::conversations::create(
+        &direct_conn,
+        NewConversation {
+            title: "Test conv".into(),
+            model: "llama3".into(),
 
-        settings_json: None,
-        tags: None,
-    }).unwrap();
+            settings_json: None,
+            tags: None,
+        },
+    )
+    .unwrap();
 
-    db::messages::create(&direct_conn, db::messages::NewMessage {
-        conversation_id: conv.id.clone(),
-        role: db::messages::MessageRole::User,
-        content: "First message".into(),
-        images_json: None,
-        files_json: None,
-        tokens_used: None,
-        generation_time_ms: None,
-        prompt_tokens: None,
-        tokens_per_sec: None,
-        total_duration_ms: None,
-        load_duration_ms: None,
-        prompt_eval_duration_ms: None,
-        eval_duration_ms: None,
-    }).unwrap();
+    db::messages::create(
+        &direct_conn,
+        db::messages::NewMessage {
+            conversation_id: conv.id.clone(),
+            role: db::messages::MessageRole::User,
+            content: "First message".into(),
+            images_json: None,
+            files_json: None,
+            tokens_used: None,
+            generation_time_ms: None,
+            prompt_tokens: None,
+            tokens_per_sec: None,
+            total_duration_ms: None,
+            load_duration_ms: None,
+            prompt_eval_duration_ms: None,
+            eval_duration_ms: None,
+        },
+    )
+    .unwrap();
 
-    db::messages::create(&direct_conn, db::messages::NewMessage {
-        conversation_id: conv.id.clone(),
-        role: db::messages::MessageRole::Assistant,
-        content: "Second message".into(),
-        images_json: None,
-        files_json: None,
-        tokens_used: Some(42),
-        generation_time_ms: None,
-        prompt_tokens: None,
-        tokens_per_sec: None,
-        total_duration_ms: None,
-        load_duration_ms: None,
-        prompt_eval_duration_ms: None,
-        eval_duration_ms: None,
-    }).unwrap();
+    db::messages::create(
+        &direct_conn,
+        db::messages::NewMessage {
+            conversation_id: conv.id.clone(),
+            role: db::messages::MessageRole::Assistant,
+            content: "Second message".into(),
+            images_json: None,
+            files_json: None,
+            tokens_used: Some(42),
+            generation_time_ms: None,
+            prompt_tokens: None,
+            tokens_per_sec: None,
+            total_duration_ms: None,
+            load_duration_ms: None,
+            prompt_eval_duration_ms: None,
+            eval_duration_ms: None,
+        },
+    )
+    .unwrap();
 
     let msgs = db::messages::list_for_conversation(&direct_conn, &conv.id).unwrap();
 
-    assert_eq!(msgs.len(), 2, "Expected exactly 2 messages, got {}", msgs.len());
+    assert_eq!(
+        msgs.len(),
+        2,
+        "Expected exactly 2 messages, got {}",
+        msgs.len()
+    );
     assert_eq!(msgs[0].content, "First message");
     assert_eq!(msgs[0].role, db::messages::MessageRole::User);
     assert_eq!(msgs[1].content, "Second message");
@@ -389,7 +500,8 @@ async fn test_assistant_message_persisted_after_streaming() {
         None,
         None,
         None,
-    ).await;
+    )
+    .await;
     assert!(res.is_ok(), "send_message failed: {:?}", res);
 
     // Allow async persistence to complete
@@ -405,10 +517,14 @@ async fn test_assistant_message_persisted_after_streaming() {
         "Expected at least 2 messages (user + assistant), got {}",
         msgs.len()
     );
-    let assistant_msgs: Vec<_> = msgs.iter()
+    let assistant_msgs: Vec<_> = msgs
+        .iter()
         .filter(|m| m.role == db::messages::MessageRole::Assistant)
         .collect();
-    assert!(!assistant_msgs.is_empty(), "No assistant message persisted to DB");
+    assert!(
+        !assistant_msgs.is_empty(),
+        "No assistant message persisted to DB"
+    );
     assert!(
         assistant_msgs[0].content.contains("Persisted response"),
         "Assistant message content mismatch: {:?}",
@@ -447,7 +563,8 @@ async fn test_tokens_used_persisted_after_streaming() {
         None,
         None,
         None,
-    ).await;
+    )
+    .await;
     assert!(res.is_ok(), "send_message failed: {:?}", res);
 
     tokio::time::sleep(Duration::from_millis(150)).await;
@@ -456,12 +573,21 @@ async fn test_tokens_used_persisted_after_streaming() {
     let msgs = tokio::task::spawn_blocking(move || {
         let conn = db.lock().unwrap();
         alpaka_desktop_lib::db::messages::list_for_conversation(&conn, &conv.id)
-    }).await.unwrap().unwrap();
+    })
+    .await
+    .unwrap()
+    .unwrap();
 
-    let assistant = msgs.iter().find(|m| m.role == alpaka_desktop_lib::db::messages::MessageRole::Assistant)
+    let assistant = msgs
+        .iter()
+        .find(|m| m.role == alpaka_desktop_lib::db::messages::MessageRole::Assistant)
         .expect("No assistant message persisted");
     assert_eq!(assistant.tokens_used, Some(42), "tokens_used mismatch");
-    assert_eq!(assistant.generation_time_ms, Some(5000), "generation_time_ms mismatch");
+    assert_eq!(
+        assistant.generation_time_ms,
+        Some(5000),
+        "generation_time_ms mismatch"
+    );
 }
 
 #[tokio::test]
@@ -476,7 +602,8 @@ async fn test_chunked_boundary_streaming() {
     let chunk_a = b"{\"model\":\"llama3\",\"created_at\":\"\",\"message\":{\"role\":\"assistant\",\"content\":\"split-tok".to_vec();
     let chunk_b = b"en\"},\"done\":false}\n{\"model\":\"llama3\",\"created_at\":\"\",\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"done\":true,\"total_duration\":1000,\"load_duration\":10,\"prompt_eval_count\":1,\"eval_count\":1,\"eval_duration\":1000}\n".to_vec();
 
-    let _mock = server.mock("POST", "/api/chat")
+    let _mock = server
+        .mock("POST", "/api/chat")
         .with_status(200)
         .with_header("content-type", "application/x-ndjson")
         .with_chunked_body(move |w| {
@@ -516,14 +643,22 @@ async fn test_chunked_boundary_streaming() {
         None,
         None,
         None,
-    ).await;
-    assert!(res.is_ok(), "send_message failed with chunked boundary: {:?}", res);
+    )
+    .await;
+    assert!(
+        res.is_ok(),
+        "send_message failed with chunked boundary: {:?}",
+        res
+    );
 
     tokio::time::sleep(Duration::from_millis(150)).await;
 
     // The split token must have been reassembled into a single emission
     let tokens = tokens_received.lock().unwrap();
-    assert!(!tokens.is_empty(), "No tokens emitted — line-buffering likely failed");
+    assert!(
+        !tokens.is_empty(),
+        "No tokens emitted — line-buffering likely failed"
+    );
     let combined: String = tokens.join("");
     assert!(
         combined.contains("split-token"),

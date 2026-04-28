@@ -1,9 +1,9 @@
-use std::path::Path;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, command, Runtime, State};
+use std::path::Path;
+use tauri::{command, AppHandle, Runtime, State};
 
-use crate::{error::AppError, state::AppState};
 use crate::db::folders::{add_folder_context, NewFolderContext};
+use crate::{error::AppError, state::AppState};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FolderContextPayload {
@@ -39,17 +39,36 @@ fn guard_path(raw: &Path) -> Result<std::path::PathBuf, AppError> {
         .map_err(|e| AppError::Io(format!("Cannot resolve path: {}", e)))?;
 
     // Reject paths inside sensitive system directories or hidden secret folders
-    let restricted_prefixes = ["/proc", "/sys", "/dev", "/etc", "/root", "/boot", "/var", "/usr/bin", "/usr/sbin"];
+    let restricted_prefixes = [
+        "/proc",
+        "/sys",
+        "/dev",
+        "/etc",
+        "/root",
+        "/boot",
+        "/var",
+        "/usr/bin",
+        "/usr/sbin",
+    ];
     for prefix in &restricted_prefixes {
         if canonical.starts_with(prefix) {
-            return Err(AppError::Internal(format!("Restricted path: prefix {} is blocked", prefix)));
+            return Err(AppError::Internal(format!(
+                "Restricted path: prefix {} is blocked",
+                prefix
+            )));
         }
     }
 
     // Guard against common hidden secret directories in HOME
     let path_str = canonical.to_string_lossy();
-    if path_str.contains("/.ssh") || path_str.contains("/.gnupg") || path_str.contains("/.aws") || path_str.contains("/.kube") {
-        return Err(AppError::Internal("Restricted path: sensitive credentials directory detected".into()));
+    if path_str.contains("/.ssh")
+        || path_str.contains("/.gnupg")
+        || path_str.contains("/.aws")
+        || path_str.contains("/.kube")
+    {
+        return Err(AppError::Internal(
+            "Restricted path: sensitive credentials directory detected".into(),
+        ));
     }
 
     Ok(canonical)
@@ -64,16 +83,22 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
     let mut content = String::new();
 
     if folder_path.is_file() {
-        let is_text = is_text_file(folder_path).map_err(|e| AppError::Io(format!("Failed to check file: {}", e)))?;
+        let is_text = is_text_file(folder_path)
+            .map_err(|e| AppError::Io(format!("Failed to check file: {}", e)))?;
         if !is_text {
-            return Err(AppError::Internal("Cannot link binary files as text context".into()));
+            return Err(AppError::Internal(
+                "Cannot link binary files as text context".into(),
+            ));
         }
 
         if let Ok(file_content) = std::fs::read_to_string(folder_path) {
             if file_content.len() > MAX_FOLDER_CONTEXT_SIZE {
                 return Err(AppError::Internal("File exceeds 50MB limit".into()));
             }
-            let filename = folder_path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+            let filename = folder_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("file");
             content.push_str(&format!("\n--- File: {} ---\n{}\n", filename, file_content));
         }
 
@@ -107,7 +132,11 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
 
         file_count += 1;
         if file_count > MAX_FOLDER_FILES {
-            log::warn!("Folder context exceeds {} file limit at {}; truncating.", MAX_FOLDER_FILES, path.display());
+            log::warn!(
+                "Folder context exceeds {} file limit at {}; truncating.",
+                MAX_FOLDER_FILES,
+                path.display()
+            );
             break;
         }
 
@@ -122,11 +151,18 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
 
         if let Ok(file_content) = std::fs::read_to_string(path) {
             if content.len() + file_content.len() > MAX_FOLDER_CONTEXT_SIZE {
-                log::warn!("Folder context exceeds 50MB limit at {}; truncating.", path.display());
+                log::warn!(
+                    "Folder context exceeds 50MB limit at {}; truncating.",
+                    path.display()
+                );
                 break;
             }
             let relative_path = path.strip_prefix(folder_path).unwrap_or(path);
-            content.push_str(&format!("\n--- File: {} ---\n{}\n", relative_path.display(), file_content));
+            content.push_str(&format!(
+                "\n--- File: {} ---\n{}\n",
+                relative_path.display(),
+                file_content
+            ));
         }
     }
 
@@ -156,26 +192,40 @@ pub async fn link_folder<R: Runtime>(
     tokio::task::spawn_blocking(move || {
         let mut payload = read_folder_context(&path_buf)?;
 
-        let guard = db_conn.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-        
+        let guard = db_conn
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+
         // Idempotency check: see if this path is already linked for this conversation
-        let existing = crate::db::folders::get_by_conversation_and_path(&guard, &conversation_id, &payload.path)?;
-        
+        let existing = crate::db::folders::get_by_conversation_and_path(
+            &guard,
+            &conversation_id,
+            &payload.path,
+        )?;
+
         if let Some(ctx) = existing {
             // Update token count if it changed, but keep the record
-            crate::db::folders::update_folder_context(&guard, &ctx.id, ctx.included_files_json, payload.token_estimate as i64)?;
+            crate::db::folders::update_folder_context(
+                &guard,
+                &ctx.id,
+                ctx.included_files_json,
+                payload.token_estimate as i64,
+            )?;
             payload.id = ctx.id;
         } else {
-            let db_ctx = add_folder_context(&guard, NewFolderContext {
-                conversation_id,
-                path: payload.path.clone(),
-                included_files_json: None,
-                auto_refresh: false,
-                estimated_tokens: payload.token_estimate as i64,
-            })?;
+            let db_ctx = add_folder_context(
+                &guard,
+                NewFolderContext {
+                    conversation_id,
+                    path: payload.path.clone(),
+                    included_files_json: None,
+                    auto_refresh: false,
+                    estimated_tokens: payload.token_estimate as i64,
+                },
+            )?;
             payload.id = db_ctx.id;
         }
-        
+
         Ok(payload)
     })
     .await
@@ -183,13 +233,12 @@ pub async fn link_folder<R: Runtime>(
 }
 
 #[command]
-pub async fn unlink_folder(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<(), AppError> {
+pub async fn unlink_folder(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
     let db_conn = state.db.clone();
     tokio::task::spawn_blocking(move || {
-        let guard = db_conn.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let guard = db_conn
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         crate::db::folders::delete_folder_context(&guard, &id)
     })
     .await
@@ -203,7 +252,9 @@ pub async fn get_folder_contexts(
 ) -> Result<Vec<crate::db::folders::FolderContext>, AppError> {
     let db_conn = state.db.clone();
     tokio::task::spawn_blocking(move || {
-        let guard = db_conn.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let guard = db_conn
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         crate::db::folders::get_by_conversation(&guard, &conversation_id)
     })
     .await
@@ -211,9 +262,7 @@ pub async fn get_folder_contexts(
 }
 
 #[command]
-pub async fn list_folder_files(
-    path: String,
-) -> Result<Vec<String>, AppError> {
+pub async fn list_folder_files(path: String) -> Result<Vec<String>, AppError> {
     let raw_path = std::path::PathBuf::from(&path);
     // MED-05: canonicalize and reject restricted paths before any FS access
     let path_buf = guard_path(&raw_path)?;
@@ -240,7 +289,10 @@ pub async fn list_folder_files(
                         if let Ok(rel) = p.strip_prefix(&path_buf) {
                             files.push(rel.display().to_string());
                             if files.len() >= MAX_FOLDER_FILES {
-                                log::warn!("File listing reached limit of {}; stopping.", MAX_FOLDER_FILES);
+                                log::warn!(
+                                    "File listing reached limit of {}; stopping.",
+                                    MAX_FOLDER_FILES
+                                );
                                 break;
                             }
                         }
@@ -263,7 +315,9 @@ pub async fn update_included_files(
     let db_conn = state.db.clone();
 
     tokio::task::spawn_blocking(move || {
-        let guard = db_conn.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let guard = db_conn
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         let ctx = crate::db::folders::get_folder_context(&guard, &id)?;
 
         // Defense-in-depth: re-verify the base path against current security rules
@@ -286,12 +340,17 @@ pub async fn update_included_files(
                 return Err(AppError::Internal("Path traversal detected".into()));
             }
             if included_files.len() > MAX_FOLDER_FILES {
-                return Err(AppError::Internal(format!("Cannot include more than {} files", MAX_FOLDER_FILES)));
+                return Err(AppError::Internal(format!(
+                    "Cannot include more than {} files",
+                    MAX_FOLDER_FILES
+                )));
             }
             if let Ok(content) = std::fs::read_to_string(&canonical) {
                 total_chars += content.chars().count();
                 if total_chars > MAX_FOLDER_CONTEXT_SIZE {
-                    return Err(AppError::Internal("Selected files exceed 50MB limit".into()));
+                    return Err(AppError::Internal(
+                        "Selected files exceed 50MB limit".into(),
+                    ));
                 }
             }
         }
@@ -299,7 +358,12 @@ pub async fn update_included_files(
         let token_estimate = (total_chars / 4) as i64;
         let included_files_json = Some(serde_json::to_string(&included_files)?);
 
-        crate::db::folders::update_folder_context(&guard, &id, included_files_json, token_estimate)?;
+        crate::db::folders::update_folder_context(
+            &guard,
+            &id,
+            included_files_json,
+            token_estimate,
+        )?;
 
         Ok(token_estimate)
     })
@@ -351,7 +415,9 @@ pub async fn estimate_tokens(
                             if let Ok(content) = std::fs::read_to_string(p) {
                                 total_chars += content.chars().count();
                                 if total_chars > MAX_FOLDER_CONTEXT_SIZE {
-                                    log::warn!("Estimation reached 50MB limit; returning partial count.");
+                                    log::warn!(
+                                        "Estimation reached 50MB limit; returning partial count."
+                                    );
                                     break;
                                 }
                             }
@@ -399,7 +465,8 @@ mod tests {
         let bin_file = base_path.join("image.png");
         let mut f = fs::File::create(&bin_file).unwrap();
         // Write some null bytes to simulate a binary file
-        f.write_all(&[0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02, 0x03]).unwrap();
+        f.write_all(&[0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02, 0x03])
+            .unwrap();
 
         let result = read_folder_context(base_path).unwrap();
 
@@ -455,6 +522,10 @@ mod tests {
         let dir = tempdir().unwrap();
         // A normal temp path should be allowed
         let result = guard_path(dir.path());
-        assert!(result.is_ok(), "Normal temp path should be allowed: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Normal temp path should be allowed: {:?}",
+            result
+        );
     }
 }

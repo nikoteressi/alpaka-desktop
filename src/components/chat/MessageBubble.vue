@@ -1,231 +1,252 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
-import { useRafFn } from '@vueuse/core'
-import { renderMarkdown } from '../../lib/markdown'
-import type { Message } from '../../types/chat'
-import ThinkBlock from './ThinkBlock.vue'
-import CodeBlock from './CodeBlock.vue'
-import SearchBlock from './SearchBlock.vue'
-import StatsBlock from './StatsBlock.vue'
-import TypingIndicator from './TypingIndicator.vue'
-import { useSettingsStore } from '../../stores/settings'
-import { useCopyToClipboard } from '../../composables/useCopyToClipboard'
-import { uint8ArrayToBase64 } from '../../stores/chat'
+import { ref, computed, watch, onUnmounted } from "vue";
+import { useRafFn } from "@vueuse/core";
+import { renderMarkdown } from "../../lib/markdown";
+import type { Message } from "../../types/chat";
+import ThinkBlock from "./ThinkBlock.vue";
+import CodeBlock from "./CodeBlock.vue";
+import SearchBlock from "./SearchBlock.vue";
+import StatsBlock from "./StatsBlock.vue";
+import TypingIndicator from "./TypingIndicator.vue";
+import { useSettingsStore } from "../../stores/settings";
+import { useCopyToClipboard } from "../../composables/useCopyToClipboard";
+import { uint8ArrayToBase64 } from "../../stores/chat";
 
 const props = defineProps<{
-  message: Message
-  messageId?: string
-  isStreaming?: boolean
-  thinkingContent?: string // Streaming thinking
-  isThinking?: boolean
-  tokensPerSec?: number | null
-}>()
+  message: Message;
+  messageId?: string;
+  isStreaming?: boolean;
+  thinkingContent?: string; // Streaming thinking
+  isThinking?: boolean;
+  tokensPerSec?: number | null;
+}>();
 
-const isUser = computed(() => props.message.role === 'user')
+const isUser = computed(() => props.message.role === "user");
 
 interface MessagePart {
-  type: 'markdown' | 'code' | 'tool' | 'think'
-  content: string
-  language?: string
-  rendered?: string
-  toolName?: string
-  toolQuery?: string
+  type: "markdown" | "code" | "tool" | "think";
+  content: string;
+  language?: string;
+  rendered?: string;
+  toolName?: string;
+  toolQuery?: string;
 }
 
 // Memoization cache for parseProcessedParts on finished messages
-const _parsedCache = ref<{ key: string; result: MessagePart[] } | null>(null)
+const _parsedCache = ref<{ key: string; result: MessagePart[] } | null>(null);
 
 // Calculate parts immediately for finished messages, or use a throttled ref for streaming
 const staticParts = computed(() => {
-  if (props.isStreaming) return null
+  if (props.isStreaming) return null;
 
   // Use content length + first 32 chars as a cheap cache key
-  const cacheKey = `${props.message.content.length}:${props.message.content.slice(0, 32)}`
+  const cacheKey = `${props.message.content.length}:${props.message.content.slice(0, 32)}`;
 
   if (_parsedCache.value?.key === cacheKey) {
-    return _parsedCache.value.result
+    return _parsedCache.value.result;
   }
 
-  const result = parseProcessedParts(props.message.content, isUser.value)
-  _parsedCache.value = { key: cacheKey, result }
-  return result
-})
+  const result = parseProcessedParts(props.message.content, isUser.value);
+  _parsedCache.value = { key: cacheKey, result };
+  return result;
+});
 
-const streamingParts = ref<MessagePart[]>([])
-const stableParts = ref<MessagePart[]>([])
-let lastStableIndex = 0
+const streamingParts = ref<MessagePart[]>([]);
+const stableParts = ref<MessagePart[]>([]);
+let lastStableIndex = 0;
 
 // Final display parts: static if finished, streaming ref if active
 const displayParts = computed(() => {
-  return staticParts.value || streamingParts.value
-})
+  return staticParts.value || streamingParts.value;
+});
 
-function parseProcessedParts(content: string, isUserMessage: boolean): MessagePart[] {
-  if (!content && !isUserMessage) return []
+function parseProcessedParts(
+  content: string,
+  isUserMessage: boolean,
+): MessagePart[] {
+  if (!content && !isUserMessage) return [];
   if (isUserMessage) {
-    return [{ type: 'markdown', content: content, rendered: content }]
+    return [{ type: "markdown", content: content, rendered: content }];
   }
 
-  const parts: MessagePart[] = []
+  const parts: MessagePart[] = [];
   // Standard regex for full parsing (used for static messages and volatile tails)
-  const blockRegex = /```(\w+)?\n([\s\S]*?)(?:```|$)|<think[\s\S]*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">([\s\S]*?)<\/tool_call>/gi
-  let lastIndex = 0
-  let match
+  const blockRegex =
+    /```(\w+)?\n([\s\S]*?)(?:```|$)|<think[\s\S]*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">([\s\S]*?)<\/tool_call>/gi;
+  let lastIndex = 0;
+  let match;
 
   while ((match = blockRegex.exec(content)) !== null) {
     if (match.index > lastIndex) {
-      const text = content.slice(lastIndex, match.index)
+      const text = content.slice(lastIndex, match.index);
       if (text.trim()) {
         parts.push({
-          type: 'markdown',
+          type: "markdown",
           content: text,
-          rendered: renderMarkdown(text)
-        })
+          rendered: renderMarkdown(text),
+        });
       }
     }
 
-    const matchText = match[0]
-    if (matchText.toLowerCase().startsWith('<think')) {
-      const startTagMatch = matchText.match(/^<think([\s\S]*?)>/i)
-      const startTag = startTagMatch ? startTagMatch[1] : ''
-      const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i)
-      const contentMatch = matchText.match(/^<think[\s\S]*?>([\s\S]*?)<\/think>$/i)
-      
+    const matchText = match[0];
+    if (matchText.toLowerCase().startsWith("<think")) {
+      const startTagMatch = matchText.match(/^<think([\s\S]*?)>/i);
+      const startTag = startTagMatch ? startTagMatch[1] : "";
+      const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
+      const contentMatch = matchText.match(
+        /^<think[\s\S]*?>([\s\S]*?)<\/think>$/i,
+      );
+
       parts.push({
-        type: 'think',
-        content: contentMatch ? contentMatch[1].trim() : (matchText.replace(/^<think[\s\S]*?>/i, '').trim()),
-        language: timeMatch ? timeMatch[1] : undefined
-      })
-    } else if (matchText.toLowerCase().startsWith('<tool_call')) {
+        type: "think",
+        content: contentMatch
+          ? contentMatch[1].trim()
+          : matchText.replace(/^<think[\s\S]*?>/i, "").trim(),
+        language: timeMatch ? timeMatch[1] : undefined,
+      });
+    } else if (matchText.toLowerCase().startsWith("<tool_call")) {
       parts.push({
-        type: 'tool',
+        type: "tool",
         toolName: match[3],
         toolQuery: match[4],
-        content: match[5] || ''
-      })
-    } else if (matchText.startsWith('```')) {
+        content: match[5] || "",
+      });
+    } else if (matchText.startsWith("```")) {
       parts.push({
-        type: 'code',
-        language: match[1] || 'text',
-        content: match[2] || ''
-      })
+        type: "code",
+        language: match[1] || "text",
+        content: match[2] || "",
+      });
     }
-    lastIndex = blockRegex.lastIndex
+    lastIndex = blockRegex.lastIndex;
   }
 
   if (lastIndex < content.length) {
-    const text = content.slice(lastIndex)
+    const text = content.slice(lastIndex);
     if (text.trim()) {
       parts.push({
-        type: 'markdown',
+        type: "markdown",
         content: text,
-        rendered: renderMarkdown(text)
-      })
+        rendered: renderMarkdown(text),
+      });
     }
   }
 
-  return parts
+  return parts;
 }
 
-let frameCount = 0
-const RENDER_EVERY_N_FRAMES = 4 // Approx 15fps during streaming for maximum smoothness/CPU balance
+let frameCount = 0;
+const RENDER_EVERY_N_FRAMES = 4; // Approx 15fps during streaming for maximum smoothness/CPU balance
 
 // Architectural Throttling for streaming only
-const { pause, resume, isActive } = useRafFn(() => {
-  if (!props.isStreaming) return
-  frameCount++
-  if (frameCount % RENDER_EVERY_N_FRAMES === 0) {
-    const content = props.message.content
-    if (!content) return
+const { pause, resume, isActive } = useRafFn(
+  () => {
+    if (!props.isStreaming) return;
+    frameCount++;
+    if (frameCount % RENDER_EVERY_N_FRAMES === 0) {
+      const content = props.message.content;
+      if (!content) return;
 
-    // Incremental Update Logic
-    // We only look for *fully closed* blocks to stabilize them
-    const stableBlockRegex = /```(\w+)?\n([\s\S]*?)```|<think[\s\S]*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">([\s\S]*?)<\/tool_call>/gi
-    stableBlockRegex.lastIndex = lastStableIndex
-    let match
+      // Incremental Update Logic
+      // We only look for *fully closed* blocks to stabilize them
+      const stableBlockRegex =
+        /```(\w+)?\n([\s\S]*?)```|<think[\s\S]*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">([\s\S]*?)<\/tool_call>/gi;
+      stableBlockRegex.lastIndex = lastStableIndex;
+      let match;
 
-    while ((match = stableBlockRegex.exec(content)) !== null) {
-      // Add the markdown before the block if it exists
-      if (match.index > lastStableIndex) {
-        const text = content.slice(lastStableIndex, match.index)
-        if (text.trim()) {
-          stableParts.value.push({
-            type: 'markdown',
-            content: text,
-            rendered: renderMarkdown(text)
-          })
+      while ((match = stableBlockRegex.exec(content)) !== null) {
+        // Add the markdown before the block if it exists
+        if (match.index > lastStableIndex) {
+          const text = content.slice(lastStableIndex, match.index);
+          if (text.trim()) {
+            stableParts.value.push({
+              type: "markdown",
+              content: text,
+              rendered: renderMarkdown(text),
+            });
+          }
         }
+
+        const matchText = match[0];
+        if (matchText.toLowerCase().startsWith("<think")) {
+          const startTagMatch = matchText.match(/^<think([\s\S]*?)>/i);
+          const startTag = startTagMatch ? startTagMatch[1] : "";
+          const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
+          const contentMatch = matchText.match(
+            /^<think[\s\S]*?>([\s\S]*?)<\/think>$/i,
+          );
+
+          stableParts.value.push({
+            type: "think",
+            content: contentMatch ? contentMatch[1].trim() : "",
+            language: timeMatch ? timeMatch[1] : undefined,
+          });
+        } else if (matchText.toLowerCase().startsWith("<tool_call")) {
+          stableParts.value.push({
+            type: "tool",
+            toolName: match[3],
+            toolQuery: match[4],
+            content: match[5] || "",
+          });
+        } else if (matchText.startsWith("```")) {
+          stableParts.value.push({
+            type: "code",
+            language: match[1] || "text",
+            content: match[2] || "",
+          });
+        }
+
+        lastStableIndex = stableBlockRegex.lastIndex;
       }
 
-      const matchText = match[0]
-      if (matchText.toLowerCase().startsWith('<think')) {
-        const startTagMatch = matchText.match(/^<think([\s\S]*?)>/i)
-        const startTag = startTagMatch ? startTagMatch[1] : ''
-        const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i)
-        const contentMatch = matchText.match(/^<think[\s\S]*?>([\s\S]*?)<\/think>$/i)
-        
-        stableParts.value.push({
-          type: 'think',
-          content: contentMatch ? contentMatch[1].trim() : '',
-          language: timeMatch ? timeMatch[1] : undefined
-        })
-      } else if (matchText.toLowerCase().startsWith('<tool_call')) {
-        stableParts.value.push({
-          type: 'tool',
-          toolName: match[3],
-          toolQuery: match[4],
-          content: match[5] || ''
-        })
-      } else if (matchText.startsWith('```')) {
-        stableParts.value.push({
-          type: 'code',
-          language: match[1] || 'text',
-          content: match[2] || ''
-        })
-      }
-      
-      lastStableIndex = stableBlockRegex.lastIndex
+      // Now parse the volatile tail (from lastStableIndex to end)
+      const volatileContent = content.slice(lastStableIndex);
+      const volatileParts = parseProcessedParts(volatileContent, false);
+
+      streamingParts.value = [...stableParts.value, ...volatileParts];
     }
+  },
+  { immediate: false },
+);
 
-    // Now parse the volatile tail (from lastStableIndex to end)
-    const volatileContent = content.slice(lastStableIndex)
-    const volatileParts = parseProcessedParts(volatileContent, false)
-    
-    streamingParts.value = [...stableParts.value, ...volatileParts]
-  }
-}, { immediate: false })
-
-watch(() => props.isStreaming, (streaming) => {
-  if (streaming) {
-    frameCount = 0
-    stableParts.value = []
-    lastStableIndex = 0
-    resume()
-  } else {
-    pause()
-    streamingParts.value = []
-    stableParts.value = []
-    lastStableIndex = 0
-  }
-}, { immediate: true })
+watch(
+  () => props.isStreaming,
+  (streaming) => {
+    if (streaming) {
+      frameCount = 0;
+      stableParts.value = [];
+      lastStableIndex = 0;
+      resume();
+    } else {
+      pause();
+      streamingParts.value = [];
+      stableParts.value = [];
+      lastStableIndex = 0;
+    }
+  },
+  { immediate: true },
+);
 
 // Watch for streaming content changes
-watch(() => props.message.content, () => {
-  if (props.isStreaming && !isActive.value) {
-    resume()
-  }
-})
+watch(
+  () => props.message.content,
+  () => {
+    if (props.isStreaming && !isActive.value) {
+      resume();
+    }
+  },
+);
 
-onUnmounted(() => pause())
+onUnmounted(() => pause());
 
 // Copy button state via composable
-const { copied, copy } = useCopyToClipboard(1500)
+const { copied, copy } = useCopyToClipboard(1500);
 
 const copyContent = async () => {
-  await copy(props.message.content)
-}
+  await copy(props.message.content);
+};
 
-const settingsStore = useSettingsStore()
+const settingsStore = useSettingsStore();
 </script>
 
 <template>
@@ -236,17 +257,32 @@ const settingsStore = useSettingsStore()
     aria-label="Your message"
     class="user-message"
     data-role="user"
-    style="display: flex; justify-content: flex-end; padding: 4px 24px;"
+    style="display: flex; justify-content: flex-end; padding: 4px 24px"
   >
     <div
-      style="background: var(--bg-user-msg); border-radius: 18px; border-top-right-radius: 4px; padding: 8px 14px; font-size: 14px; color: var(--text); max-width: 70%; line-height: 1.5; white-space: pre-wrap; word-break: break-word; border: 1px solid var(--border-subtle);"
+      style="
+        background: var(--bg-user-msg);
+        border-radius: 18px;
+        border-top-right-radius: 4px;
+        padding: 8px 14px;
+        font-size: 14px;
+        color: var(--text);
+        max-width: 70%;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border: 1px solid var(--border-subtle);
+      "
     >
       <!-- Attached Images -->
-      <div v-if="message.images && message.images.length > 0" class="flex flex-wrap gap-2 mb-2">
-        <img 
-          v-for="(img, idx) in message.images" 
-          :key="idx" 
-          :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`" 
+      <div
+        v-if="message.images && message.images.length > 0"
+        class="flex flex-wrap gap-2 mb-2"
+      >
+        <img
+          v-for="(img, idx) in message.images"
+          :key="idx"
+          :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
           class="max-h-64 max-w-full rounded-lg object-contain border border-[var(--border-strong)]"
         />
       </div>
@@ -254,7 +290,7 @@ const settingsStore = useSettingsStore()
     </div>
   </div>
 
-    <!-- Assistant message: plain text area, no bubble -->
+  <!-- Assistant message: plain text area, no bubble -->
   <div
     v-else
     role="article"
@@ -263,7 +299,7 @@ const settingsStore = useSettingsStore()
     aria-atomic="false"
     class="assistant-message"
     data-role="assistant"
-    style="padding: 12px 24px 20px;"
+    style="padding: 12px 24px 20px"
   >
     <!-- Rendered Content Parts (including archived thinking and tool blocks) -->
     <div
@@ -278,11 +314,20 @@ const settingsStore = useSettingsStore()
           :think-time="part.language ? parseFloat(part.language) : null"
           :message-key="messageId ? `${messageId}-think-${index}` : undefined"
         />
-        <div v-else-if="part.type === 'markdown'" class="rendered-markdown" v-html="part.rendered"></div>
-        <CodeBlock v-else-if="part.type === 'code'" :code="part.content" :language="part.language || ''" :is-streaming="isStreaming" />
-        <SearchBlock 
-          v-else-if="part.type === 'tool'" 
-          :query="part.toolQuery || ''" 
+        <div
+          v-else-if="part.type === 'markdown'"
+          class="rendered-markdown"
+          v-html="part.rendered"
+        ></div>
+        <CodeBlock
+          v-else-if="part.type === 'code'"
+          :code="part.content"
+          :language="part.language || ''"
+          :is-streaming="isStreaming"
+        />
+        <SearchBlock
+          v-else-if="part.type === 'tool'"
+          :query="part.toolQuery || ''"
           :result="part.content"
           :message-key="messageId ? `${messageId}-tool-${index}` : undefined"
         />
@@ -305,7 +350,9 @@ const settingsStore = useSettingsStore()
 
     <!-- Blinking cursor: shown during streaming once content has started -->
     <span
-      v-else-if="isStreaming && !isThinking && (message.content || thinkingContent)"
+      v-else-if="
+        isStreaming && !isThinking && (message.content || thinkingContent)
+      "
       class="streaming-cursor"
     ></span>
 
@@ -318,25 +365,51 @@ const settingsStore = useSettingsStore()
       class="copy-btn"
     >
       <!-- Checkmark icon when copied -->
-      <svg v-if="copied" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12"/>
+      <svg
+        v-if="copied"
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="20 6 9 17 4 12" />
       </svg>
       <!-- Copy icon otherwise -->
-      <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      <svg
+        v-else
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
       </svg>
-      <span>{{ copied ? 'Copied!' : 'Copy' }}</span>
+      <span>{{ copied ? "Copied!" : "Copy" }}</span>
     </button>
 
     <!-- Full Stats Block (Isolated component) -->
     <StatsBlock
-      v-if="settingsStore.showPerformanceMetrics && (message.tokens_per_sec !== undefined || message.tokens !== undefined || tokensPerSec !== undefined) && !isStreaming"
+      v-if="
+        settingsStore.showPerformanceMetrics &&
+        (message.tokens_per_sec !== undefined ||
+          message.tokens !== undefined ||
+          tokensPerSec !== undefined) &&
+        !isStreaming
+      "
       :metrics="{
         total_duration_ms: message.total_duration_ms,
         load_duration_ms: message.load_duration_ms,
         prompt_eval_duration_ms: message.prompt_eval_duration_ms,
-        eval_duration_ms: message.eval_duration_ms
+        eval_duration_ms: message.eval_duration_ms,
       }"
       :tokens-per-sec="message.tokens_per_sec || tokensPerSec || 0"
       :output-tokens="message.tokens || 0"
@@ -450,7 +523,8 @@ const settingsStore = useSettingsStore()
   height: 4px;
 }
 
-.rendered-markdown-container :deep(.table-scroll-wrapper)::-webkit-scrollbar-thumb {
+.rendered-markdown-container
+  :deep(.table-scroll-wrapper)::-webkit-scrollbar-thumb {
   background: var(--scrollbar);
   border-radius: 2px;
 }
@@ -517,8 +591,13 @@ const settingsStore = useSettingsStore()
 
 /* ── Streaming cursor ─────────────────────────────────── */
 @keyframes cursor-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .streaming-cursor {

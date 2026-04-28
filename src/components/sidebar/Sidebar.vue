@@ -1,5 +1,7 @@
 <template>
-  <aside class="flex flex-col h-full w-64 flex-shrink-0 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800">
+  <aside
+    class="flex flex-col h-full w-64 flex-shrink-0 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-800"
+  >
     <!-- New Chat -->
     <div class="flex-shrink-0 p-3">
       <button
@@ -7,8 +9,16 @@
         @click="newChat"
       >
         <div class="flex items-center gap-2">
-          <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 5v14M5 12h14"/>
+          <svg
+            class="w-3.5 h-3.5 flex-shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 5v14M5 12h14" />
           </svg>
           <span class="leading-none">New Chat</span>
         </div>
@@ -18,8 +28,17 @@
     <!-- Search -->
     <div class="flex-shrink-0 px-3 pb-2">
       <div class="relative">
-        <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        <svg
+          class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-neutral-400"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
         </svg>
         <input
           v-model="search"
@@ -36,14 +55,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import ConversationList from './ConversationList.vue'
-import { useConversationLifecycle } from '../../composables/useConversationLifecycle'
+import { ref } from "vue";
+import ConversationList from "./ConversationList.vue";
+import { useConversationLifecycle } from "../../composables/useConversationLifecycle";
 
-const { createConversation } = useConversationLifecycle()
-const search = ref('')
+const { createConversation } = useConversationLifecycle();
+const search = ref("");
 
 async function newChat() {
-  await createConversation()
+  await createConversation();
 }
 </script>

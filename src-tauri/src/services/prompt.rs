@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use chrono::Local;
 use crate::db::messages::Message;
-use crate::ollama::types::Message as OllamaMessage;
 use crate::error::AppError;
+use crate::ollama::types::Message as OllamaMessage;
+use chrono::Local;
+use std::collections::HashMap;
 
 /// A service for building and managing LLM prompts.
 pub struct PromptService;
@@ -27,11 +27,26 @@ impl PromptService {
         settings: HashMap<String, String>,
         options: BuildPromptOptions,
     ) -> Result<Vec<OllamaMessage>, AppError> {
-        let global_prompt = settings.get("globalSystemPrompt").map(|s| s.as_str()).unwrap_or("");
-        let formatting_enabled = settings.get("systemFormattingEnabled").map(|s| s == "true").unwrap_or(false);
-        let formatting_template = settings.get("systemFormattingTemplate").map(|s| s.as_str()).unwrap_or("");
-        let search_template = settings.get("systemSearchTemplate").map(|s| s.as_str()).unwrap_or("");
-        let folder_template = settings.get("systemFolderTemplate").map(|s| s.as_str()).unwrap_or("");
+        let global_prompt = settings
+            .get("globalSystemPrompt")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let formatting_enabled = settings
+            .get("systemFormattingEnabled")
+            .map(|s| s == "true")
+            .unwrap_or(false);
+        let formatting_template = settings
+            .get("systemFormattingTemplate")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let search_template = settings
+            .get("systemSearchTemplate")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let folder_template = settings
+            .get("systemFolderTemplate")
+            .map(|s| s.as_str())
+            .unwrap_or("");
 
         let mut messages = Vec::new();
 
@@ -99,11 +114,14 @@ impl PromptService {
 
         // 4. Message history
         for msg in history {
-            let msg_imgs: Option<Vec<String>> = if msg.images_json != "[]" && !msg.images_json.is_empty() {
-                serde_json::from_str(&msg.images_json).map_err(|e| AppError::Serialization(format!("Failed to parse image JSON: {}", e)))?
-            } else {
-                None
-            };
+            let msg_imgs: Option<Vec<String>> =
+                if msg.images_json != "[]" && !msg.images_json.is_empty() {
+                    serde_json::from_str(&msg.images_json).map_err(|e| {
+                        AppError::Serialization(format!("Failed to parse image JSON: {}", e))
+                    })?
+                } else {
+                    None
+                };
             messages.push(OllamaMessage {
                 role: msg.role.as_str().to_string(),
                 content: msg.content,
