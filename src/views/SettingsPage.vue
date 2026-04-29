@@ -641,10 +641,12 @@ import HostSettings from "../components/settings/HostSettings.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
 import { useSettingsStore } from "../stores/settings";
 import { useModelStore } from "../stores/models";
+import { useHostStore } from "../stores/hosts";
 import { useConfirmationModal } from "../composables/useConfirmationModal";
 
 const settingsStore = useSettingsStore();
 const modelsStore = useModelStore();
+const hostStore = useHostStore();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
 
 // ── Model path feature ────────────────────────────────────────────────────────
@@ -757,8 +759,21 @@ async function applyModelPath(path: string) {
     } else {
       pathApply.value = { status: "success", message: result.message };
       if (result.restarted) {
-        // Attempt twice: once after 2s, again after 5s in case restart is slow
-        setTimeout(() => modelsStore.fetchModels(), 2000);
+        // Model path is a local operation — ensure a local host is active before
+        // fetching models. If the cloud host is currently active, switch to a local
+        // host so list_models queries the restarted local Ollama.
+        const ensureLocalHost = async () => {
+          await hostStore.fetchHosts();
+          const active = hostStore.activeHost;
+          const isCloud = active?.url?.includes("api.ollama.com") ?? false;
+          if (isCloud) {
+            const local = hostStore.hosts.find(
+              (h) => !h.url.includes("api.ollama.com"),
+            );
+            if (local) await hostStore.setActiveHost(local.id);
+          }
+        };
+        setTimeout(async () => { await ensureLocalHost(); modelsStore.fetchModels(); }, 2000);
         setTimeout(() => modelsStore.fetchModels(), 5000);
       }
     }
