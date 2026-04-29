@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- MO-08: Configurable Ollama model storage path — Settings Engine tab writes a systemd service override (`OLLAMA_MODELS`) and restarts Ollama on save; user service handled automatically, system service via pkexec; live path validation with model count and accessibility feedback
 - CL-05: Ollama Cloud routing — stored API key is now injected as `Authorization: Bearer` on all requests to `api.ollama.com` hosts. Missing key surfaces a friendly error in the chat rather than a raw network failure. Saving a key for the first time auto-adds the Ollama Cloud host entry.
 
 ### Changed
