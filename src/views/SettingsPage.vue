@@ -209,7 +209,10 @@
                 <input
                   v-model="settingsStore.modelPath"
                   @change="applyModelPath(settingsStore.modelPath)"
-                  placeholder="~/.ollama/models"
+                  @keydown.enter.prevent="
+                    applyModelPath(settingsStore.modelPath)
+                  "
+                  placeholder="~/.ollama/models (press Enter)"
                   class="custom-input w-36 font-mono"
                 />
                 <button

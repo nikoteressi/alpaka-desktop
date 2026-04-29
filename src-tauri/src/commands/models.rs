@@ -358,6 +358,12 @@ pub async fn get_model_capabilities(
     })
 }
 
+/// Returns pull history entries. Currently unimplemented — returns empty list.
+#[tauri::command]
+pub async fn get_pull_history() -> Result<Vec<serde_json::Value>, AppError> {
+    Ok(vec![])
+}
+
 // pull_model will need more than just client and base_url because it emits events.
 // We can pass an `app: &AppHandle` to the core function.
 
