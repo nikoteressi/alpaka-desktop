@@ -549,9 +549,12 @@ import AccountSettings from "../components/settings/AccountSettings.vue";
 import HostSettings from "../components/settings/HostSettings.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
 import { useSettingsStore } from "../stores/settings";
+import { useModelsStore } from "../stores/models";
+import { tauriApi } from "../lib/tauri";
 import { useConfirmationModal } from "../composables/useConfirmationModal";
 
 const settingsStore = useSettingsStore();
+const modelsStore = useModelsStore();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
 
 const themeOptions = [
@@ -757,15 +760,17 @@ async function applyModelPath(path: string) {
   if (!path.trim()) {
     try {
       await invoke("apply_model_path", { path });
-      openModal({
-        title: "Model Path Reset",
-        message:
-          "Ollama will use the default model storage path after restart.",
-        confirmLabel: "OK",
-        kind: "primary",
-        hideCancel: true,
-        onConfirm: () => {},
-      });
+      try {
+        await tauriApi.stopOllama();
+      } catch {
+        // ignore
+      }
+      try {
+        await tauriApi.startOllama();
+        await modelsStore.fetchModels();
+      } catch {
+        // ignore
+      }
     } catch (err: unknown) {
       await settingsStore.updateSetting("modelPath", previousPath);
       const detail = err instanceof Error ? err.message : String(err);
@@ -785,18 +790,30 @@ async function applyModelPath(path: string) {
     // ③ Apply the new path via systemd override
     const result = await invoke<ModelPathResult>("apply_model_path", { path });
 
-    const message = result.models_found_at_path
-      ? "Restart Ollama for the new model storage path to take effect."
-      : "No Ollama models found at this location. Move your existing models there, then restart Ollama to apply the change.";
+    // Restart Ollama so it picks up the new OLLAMA_MODELS env var, then refresh the model list.
+    try {
+      await tauriApi.stopOllama();
+    } catch {
+      // Ignore stop errors (service may already be stopped)
+    }
+    try {
+      await tauriApi.startOllama();
+      await modelsStore.fetchModels();
+    } catch {
+      // Service restart failed — models list may be stale, but path is saved
+    }
 
-    openModal({
-      title: "Model Path Updated",
-      message,
-      confirmLabel: "OK",
-      kind: "primary",
-      hideCancel: true,
-      onConfirm: () => {},
-    });
+    if (!result.models_found_at_path) {
+      openModal({
+        title: "Model Path Updated",
+        message:
+          "No Ollama models were found at this location. Move your existing models there and the path will be used on next Ollama start.",
+        confirmLabel: "OK",
+        kind: "primary",
+        hideCancel: true,
+        onConfirm: () => {},
+      });
+    }
   } catch (err: unknown) {
     // ④ Rollback: undo the optimistic update so the bad path doesn't persist
     await settingsStore.updateSetting("modelPath", previousPath);
