@@ -100,6 +100,15 @@
       >
         + Save current as preset
       </button>
+
+      <div v-if="props.model" class="flex justify-end">
+        <button
+          @click="handleSaveAsModelDefault"
+          class="text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+        >
+          {{ savedAsDefault ? "Saved as model default ✓" : "Save as model default" }}
+        </button>
+      </div>
     </div>
 
     <div
@@ -169,10 +178,12 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "../../../stores/settings";
 import type { ChatOptions, PresetOptions } from "../../../types/settings";
 import SettingsSlider from "../../settings/SettingsSlider.vue";
+import { useModelDefaults } from "../../../composables/useModelDefaults";
 
 const props = defineProps<{
   modelValue: Partial<ChatOptions>;
   presetId: string;
+  model?: string;
 }>();
 
 const emit = defineEmits<{
@@ -182,10 +193,13 @@ const emit = defineEmits<{
 }>();
 
 const settingsStore = useSettingsStore();
+const { saveAsModelDefault } = useModelDefaults();
 
 const saving = ref(false);
 const saveName = ref("");
 const saveInput = ref<HTMLInputElement | null>(null);
+const savedAsDefault = ref(false);
+
 
 const isPresetOpen = ref(false);
 const presetDropdownRef = ref<HTMLElement | null>(null);
@@ -253,6 +267,19 @@ async function commitSave() {
   await settingsStore.saveAsPreset(saveName.value, options);
   saving.value = false;
   saveName.value = "";
+}
+
+async function handleSaveAsModelDefault() {
+  if (!props.model) return;
+  try {
+    await saveAsModelDefault(props.model, props.modelValue);
+    savedAsDefault.value = true;
+    setTimeout(() => {
+      savedAsDefault.value = false;
+    }, 1500);
+  } catch {
+    // ignore IPC failures silently
+  }
 }
 </script>
 

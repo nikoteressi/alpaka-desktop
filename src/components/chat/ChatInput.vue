@@ -542,6 +542,7 @@ onUnmounted(() => {
           <AdvancedChatOptions
             v-model="chatOptions"
             v-model:presetId="presetId"
+            :model="chatStore.activeConversation?.model"
             @reset="resetChatOptions"
           />
         </div>
