@@ -147,10 +147,7 @@ pub async fn create_model<R: Runtime>(
 }
 
 #[tauri::command]
-pub async fn cancel_model_create(
-    state: State<'_, AppState>,
-    name: String,
-) -> Result<(), AppError> {
+pub async fn cancel_model_create(state: State<'_, AppState>, name: String) -> Result<(), AppError> {
     let mut map = state
         .model_create_cancel_tx
         .lock()
@@ -308,6 +305,9 @@ mod tests {
         mock.assert_async().await;
 
         // With biased; in select!, cancel fires before the first chunk — verified deterministic
-        assert!(result.is_ok(), "cancelled returns Ok(()) — cancel path emits model:create-error instead");
+        assert!(
+            result.is_ok(),
+            "cancelled returns Ok(()) — cancel path emits model:create-error instead"
+        );
     }
 }

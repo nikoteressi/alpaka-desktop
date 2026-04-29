@@ -219,7 +219,10 @@ const modelfileLanguage = StreamLanguage.define({
         "LICENSE",
       ];
       for (const kw of keywords) {
-        if (stream.match(kw) && (stream.eol() || /\s/.test(stream.peek() ?? "")))
+        if (
+          stream.match(kw) &&
+          (stream.eol() || /\s/.test(stream.peek() ?? ""))
+        )
           return "keyword";
       }
       if (stream.match("#")) {
