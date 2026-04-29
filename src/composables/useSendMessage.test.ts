@@ -200,6 +200,49 @@ describe("useSendMessage", () => {
     );
   });
 
+  it("forwards chatOptions to invoke when provided", async () => {
+    const store = useChatStore();
+    store.activeConversationId = "conv-1";
+    store.messages["conv-1"] = [];
+    store.conversations = [makeConv("conv-1")];
+
+    vi.mocked(invoke).mockResolvedValue(undefined);
+
+    const options = {
+      temperature: 0.1,
+      top_p: 0.7,
+      top_k: 20,
+      num_ctx: 8192,
+      repeat_penalty: 1.15,
+      repeat_last_n: 64,
+    };
+
+    const { sendMessage } = useSendMessage();
+    await sendMessage("hello", undefined, undefined, undefined, options);
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith(
+      "send_message",
+      expect.objectContaining({ chatOptions: options }),
+    );
+  });
+
+  it("passes null chatOptions to invoke when not provided", async () => {
+    const store = useChatStore();
+    store.activeConversationId = "conv-1";
+    store.messages["conv-1"] = [];
+    store.conversations = [makeConv("conv-1")];
+
+    vi.mocked(invoke).mockResolvedValue(undefined);
+
+    const { sendMessage } = useSendMessage();
+    await sendMessage("hello");
+
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith(
+      "send_message",
+      expect.objectContaining({ chatOptions: null }),
+    );
+  });
+
   it("does not roll back when backend already appended an error message", async () => {
     const store = useChatStore();
     store.activeConversationId = "conv-1";

@@ -22,6 +22,7 @@ import AttachmentList from "./input/AttachmentList.vue";
 import ContextBar from "./input/ContextBar.vue";
 import ContextPill from "./input/ContextPill.vue";
 import AdvancedChatOptions from "./input/AdvancedChatOptions.vue";
+import CustomTooltip from "../shared/CustomTooltip.vue";
 
 const props = defineProps<{
   isStreaming: boolean;
@@ -184,6 +185,20 @@ const thinkEnabled = ref(false);
 const thinkLevel = ref<"low" | "medium" | "high">("medium");
 const isAdvancedOptionsOpen = ref(false);
 const chatOptions = ref<ChatOptions>({});
+const presetId = ref<string>("");
+
+function resetChatOptions() {
+  const defaultPreset = settingsStore.presets.find(
+    (p) => p.id === settingsStore.defaultPresetId,
+  );
+  if (defaultPreset) {
+    chatOptions.value = { ...defaultPreset.options };
+    presetId.value = defaultPreset.id;
+  } else {
+    chatOptions.value = {};
+    presetId.value = "";
+  }
+}
 
 watch(
   activeModelName,
@@ -360,6 +375,7 @@ function loadDraft() {
     thinkEnabled.value = draft.thinkEnabled;
     thinkLevel.value = draft.thinkLevel;
     chatOptions.value = draft.chatOptions || {};
+    presetId.value = draft.presetId ?? "";
 
     // Restore attachments
     clearAttachments();
@@ -385,7 +401,7 @@ function loadDraft() {
     webSearchEnabled.value = false;
     thinkEnabled.value = false;
     thinkLevel.value = "medium";
-    chatOptions.value = {};
+    resetChatOptions();
   }
 
   nextTick(() => {
@@ -412,6 +428,7 @@ function saveDraft() {
     thinkEnabled: thinkEnabled.value,
     thinkLevel: thinkLevel.value,
     chatOptions: chatOptions.value,
+    presetId: presetId.value,
   });
 }
 
@@ -428,7 +445,14 @@ function debouncedSaveDraft() {
 
 // Watchers for auto-saving (debounced)
 watch(
-  [inputContent, webSearchEnabled, thinkEnabled, thinkLevel, chatOptions],
+  [
+    inputContent,
+    webSearchEnabled,
+    thinkEnabled,
+    thinkLevel,
+    chatOptions,
+    presetId,
+  ],
   () => {
     debouncedSaveDraft();
   },
@@ -508,7 +532,8 @@ onUnmounted(() => {
         >
           <AdvancedChatOptions
             v-model="chatOptions"
-            @reset="chatOptions = {}"
+            v-model:presetId="presetId"
+            @reset="resetChatOptions"
           />
         </div>
       </transition>
@@ -601,108 +626,114 @@ onUnmounted(() => {
           />
 
           <!-- Compact conversation button — visible when context >= 70% -->
-          <button
+          <CustomTooltip
             v-if="
               isContextNearFull && !isCurrentChatStreaming && !chatStore.isDraft
             "
-            @click="handleCompact"
-            :disabled="isCompacting"
-            class="flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-[10px] font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-            title="Summarize conversation and continue in a new chat"
+            text="Summarize conversation and continue in a new chat"
+            wrapper-class="flex-shrink-0"
           >
-            <svg
-              v-if="isCompacting"
-              class="w-2.5 h-2.5 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
+            <button
+              @click="handleCompact"
+              :disabled="isCompacting"
+              class="flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-[10px] font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
+              <svg
+                v-if="isCompacting"
+                class="w-2.5 h-2.5 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              <svg
+                v-else
+                class="w-2.5 h-2.5"
+                fill="none"
                 stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            <svg
-              v-else
-              class="w-2.5 h-2.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-              />
-            </svg>
-            <span>{{ isCompacting ? "Compacting…" : "Compact" }}</span>
-          </button>
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
+              </svg>
+              <span>{{ isCompacting ? "Compacting…" : "Compact" }}</span>
+            </button>
+          </CustomTooltip>
         </div>
 
         <div class="flex items-center gap-1.5">
-          <button
-            @click="toggleSystemPrompt"
-            class="w-7 h-7 rounded-full flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
-            :class="
-              isSystemPromptOpen
-                ? 'bg-[var(--bg-active)] border border-[var(--border-strong)] text-[var(--text)]'
-                : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
-            "
-            title="System prompt"
-            aria-label="Edit system prompt"
-            :aria-pressed="isSystemPromptOpen"
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 20h9" />
-              <path
-                d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
-              />
-            </svg>
-          </button>
-
-          <div class="relative" ref="attachMenuRef">
+          <CustomTooltip text="System prompt" wrapper-class="flex-shrink-0">
             <button
-              @click="toggleAttachMenu"
-              :disabled="isStreaming"
-              class="w-7 h-7 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)] transition-colors flex-shrink-0 cursor-pointer disabled:opacity-40"
-              :class="{
-                'text-[var(--text)] bg-[var(--bg-active)]': isAttachMenuOpen,
-              }"
-              title="Attach"
-              aria-label="Attach"
+              @click="toggleSystemPrompt"
+              class="w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+              :class="
+                isSystemPromptOpen
+                  ? 'bg-[var(--bg-active)] border border-[var(--border-strong)] text-[var(--text)]'
+                  : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
+              "
+              aria-label="Edit system prompt"
+              :aria-pressed="isSystemPromptOpen"
             >
               <svg
-                width="14"
-                height="14"
+                width="13"
+                height="13"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                stroke-width="2.5"
+                stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
               >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
+                <path d="M12 20h9" />
+                <path
+                  d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
+                />
               </svg>
             </button>
+          </CustomTooltip>
+
+          <div class="relative" ref="attachMenuRef">
+            <CustomTooltip text="Attach" wrapper-class="block">
+              <button
+                @click="toggleAttachMenu"
+                :disabled="isStreaming"
+                class="w-7 h-7 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-strong)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)] transition-colors cursor-pointer disabled:opacity-40"
+                :class="{
+                  'text-[var(--text)] bg-[var(--bg-active)]': isAttachMenuOpen,
+                }"
+                aria-label="Attach"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </CustomTooltip>
 
             <!-- Attachment Menu -->
             <transition name="pop-up">
@@ -780,97 +811,109 @@ onUnmounted(() => {
             </transition>
           </div>
           <!-- Web Search Toggle -->
-          <button
+          <CustomTooltip
             v-if="settingsStore.cloud && modelSupportsTools"
-            @click="webSearchEnabled = !webSearchEnabled"
-            :title="webSearchEnabled ? 'Web search on' : 'Web search off'"
-            aria-label="Enable web search"
-            :aria-pressed="webSearchEnabled"
-            class="w-7 h-7 rounded-full flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
-            :class="
-              webSearchEnabled
-                ? 'bg-[var(--accent-muted)] border border-[var(--accent)] text-[var(--accent)]'
-                : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
-            "
+            :text="webSearchEnabled ? 'Web search on' : 'Web search off'"
+            wrapper-class="flex-shrink-0"
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <button
+              @click="webSearchEnabled = !webSearchEnabled"
+              aria-label="Enable web search"
+              :aria-pressed="webSearchEnabled"
+              class="w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+              :class="
+                webSearchEnabled
+                  ? 'bg-[var(--accent-muted)] border border-[var(--accent)] text-[var(--accent)]'
+                  : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
+              "
             >
-              <circle cx="12" cy="12" r="10" />
-              <path
-                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-              />
-            </svg>
-          </button>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path
+                  d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                />
+              </svg>
+            </button>
+          </CustomTooltip>
           <!-- Thinking Toggle -->
-          <button
+          <CustomTooltip
             v-if="supportsThinking"
-            @click="thinkEnabled = !thinkEnabled"
-            :title="thinkEnabled ? 'Thinking on' : 'Thinking off'"
-            aria-label="Enable thinking mode"
-            :aria-pressed="thinkEnabled"
-            class="w-7 h-7 rounded-full flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
-            :class="
-              thinkEnabled
-                ? 'bg-[var(--tag-thinking-bg)] border border-[var(--tag-thinking-text)] text-[var(--tag-thinking-text)]'
-                : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
-            "
+            :text="thinkEnabled ? 'Thinking on' : 'Thinking off'"
+            wrapper-class="flex-shrink-0"
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <button
+              @click="thinkEnabled = !thinkEnabled"
+              aria-label="Enable thinking mode"
+              :aria-pressed="thinkEnabled"
+              class="w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+              :class="
+                thinkEnabled
+                  ? 'bg-[var(--tag-thinking-bg)] border border-[var(--tag-thinking-text)] text-[var(--tag-thinking-text)]'
+                  : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
+              "
             >
-              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-            </svg>
-          </button>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+            </button>
+          </CustomTooltip>
 
-          <button
-            @click="isAdvancedOptionsOpen = !isAdvancedOptionsOpen"
-            title="Advanced model parameters"
-            aria-label="Toggle advanced options"
-            :aria-pressed="isAdvancedOptionsOpen"
-            class="w-7 h-7 rounded-full flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
-            :class="
-              isAdvancedOptionsOpen
-                ? 'bg-[var(--bg-active)] border border-[var(--border-strong)] text-[var(--accent)]'
-                : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
-            "
+          <CustomTooltip
+            text="Advanced model parameters"
+            wrapper-class="flex-shrink-0"
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <button
+              @click="isAdvancedOptionsOpen = !isAdvancedOptionsOpen"
+              aria-label="Toggle advanced options"
+              :aria-pressed="isAdvancedOptionsOpen"
+              class="w-7 h-7 rounded-full flex items-center justify-center transition-colors cursor-pointer"
+              :class="
+                isAdvancedOptionsOpen
+                  ? 'bg-[var(--bg-active)] border border-[var(--border-strong)] text-[var(--accent)]'
+                  : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)] text-[var(--text-muted)] hover:bg-[var(--bg-active)] hover:text-[var(--text)]'
+              "
             >
-              <line x1="4" y1="21" x2="4" y2="14" />
-              <line x1="4" y1="10" x2="4" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12" y2="3" />
-              <line x1="20" y1="21" x2="20" y2="16" />
-              <line x1="20" y1="12" x2="20" y2="3" />
-              <line x1="2" y1="14" x2="6" y2="14" />
-              <line x1="10" y1="8" x2="14" y2="8" />
-              <line x1="18" y1="16" x2="22" y2="16" />
-            </svg>
-          </button>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="4" y1="21" x2="4" y2="14" />
+                <line x1="4" y1="10" x2="4" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12" y2="3" />
+                <line x1="20" y1="21" x2="20" y2="16" />
+                <line x1="20" y1="12" x2="20" y2="3" />
+                <line x1="2" y1="14" x2="6" y2="14" />
+                <line x1="10" y1="8" x2="14" y2="8" />
+                <line x1="18" y1="16" x2="22" y2="16" />
+              </svg>
+            </button>
+          </CustomTooltip>
 
           <ModelSelector
             :activeModelName="activeModelName"

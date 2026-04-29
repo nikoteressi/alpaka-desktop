@@ -49,7 +49,7 @@ export interface SettingsState {
   systemSearchTemplate: string;
   systemFolderTemplate: string;
   presets: Preset[];
-  activePresetId: string;
+  defaultPresetId: string;
 }
 
 export interface AppSettings {

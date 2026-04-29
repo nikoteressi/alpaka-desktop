@@ -788,6 +788,70 @@ mod tests {
     }
 
     #[test]
+    fn merge_with_fallback_custom_wins_for_every_field() {
+        use crate::ollama::types::ChatOptions;
+        let global = ChatOptions {
+            temperature: Some(0.7),
+            top_p: Some(0.9),
+            top_k: Some(40),
+            num_ctx: Some(4096),
+            repeat_penalty: Some(1.1),
+            repeat_last_n: Some(64),
+            ..Default::default()
+        };
+        let custom = ChatOptions {
+            temperature: Some(0.1),
+            top_p: Some(0.5),
+            top_k: Some(10),
+            num_ctx: Some(8192),
+            repeat_penalty: Some(1.3),
+            repeat_last_n: Some(32),
+            ..Default::default()
+        };
+        let merged = custom.merge_with_fallback(&global);
+        assert_eq!(merged.temperature, Some(0.1));
+        assert_eq!(merged.top_p, Some(0.5));
+        assert_eq!(merged.top_k, Some(10));
+        assert_eq!(merged.num_ctx, Some(8192));
+        assert_eq!(merged.repeat_penalty, Some(1.3));
+        assert_eq!(merged.repeat_last_n, Some(32));
+    }
+
+    #[test]
+    fn merge_with_fallback_falls_back_to_global_for_absent_fields() {
+        use crate::ollama::types::ChatOptions;
+        let global = ChatOptions {
+            temperature: Some(0.7),
+            top_p: Some(0.9),
+            top_k: Some(40),
+            num_ctx: Some(4096),
+            repeat_penalty: Some(1.1),
+            repeat_last_n: Some(64),
+            ..Default::default()
+        };
+        // custom only sets temperature; everything else should fall back
+        let custom = ChatOptions {
+            temperature: Some(0.2),
+            ..Default::default()
+        };
+        let merged = custom.merge_with_fallback(&global);
+        assert_eq!(merged.temperature, Some(0.2), "custom temperature wins");
+        assert_eq!(merged.top_p, Some(0.9), "falls back to global top_p");
+        assert_eq!(merged.top_k, Some(40), "falls back to global top_k");
+        assert_eq!(merged.num_ctx, Some(4096), "falls back to global num_ctx");
+        assert_eq!(
+            merged.repeat_penalty,
+            Some(1.1),
+            "falls back to global repeat_penalty"
+        );
+        assert_eq!(
+            merged.repeat_last_n,
+            Some(64),
+            "falls back to global repeat_last_n"
+        );
+    }
+
+    #[test]
     fn sliding_window_keeps_system_and_recent_messages() {
         use crate::ollama::types::Message;
 

@@ -5,7 +5,11 @@ use reqwest::{Client, RequestBuilder};
 /// Returns true if `url` points to the Ollama Cloud API endpoint.
 /// Cloud hosts use the global API key rather than a per-host OAuth token.
 pub fn is_cloud_host(url: &str) -> bool {
-    url.contains("api.ollama.com")
+    url::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
+        .map(|h| h == "api.ollama.com")
+        .unwrap_or(false)
 }
 
 #[derive(Clone)]
@@ -106,5 +110,9 @@ mod tests {
         assert!(!is_cloud_host("http://127.0.0.1:11434"));
         assert!(!is_cloud_host("http://192.168.1.10:11434"));
         assert!(!is_cloud_host("https://my.custom-ollama.example.com"));
+        // Subdomain-prefix attack: hostname contains "api.ollama.com" as a substring
+        // but is a different domain. Must not be classified as cloud.
+        assert!(!is_cloud_host("https://api.ollama.com.attacker.tld"));
+        assert!(!is_cloud_host("https://api.ollama.com.attacker.tld/api/chat"));
     }
 }

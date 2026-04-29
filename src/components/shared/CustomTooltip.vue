@@ -1,7 +1,7 @@
 <template>
   <div
     ref="triggerRef"
-    class="min-w-0 overflow-hidden"
+    :class="wrapperClass ?? 'min-w-0 overflow-hidden'"
     @mouseenter="handleMouseEnter"
     @mouseleave="isVisible = false"
   >
@@ -27,11 +27,12 @@ import { ref, computed } from "vue";
 const props = defineProps<{
   text: string;
   onlyIfTruncated?: boolean;
+  wrapperClass?: string;
 }>();
 
 const triggerRef = ref<HTMLElement | null>(null);
 const isVisible = ref(false);
-const position = ref({ x: 0, y: 0 });
+const position = ref({ x: 0, y: 0, above: false, triggerTop: 0 });
 
 const handleMouseEnter = () => {
   if (!triggerRef.value) return;
@@ -48,28 +49,29 @@ const handleMouseEnter = () => {
 
   const rect = triggerRef.value.getBoundingClientRect();
 
-  // Position below the element
   position.value = {
     x: rect.left,
     y: rect.bottom + 8,
+    above: false,
+    triggerTop: rect.top,
   };
 
   isVisible.value = true;
 };
 
+const TOOLTIP_HEIGHT_EST = 36;
+
 const tooltipStyle = computed(() => {
-  // Ensure it doesn't go off screen
   let x = position.value.x;
   let y = position.value.y;
 
-  // If it would go off the right edge, shift it left
   if (x + 300 > window.innerWidth) {
     x = Math.max(10, window.innerWidth - 310);
   }
 
-  // If it would go off the bottom edge, show it above the trigger
-  if (y + 100 > window.innerHeight) {
-    y = y - 60; // 60px is an estimate, ideally we'd measure
+  // If below viewport, flip above the trigger element
+  if (y + TOOLTIP_HEIGHT_EST > window.innerHeight) {
+    y = position.value.triggerTop - TOOLTIP_HEIGHT_EST - 8;
   }
 
   return {

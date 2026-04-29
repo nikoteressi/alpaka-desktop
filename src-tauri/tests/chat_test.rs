@@ -2,6 +2,7 @@ use alpaka_desktop_lib::commands::chat::{send_message, stop_generation};
 use alpaka_desktop_lib::db;
 use alpaka_desktop_lib::db::conversations::NewConversation;
 use alpaka_desktop_lib::db::hosts::NewHost;
+use alpaka_desktop_lib::ollama::types::ChatOptions;
 use alpaka_desktop_lib::state::AppState;
 use mockito::Server;
 use rusqlite::Connection;
@@ -670,4 +671,99 @@ async fn test_chunked_boundary_streaming() {
         *done_received.lock().unwrap(),
         "chat:done not received after chunked boundary stream"
     );
+}
+
+// ── Chat options / preset forwarding ─────────────────────────────────────────
+
+const DONE_CHUNK: &str = "{\"model\":\"llama3\",\"created_at\":\"\",\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"done\":true,\"total_duration\":100,\"load_duration\":1,\"prompt_eval_count\":1,\"eval_count\":1,\"eval_duration\":100}\n";
+
+#[tokio::test]
+async fn test_chat_options_temperature_reaches_ollama_request() {
+    let mut server = Server::new_async().await;
+
+    // The mock only matches if the POST body contains the expected temperature.
+    // If the options are not forwarded, mockito will return 501 and send_message
+    // will surface an error, making the assertion below fail.
+    let mock = server
+        .mock("POST", "/api/chat")
+        .match_body(mockito::Matcher::PartialJsonString(
+            r#"{"options":{"temperature":0.1}}"#.to_string(),
+        ))
+        .with_status(200)
+        .with_header("content-type", "application/x-ndjson")
+        .with_body(DONE_CHUNK)
+        .create_async()
+        .await;
+
+    let app = build_app_with_state(&server.url());
+    let conv = make_conv(&app);
+    let state = app.handle().state::<AppState>();
+
+    let result = send_message(
+        state,
+        app.handle().clone(),
+        conv.id,
+        "hello".into(),
+        None,
+        "llama3".into(),
+        None,
+        None,
+        None,
+        Some(ChatOptions {
+            temperature: Some(0.1),
+            ..Default::default()
+        }),
+    )
+    .await;
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(result.is_ok(), "send_message failed: {:?}", result);
+    mock.assert_async().await;
+}
+
+#[tokio::test]
+async fn test_chat_options_all_preset_fields_reach_ollama_request() {
+    let mut server = Server::new_async().await;
+
+    // Verify that all six preset fields are forwarded together.
+    let mock = server
+        .mock("POST", "/api/chat")
+        .match_body(mockito::Matcher::PartialJsonString(
+            r#"{"options":{"temperature":0.2,"top_p":0.7,"top_k":20,"num_ctx":8192,"repeat_penalty":1.15,"repeat_last_n":64}}"#.to_string(),
+        ))
+        .with_status(200)
+        .with_header("content-type", "application/x-ndjson")
+        .with_body(DONE_CHUNK)
+        .create_async()
+        .await;
+
+    let app = build_app_with_state(&server.url());
+    let conv = make_conv(&app);
+    let state = app.handle().state::<AppState>();
+
+    let result = send_message(
+        state,
+        app.handle().clone(),
+        conv.id,
+        "hello".into(),
+        None,
+        "llama3".into(),
+        None,
+        None,
+        None,
+        Some(ChatOptions {
+            temperature: Some(0.2),
+            top_p: Some(0.7),
+            top_k: Some(20),
+            num_ctx: Some(8192),
+            repeat_penalty: Some(1.15),
+            repeat_last_n: Some(64),
+            ..Default::default()
+        }),
+    )
+    .await;
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(result.is_ok(), "send_message failed: {:?}", result);
+    mock.assert_async().await;
 }

@@ -111,7 +111,11 @@ describe("ChatInput — Web Search toggle visibility", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('[title="Web search off"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .find('[aria-label="Enable web search"][aria-pressed="false"]')
+        .exists(),
+    ).toBe(true);
   });
 
   it("GIVEN Cloud=ON + tool-capable model — clicking once activates web search (blue border class applied)", async () => {
@@ -131,12 +135,13 @@ describe("ChatInput — Web Search toggle visibility", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    const btn = wrapper.find('[title="Web search off"]');
+    const btn = wrapper.find('[aria-label="Enable web search"]');
     await btn.trigger("click");
     await wrapper.vm.$nextTick();
 
-    // After activation the button title changes to "Web search on"
-    const activeBtn = wrapper.find('[title="Web search on"]');
+    const activeBtn = wrapper.find(
+      '[aria-label="Enable web search"][aria-pressed="true"]',
+    );
     expect(activeBtn.exists()).toBe(true);
     expect(activeBtn.classes()).toContain("border-[var(--accent)]");
   });
@@ -158,15 +163,16 @@ describe("ChatInput — Web Search toggle visibility", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    const btn = wrapper.find('[title="Web search off"]');
+    const btn = wrapper.find('[aria-label="Enable web search"]');
     await btn.trigger("click");
     await wrapper.vm.$nextTick();
 
-    const activeBtn = wrapper.find('[title="Web search on"]');
-    await activeBtn.trigger("click");
+    await btn.trigger("click");
     await wrapper.vm.$nextTick();
 
-    const inactiveBtn = wrapper.find('[title="Web search off"]');
+    const inactiveBtn = wrapper.find(
+      '[aria-label="Enable web search"][aria-pressed="false"]',
+    );
     expect(inactiveBtn.exists()).toBe(true);
     expect(inactiveBtn.classes()).toContain("border-[var(--border-strong)]");
   });
@@ -196,8 +202,12 @@ describe("ChatInput — Thinking toggle visibility", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    // Binary-think models show a button toggling between "Thinking off" and "Thinking on"
-    expect(wrapper.find('[title="Thinking off"]').exists()).toBe(true);
+    // Binary-think models show a button toggling between off (aria-pressed=false) and on
+    expect(
+      wrapper
+        .find('[aria-label="Enable thinking mode"][aria-pressed="false"]')
+        .exists(),
+    ).toBe(true);
   });
 
   it('GIVEN model="deepseek-r1:7b" — clicking thinking toggle activates it', async () => {
@@ -214,11 +224,15 @@ describe("ChatInput — Thinking toggle visibility", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    const btn = wrapper.find('[title="Thinking off"]');
+    const btn = wrapper.find('[aria-label="Enable thinking mode"]');
     await btn.trigger("click");
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('[title="Thinking on"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .find('[aria-label="Enable thinking mode"][aria-pressed="true"]')
+        .exists(),
+    ).toBe(true);
   });
 
   it('GIVEN model="deepseek-r1:7b" — thinking toggle initial state is off', async () => {
@@ -236,8 +250,16 @@ describe("ChatInput — Thinking toggle visibility", () => {
     await wrapper.vm.$nextTick();
 
     // Starts in "off" state — not yet activated
-    expect(wrapper.find('[title="Thinking off"]').exists()).toBe(true);
-    expect(wrapper.find('[title="Thinking on"]').exists()).toBe(false);
+    expect(
+      wrapper
+        .find('[aria-label="Enable thinking mode"][aria-pressed="false"]')
+        .exists(),
+    ).toBe(true);
+    expect(
+      wrapper
+        .find('[aria-label="Enable thinking mode"][aria-pressed="true"]')
+        .exists(),
+    ).toBe(false);
   });
 
   it('GIVEN model="llama3:8b" (non-thinking) — thinking toggle is NOT rendered', async () => {
@@ -254,17 +276,20 @@ describe("ChatInput — Thinking toggle visibility", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('[title="Thinking off"]').exists()).toBe(false);
-    expect(wrapper.find('[title="Thinking on"]').exists()).toBe(false);
-    expect(wrapper.find('[title="Reasoning depth"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Enable thinking mode"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[aria-label="Reasoning depth"]').exists()).toBe(false);
   });
 
   it('GIVEN no active conversation — thinking toggle is NOT rendered (falls back to "Select model")', async () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('[title="Thinking off"]').exists()).toBe(false);
-    expect(wrapper.find('[title="Reasoning depth"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Enable thinking mode"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[aria-label="Reasoning depth"]').exists()).toBe(false);
   });
 });
 
@@ -295,9 +320,12 @@ describe("ChatInput — Cloud=OFF, non-thinking model baseline", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('[title="Web search off"]').exists()).toBe(false);
-    expect(wrapper.find('[title="Web search on"]').exists()).toBe(false);
-    expect(wrapper.find('[title="Thinking off"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Enable web search"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[aria-label="Enable thinking mode"]').exists()).toBe(
+      false,
+    );
   });
 });
 
@@ -329,8 +357,16 @@ describe("ChatInput — Cloud=ON AND thinking model", () => {
     const wrapper = mountInput();
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('[title="Web search off"]').exists()).toBe(true);
-    expect(wrapper.find('[title="Thinking off"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .find('[aria-label="Enable web search"][aria-pressed="false"]')
+        .exists(),
+    ).toBe(true);
+    expect(
+      wrapper
+        .find('[aria-label="Enable thinking mode"][aria-pressed="false"]')
+        .exists(),
+    ).toBe(true);
   });
 });
 

@@ -69,6 +69,7 @@ export interface ChatDraft {
   thinkEnabled: boolean;
   thinkLevel: "low" | "medium" | "high";
   chatOptions?: Partial<ChatOptions>;
+  presetId?: string;
 }
 
 export interface StreamingState {
