@@ -6,11 +6,9 @@ use crate::error::AppError;
 use crate::state::AppState;
 use serde::Serialize;
 use std::path::PathBuf;
-#[allow(unused_imports)]
 use std::process::Stdio;
 #[allow(unused_imports)]
 use tauri::State;
-#[allow(unused_imports)]
 use tokio::process::Command;
 
 // ── Public response types ──────────────────────────────────────────────────────
@@ -33,7 +31,6 @@ pub struct ApplyModelPathResult {
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
-#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 enum ServiceType {
     User,
@@ -114,10 +111,43 @@ pub async fn validate_model_path(path: String) -> Result<ModelPathInfo, AppError
     .await?
 }
 
-// ── Placeholder stubs (filled in later tasks) ─────────────────────────────────
+// ── Service detection ─────────────────────────────────────────────────────────
+
+async fn run_systemctl(args: &[&str]) -> bool {
+    Command::new("systemctl")
+        .args(args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
 
 #[allow(dead_code)]
 async fn detect_service_type() -> ServiceType {
+    // Prefer user service — no elevated privileges needed
+    let user_checks: &[&[&str]] = &[
+        &["--user", "is-enabled", "ollama"],
+        &["--user", "is-active", "ollama"],
+    ];
+    for args in user_checks {
+        if run_systemctl(args).await {
+            return ServiceType::User;
+        }
+    }
+
+    // Fall back to system service
+    let system_checks: &[&[&str]] = &[
+        &["is-enabled", "ollama"],
+        &["is-active", "ollama"],
+    ];
+    for args in system_checks {
+        if run_systemctl(args).await {
+            return ServiceType::System;
+        }
+    }
+
     ServiceType::None
 }
 
