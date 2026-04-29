@@ -543,7 +543,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, markRaw, h, type Component } from "vue";
+import { ref, computed, watch, markRaw, h, type Component } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import ConfirmationModal from "../components/shared/ConfirmationModal.vue";
@@ -558,6 +558,98 @@ import { useConfirmationModal } from "../composables/useConfirmationModal";
 
 const settingsStore = useSettingsStore();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
+
+// ── Model path feature ────────────────────────────────────────────────────────
+
+interface ModelPathInfo {
+  resolved_path: string;
+  exists: boolean;
+  accessible: boolean;
+  model_count: number;
+}
+
+interface ApplyModelPathResult {
+  service_type: string;
+  applied: boolean;
+  restarted: boolean;
+  message: string;
+}
+
+interface ModelPathValidation {
+  status: "idle" | "checking" | "ok" | "warning" | "error";
+  message: string;
+  modelCount: number;
+}
+
+interface ModelPathApply {
+  status: "idle" | "applying" | "success" | "error" | "manual";
+  message: string;
+}
+
+const pathValidation = ref<ModelPathValidation>({
+  status: "idle",
+  message: "",
+  modelCount: 0,
+});
+
+const pathApply = ref<ModelPathApply>({
+  status: "idle",
+  message: "",
+});
+
+let _validateTimer: ReturnType<typeof setTimeout> | null = null;
+
+watch(
+  () => settingsStore.modelPath,
+  (newPath) => {
+    if (_validateTimer) clearTimeout(_validateTimer);
+    if (!newPath) {
+      pathValidation.value = { status: "idle", message: "", modelCount: 0 };
+      return;
+    }
+    pathValidation.value = { ...pathValidation.value, status: "checking" };
+    _validateTimer = setTimeout(async () => {
+      try {
+        const info = await invoke<ModelPathInfo>("validate_model_path", {
+          path: newPath,
+        });
+        if (!info.exists) {
+          pathValidation.value = {
+            status: "error",
+            message: "Path does not exist",
+            modelCount: 0,
+          };
+        } else if (!info.accessible) {
+          pathValidation.value = {
+            status: "ok",
+            message:
+              "System path — Alpaka will request elevated access to configure Ollama",
+            modelCount: 0,
+          };
+        } else if (info.model_count === 0) {
+          pathValidation.value = {
+            status: "warning",
+            message:
+              "No Ollama models found here — your current models won't be accessible at this location",
+            modelCount: 0,
+          };
+        } else {
+          pathValidation.value = {
+            status: "ok",
+            message: `Found ${info.model_count} model(s)`,
+            modelCount: info.model_count,
+          };
+        }
+      } catch {
+        pathValidation.value = {
+          status: "error",
+          message: "Validation failed",
+          modelCount: 0,
+        };
+      }
+    }, 500);
+  },
+);
 
 const themeOptions = [
   { id: "system" as const, label: "System", sub: "Follows OS" },
