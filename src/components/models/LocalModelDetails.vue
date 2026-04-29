@@ -104,14 +104,6 @@
           :step="0.05"
         />
         <SettingsSlider
-          label="Context (tokens)"
-          :model-value="edited.num_ctx ?? settingsStore.chatOptions.num_ctx"
-          @update:model-value="edited = { ...edited, num_ctx: $event }"
-          :min="512"
-          :max="131072"
-          :step="512"
-        />
-        <SettingsSlider
           label="Top P"
           :model-value="edited.top_p ?? settingsStore.chatOptions.top_p"
           @update:model-value="edited = { ...edited, top_p: $event }"
@@ -146,6 +138,14 @@
           :min="0"
           :max="128"
           :step="8"
+        />
+        <SettingsSlider
+          label="Context (tokens)"
+          :model-value="edited.num_ctx ?? settingsStore.chatOptions.num_ctx"
+          @update:model-value="edited = { ...edited, num_ctx: $event }"
+          :min="512"
+          :max="131072"
+          :step="512"
         />
 
         <div

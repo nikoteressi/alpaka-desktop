@@ -33,21 +33,12 @@ const MIGRATIONS: &[Migration] = &[
 pub fn run(conn: &Connection) -> Result<(), AppError> {
     create_versions_table_if_missing(conn)?;
     let applied_through = highest_applied_version(conn)?;
-    eprintln!("[migrations] highest applied version: {applied_through}");
 
     for migration in MIGRATIONS {
         if migration.version <= applied_through {
-            eprintln!(
-                "[migrations] skipping v{} (already applied)",
-                migration.version
-            );
             continue;
         }
 
-        eprintln!(
-            "[migrations] applying v{}: {}",
-            migration.version, migration.description
-        );
         conn.execute_batch(migration.sql).map_err(|e| {
             AppError::Db(format!(
                 "Migration v{} ('{}') failed: {e}",
@@ -56,7 +47,6 @@ pub fn run(conn: &Connection) -> Result<(), AppError> {
         })?;
 
         record_migration(conn, migration.version, migration.description)?;
-        eprintln!("[migrations] v{} applied OK", migration.version);
 
         tracing::info!(
             version = migration.version,
