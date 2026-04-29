@@ -202,11 +202,39 @@ pub fn models_exist_at_path(path: &Path) -> bool {
             .unwrap_or(false)
 }
 
+/// Validates that `path` is a directory we can use.
+/// PermissionDenied is allowed — the path exists and Ollama (running as its own user)
+/// may have access even if the desktop app does not (e.g. /usr/share/ollama/.ollama/models).
+fn check_path_accessible(path: &Path) -> Result<(), AppError> {
+    match std::fs::metadata(path) {
+        Ok(m) if m.is_dir() => Ok(()),
+        Ok(_) => Err(AppError::Io(format!("Not a directory: {}", path.display()))),
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Err(AppError::Io(format!(
+            "Directory does not exist: {}",
+            path.display()
+        ))),
+        Err(e) => Err(AppError::Io(e.to_string())),
+    }
+}
+
 #[tauri::command]
 pub async fn apply_model_path(path: String) -> Result<ModelPathResult, AppError> {
+    use crate::system::systemd::{detect_ollama_service_type, OllamaServiceType};
+
+    let service = detect_ollama_service_type().await;
+
     if path.trim().is_empty() {
-        crate::system::systemd::remove_model_path_override().await?;
         // models_found_at_path is not meaningful for a reset — the caller should ignore it
+        match service {
+            OllamaServiceType::System => {
+                crate::system::systemd::remove_system_model_path_override().await?
+            }
+            _ => {
+                // User service or unknown — remove user override best-effort
+                let _ = crate::system::systemd::remove_model_path_override().await;
+            }
+        }
         return Ok(ModelPathResult { models_found_at_path: false });
     }
 
@@ -214,15 +242,20 @@ pub async fn apply_model_path(path: String) -> Result<ModelPathResult, AppError>
     if !p.is_absolute() {
         return Err(AppError::Io(format!("Path must be absolute: {}", path)));
     }
-    if !p.is_dir() {
-        return Err(AppError::Io(format!(
-            "Directory does not exist: {}",
-            path
-        )));
-    }
+    check_path_accessible(p)?;
 
     let models_found = models_exist_at_path(p);
-    crate::system::systemd::write_model_path_override(&path).await?;
+
+    match service {
+        OllamaServiceType::System => {
+            crate::system::systemd::write_system_model_path_override(&path).await?
+        }
+        _ => {
+            // User service or no service — write user unit override
+            crate::system::systemd::write_model_path_override(&path).await?
+        }
+    }
+
     Ok(ModelPathResult { models_found_at_path: models_found })
 }
 

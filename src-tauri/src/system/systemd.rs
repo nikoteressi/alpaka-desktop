@@ -1,6 +1,18 @@
 use crate::error::AppError;
+use std::io::Write;
 use std::process::{ExitStatus, Stdio};
 use tokio::process::Command;
+
+/// Which systemd service manages Ollama on this machine.
+#[derive(Debug, PartialEq)]
+pub enum OllamaServiceType {
+    /// Managed by a per-user unit (`systemctl --user`). No polkit needed.
+    User,
+    /// Managed by a system-wide unit (`systemctl`). Writes require polkit.
+    System,
+    /// No systemd unit found (manual `ollama serve`, or systemd unavailable).
+    None,
+}
 
 /// Returns the path to ~/.config/systemd/user/ollama.service.d
 fn override_dir() -> std::path::PathBuf {
@@ -48,6 +60,54 @@ pub(crate) async fn remove_model_path_override() -> Result<(), AppError> {
     // Best-effort: if daemon-reload fails (e.g. no user service), that's acceptable for a reset.
     let _ = run_command("systemctl", &["--user", "daemon-reload"]).await;
     Ok(())
+}
+
+/// Detects whether Ollama is managed by a user unit, a system unit, or neither.
+/// Uses `systemctl cat ollama` (exits 0 if unit file exists, regardless of active state).
+pub async fn detect_ollama_service_type() -> OllamaServiceType {
+    if let Ok(true) = try_systemctl(&["--user", "cat", "ollama"]).await {
+        return OllamaServiceType::User;
+    }
+    if let Ok(true) = try_systemctl(&["cat", "ollama"]).await {
+        return OllamaServiceType::System;
+    }
+    OllamaServiceType::None
+}
+
+/// Writes the OLLAMA_MODELS override for the system Ollama service using pkexec.
+/// Triggers a polkit authentication prompt. Calls `systemctl daemon-reload` after.
+pub(crate) async fn write_system_model_path_override(models_path: &str) -> Result<(), AppError> {
+    let escaped = models_path.replace('"', "\\\"");
+    let content = format!("[Service]\nEnvironment=\"OLLAMA_MODELS={}\"\n", escaped);
+
+    // Write content to a temp file so we don't pass it through the shell.
+    let mut tmp = tempfile::NamedTempFile::new()
+        .map_err(|e| AppError::Io(format!("failed to create temp file: {}", e)))?;
+    tmp.write_all(content.as_bytes())
+        .map_err(|e| AppError::Io(format!("failed to write temp file: {}", e)))?;
+    tmp.flush()
+        .map_err(|e| AppError::Io(format!("failed to flush temp file: {}", e)))?;
+
+    let tmp_path = tmp.path().to_str().ok_or_else(|| {
+        AppError::Io("temp file path contains non-UTF-8 characters".into())
+    })?;
+    // Single-quote both paths to handle spaces; temp path is OS-generated so no quotes inside.
+    let cmd = format!(
+        "mkdir -p '/etc/systemd/system/ollama.service.d' && \
+         cp '{}' '/etc/systemd/system/ollama.service.d/override.conf' && \
+         systemctl daemon-reload",
+        tmp_path
+    );
+    let output = run_command("pkexec", &["sh", "-c", &cmd]).await?;
+    handle_result(output, "pkexec failed to install system ollama.service override")
+}
+
+/// Removes the OLLAMA_MODELS system override using pkexec and reloads the daemon.
+pub(crate) async fn remove_system_model_path_override() -> Result<(), AppError> {
+    let cmd = "rm -f '/etc/systemd/system/ollama.service.d/override.conf' && \
+               systemctl daemon-reload";
+    let output = run_command("pkexec", &["sh", "-c", cmd]).await?;
+    handle_result(output, "pkexec failed to remove system ollama.service override")
 }
 
 fn systemctl_available() -> bool {
