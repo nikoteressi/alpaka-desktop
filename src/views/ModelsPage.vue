@@ -124,7 +124,9 @@
                   v-else-if="modelStore.error"
                   class="flex flex-col items-center gap-3 text-[13px] py-12 text-center bg-[var(--bg-input)] border border-dashed border-[var(--danger)]/40 rounded-xl"
                 >
-                  <span class="text-[var(--danger)]">Failed to load models: {{ modelStoreErrorMessage }}</span>
+                  <span class="text-[var(--danger)]"
+                    >Failed to load models: {{ modelStoreErrorMessage }}</span
+                  >
                   <button
                     @click="modelStore.fetchModels()"
                     class="px-4 py-1.5 bg-[var(--bg-hover)] border border-[var(--border-strong)] rounded-lg text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors"
@@ -136,7 +138,10 @@
                   v-else-if="modelStore.models.length === 0"
                   class="flex flex-col items-center gap-3 text-[13px] py-12 text-center bg-[var(--bg-input)] border border-dashed border-[var(--border-subtle)] rounded-xl"
                 >
-                  <span class="text-[var(--text-dim)]">No models installed locally. Go to Library to pull one!</span>
+                  <span class="text-[var(--text-dim)]"
+                    >No models installed locally. Go to Library to pull
+                    one!</span
+                  >
                   <button
                     @click="modelStore.fetchModels()"
                     class="px-4 py-1.5 bg-[var(--bg-hover)] border border-[var(--border-strong)] rounded-lg text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors"
@@ -424,19 +429,7 @@ import { storeToRefs } from "pinia";
 const modelStore = useModelStore();
 const { selectedModel } = storeToRefs(modelStore);
 
-const modelStoreErrorMessage = computed(() => {
-  const e = modelStore.error;
-  if (!e) return "";
-  if (typeof e === "string") return e;
-  if (e instanceof Error) return (e as Error).message;
-  if (typeof e === "object" && !Array.isArray(e)) {
-    const entries = Object.entries(e as Record<string, unknown>);
-    return entries.length > 0
-      ? entries.map(([k, v]) => `${k}: ${v}`).join("; ")
-      : JSON.stringify(e);
-  }
-  return String(e);
-});
+const modelStoreErrorMessage = computed(() => modelStore.error ?? "");
 const orchestration = useAppOrchestration();
 const router = useRouter();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();

@@ -6,7 +6,6 @@ import type {
   PullProgressPayload,
   LibraryModel,
   ModelCapabilities,
-  PullHistoryEntry,
   LibraryTag,
   LaunchApp,
 } from "../types/models";
@@ -23,7 +22,6 @@ export const useModelStore = defineStore("models", {
     capabilities: {} as Record<string, ModelCapabilities>,
     // Library search state
     libraryResults: [] as LibraryModel[],
-    pullHistory: [] as PullHistoryEntry[],
     searchQuery: "",
     isSearching: false,
     _searchTimer: null as ReturnType<typeof setTimeout> | null,
@@ -195,28 +193,16 @@ export const useModelStore = defineStore("models", {
       if (this.listenersInitialized) return;
       this.listenersInitialized = true;
 
-      this.fetchPullHistory();
-
       await listen<PullProgressPayload>("model:pull-progress", (event) => {
         const payload = event.payload;
         this.pulling[payload.model] = payload;
-        // Optionally refresh history during pull if status changes significantly
       });
       await listen<{ model: string }>("model:pull-done", (event) => {
         const payload = event.payload;
         delete this.pulling[payload.model];
-        this.fetchModels(); // Refresh list automatically
-        this.fetchPullHistory(); // Also refresh history
-        this.fetchCapabilities(payload.model); // Re-fetch capabilities now that it's ready
+        this.fetchModels();
+        this.fetchCapabilities(payload.model);
       });
-    },
-
-    async fetchPullHistory() {
-      try {
-        this.pullHistory = await invoke<PullHistoryEntry[]>("get_pull_history");
-      } catch (err) {
-        console.error("Failed to fetch pull history:", err);
-      }
     },
 
     formatBytes(bytes: number) {

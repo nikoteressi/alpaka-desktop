@@ -35,7 +35,7 @@ enum ServiceType {
 }
 
 /// Expand a leading `~` to the value of `$HOME`.
-pub fn expand_tilde(path: &str) -> PathBuf {
+fn expand_tilde(path: &str) -> PathBuf {
     if path == "~" {
         if let Ok(home) = std::env::var("HOME") {
             return PathBuf::from(home);
@@ -51,7 +51,7 @@ pub fn expand_tilde(path: &str) -> PathBuf {
 /// Count Ollama model manifests under `<path>/manifests/`.
 /// Ollama stores manifests at: <path>/manifests/registry.ollama.ai/library/<name>/<tag>
 /// We walk up to 5 levels deep and count leaf files.
-pub fn count_models(base: &std::path::Path) -> u32 {
+fn count_models(base: &std::path::Path) -> u32 {
     let manifests = base.join("manifests");
     if !manifests.is_dir() {
         return 0;
@@ -77,7 +77,7 @@ pub fn count_models(base: &std::path::Path) -> u32 {
 }
 
 /// Generate the content of a systemd service override that sets `OLLAMA_MODELS`.
-pub fn override_file_content(resolved_path: &str) -> String {
+fn override_file_content(resolved_path: &str) -> String {
     format!("[Service]\nEnvironment=\"OLLAMA_MODELS={resolved_path}\"\n")
 }
 
@@ -291,10 +291,10 @@ async fn apply_system_service(resolved_path: &str) -> Result<ApplyModelPathResul
     // The model path lives in the file content, not in shell args, preventing injection.
     let script = format!(
         "mkdir -p /etc/systemd/system/ollama.service.d && \
-         cp {tmp} /etc/systemd/system/ollama.service.d/override.conf && \
+         cp '{tmp}' /etc/systemd/system/ollama.service.d/override.conf && \
          systemctl daemon-reload && \
          systemctl restart ollama",
-        tmp = tmp_path
+        tmp = tmp_path.replace('\'', "'\\''")
     );
 
     let result = Command::new("pkexec")
