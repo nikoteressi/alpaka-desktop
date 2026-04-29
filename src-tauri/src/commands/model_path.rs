@@ -88,6 +88,32 @@ pub fn override_file_content(resolved_path: &str) -> String {
     format!("[Service]\nEnvironment=\"OLLAMA_MODELS={resolved_path}\"\n")
 }
 
+// ── Commands ───────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn validate_model_path(path: String) -> Result<ModelPathInfo, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let resolved = expand_tilde(&path);
+        let resolved_str = resolved.to_string_lossy().to_string();
+        let exists = resolved.is_dir();
+        let (accessible, model_count) = if exists {
+            match std::fs::read_dir(&resolved) {
+                Ok(_) => (true, count_models(&resolved)),
+                Err(_) => (false, 0),
+            }
+        } else {
+            (false, 0)
+        };
+        Ok(ModelPathInfo {
+            resolved_path: resolved_str,
+            exists,
+            accessible,
+            model_count,
+        })
+    })
+    .await?
+}
+
 // ── Placeholder stubs (filled in later tasks) ─────────────────────────────────
 
 #[allow(dead_code)]
@@ -185,5 +211,50 @@ mod tests {
     fn override_file_content_with_home_path() {
         let content = override_file_content("/home/user/.ollama/models");
         assert!(content.contains("OLLAMA_MODELS=/home/user/.ollama/models"));
+    }
+
+    // ── validate_model_path ───────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn validate_nonexistent_path() {
+        let result = validate_model_path("/nonexistent/path/xyz_alpaka_test_123".into())
+            .await
+            .unwrap();
+        assert!(!result.exists);
+        assert!(!result.accessible);
+        assert_eq!(result.model_count, 0);
+    }
+
+    #[tokio::test]
+    async fn validate_existing_empty_dir() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let result = validate_model_path(dir.path().to_str().unwrap().into())
+            .await
+            .unwrap();
+        assert!(result.exists);
+        assert!(result.accessible);
+        assert_eq!(result.model_count, 0);
+    }
+
+    #[tokio::test]
+    async fn validate_dir_with_models() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let base = dir.path().join("manifests/registry.ollama.ai/library/llama3");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("latest"), b"{}").unwrap();
+
+        let result = validate_model_path(dir.path().to_str().unwrap().into())
+            .await
+            .unwrap();
+        assert!(result.exists);
+        assert!(result.accessible);
+        assert_eq!(result.model_count, 1);
+    }
+
+    #[tokio::test]
+    async fn validate_tilde_path_resolves() {
+        let result = validate_model_path("~".into()).await.unwrap();
+        assert!(result.exists);
+        assert!(!result.resolved_path.contains('~'));
     }
 }
