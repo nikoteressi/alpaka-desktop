@@ -749,14 +749,42 @@ interface ModelPathResult {
 }
 
 async function applyModelPath(path: string) {
-  // ① Update Pinia store + SQLite immediately — v-model reflects this
+  const previousPath = settingsStore.modelPath;
+  // ① Optimistic update — input reflects new path immediately
   await settingsStore.updateSetting("modelPath", path);
 
+  // ② Reset / empty path: remove the systemd override
+  if (!path.trim()) {
+    try {
+      await invoke("apply_model_path", { path });
+      openModal({
+        title: "Model Path Reset",
+        message:
+          "Ollama will use the default model storage path after restart.",
+        confirmLabel: "OK",
+        kind: "primary",
+        hideCancel: true,
+        onConfirm: () => {},
+      });
+    } catch (err: unknown) {
+      await settingsStore.updateSetting("modelPath", previousPath);
+      const detail = err instanceof Error ? err.message : String(err);
+      openModal({
+        title: "Failed to Reset Model Path",
+        message: `Could not reset the Ollama model path: ${detail}`,
+        confirmLabel: "OK",
+        kind: "danger",
+        hideCancel: true,
+        onConfirm: () => {},
+      });
+    }
+    return;
+  }
+
   try {
-    // ② Write systemd override (or remove it if path is empty/whitespace)
+    // ③ Apply the new path via systemd override
     const result = await invoke<ModelPathResult>("apply_model_path", { path });
 
-    // ③ Inform user
     const message = result.models_found_at_path
       ? "Restart Ollama for the new model storage path to take effect."
       : "No Ollama models found at this location. Move your existing models there, then restart Ollama to apply the change.";
@@ -770,6 +798,8 @@ async function applyModelPath(path: string) {
       onConfirm: () => {},
     });
   } catch (err: unknown) {
+    // ④ Rollback: undo the optimistic update so the bad path doesn't persist
+    await settingsStore.updateSetting("modelPath", previousPath);
     const detail = err instanceof Error ? err.message : String(err);
     openModal({
       title: "Failed to Apply Model Path",
