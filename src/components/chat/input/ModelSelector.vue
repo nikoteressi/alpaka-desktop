@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
-import { useModelStore } from "../../../stores/models";
+import { useModelStore, modelMatchesTag } from "../../../stores/models";
 import type { ModelName } from "../../../types/models";
 import ModelTagBadge from "../../shared/ModelTagBadge.vue";
 
@@ -21,12 +21,27 @@ const modelSearch = ref("");
 const modelSelectorRef = ref<HTMLElement | null>(null);
 const modelSearchInput = ref<HTMLInputElement | null>(null);
 
-const allModelNames = computed(() => modelStore.models.map((m) => m.name));
+const selectorTagFilter = ref<string | null>(null);
+
+const allModelNames = computed(() =>
+  modelStore.sortedModels.map((m) => m.name),
+);
 
 const filteredInstalledModels = computed(() => {
-  if (!modelSearch.value.trim()) return modelStore.models;
+  let base = modelStore.sortedModels;
+  if (selectorTagFilter.value) {
+    base = base.filter((m) =>
+      modelMatchesTag(
+        m.name,
+        selectorTagFilter.value!,
+        modelStore.modelUserData,
+        modelStore.capabilities[m.name],
+      ),
+    );
+  }
+  if (!modelSearch.value.trim()) return base;
   const s = modelSearch.value.toLowerCase();
-  return modelStore.models.filter((m) => m.name.toLowerCase().includes(s));
+  return base.filter((m) => m.name.toLowerCase().includes(s));
 });
 
 const filteredLibraryModels = computed(() => {
@@ -66,6 +81,7 @@ function selectLibraryModel(name: string) {
 
 function closeModelDropdown() {
   isModelDropdownOpen.value = false;
+  selectorTagFilter.value = null;
 }
 
 // Click outside handling
@@ -141,6 +157,37 @@ onUnmounted(() => {
         />
       </div>
 
+      <!-- Tag filter chips — only when filterable tags exist -->
+      <div
+        v-if="modelStore.allFilterableTags.length > 0"
+        class="flex flex-wrap gap-1 px-2 py-1.5 border-b border-[var(--border)] bg-[var(--bg-base)]"
+      >
+        <button
+          class="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors"
+          :class="
+            selectorTagFilter === null
+              ? 'bg-[var(--accent)]/20 text-[var(--accent)] border-[var(--accent)]/30'
+              : 'text-[var(--text-dim)] border-[var(--border)] hover:text-[var(--text)]'
+          "
+          @click="selectorTagFilter = null"
+        >
+          All
+        </button>
+        <button
+          v-for="tag in modelStore.allFilterableTags"
+          :key="tag"
+          class="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors"
+          :class="
+            selectorTagFilter === tag
+              ? 'bg-[var(--accent)]/20 text-[var(--accent)] border-[var(--accent)]/30'
+              : 'text-[var(--text-dim)] border-[var(--border)] hover:text-[var(--text)]'
+          "
+          @click="selectorTagFilter = tag"
+        >
+          {{ tag }}
+        </button>
+      </div>
+
       <div class="max-h-[380px] overflow-y-auto no-scrollbar">
         <!-- INSTALLED MODELS -->
         <template v-if="filteredInstalledModels.length > 0">
@@ -163,6 +210,19 @@ onUnmounted(() => {
             >
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 truncate">
+                  <!-- Star indicator for favorites -->
+                  <svg
+                    v-if="modelStore.isFavorite(m.name)"
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    class="text-amber-400 flex-shrink-0"
+                  >
+                    <polygon
+                      points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                    />
+                  </svg>
                   <span
                     class="truncate text-[13.5px] font-[600]"
                     :class="
@@ -220,6 +280,23 @@ onUnmounted(() => {
                     v-if="modelStore.capabilities[m.name].thinking"
                     tag="thinking"
                   />
+                </template>
+
+                <!-- User custom tags -->
+                <template v-if="modelStore.getUserTags(m.name).length > 0">
+                  <span
+                    v-for="userTag in modelStore
+                      .getUserTags(m.name)
+                      .slice(0, 2)"
+                    :key="'user-' + userTag"
+                    class="model-tag tag-user"
+                    >{{ userTag }}</span
+                  >
+                  <span
+                    v-if="modelStore.getUserTags(m.name).length > 2"
+                    class="model-tag tag-generic"
+                    >+{{ modelStore.getUserTags(m.name).length - 2 }}</span
+                  >
                 </template>
               </div>
             </div>

@@ -1,4 +1,32 @@
 import { defineStore } from "pinia";
+
+// Module-level helper — not part of store state. Used by ModelsPage and ModelSelector.
+export function modelMatchesTag(
+  modelName: string,
+  tag: string,
+  userDataMap: Record<string, { tags: string[] }>,
+  caps:
+    | {
+        vision?: boolean;
+        tools?: boolean;
+        thinking?: boolean;
+        embedding?: boolean;
+        cloud?: boolean;
+        audio?: boolean;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (userDataMap[modelName]?.tags.includes(tag)) return true;
+  if (!caps) return false;
+  if (tag === "vision") return !!caps.vision;
+  if (tag === "tools") return !!caps.tools;
+  if (tag === "thinking") return !!caps.thinking;
+  if (tag === "embed") return !!caps.embedding;
+  if (tag === "cloud") return !!caps.cloud;
+  if (tag === "audio") return !!caps.audio;
+  return false;
+}
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
@@ -8,6 +36,7 @@ import type {
   ModelCapabilities,
   LibraryTag,
   LaunchApp,
+  ModelUserData,
 } from "../types/models";
 
 export type { ModelCapabilities };
@@ -20,6 +49,7 @@ export const useModelStore = defineStore("models", {
     error: null as string | null,
     listenersInitialized: false,
     capabilities: {} as Record<string, ModelCapabilities>,
+    modelUserData: {} as Record<string, ModelUserData>,
     // Library search state
     libraryResults: [] as LibraryModel[],
     searchQuery: "",
@@ -38,6 +68,43 @@ export const useModelStore = defineStore("models", {
       state.models.some(
         (m) => m.name === name || m.name.startsWith(name + ":"),
       ),
+    /** Models sorted with favorites first, preserving relative order otherwise */
+    sortedModels: (state) => {
+      return [...state.models].sort((a, b) => {
+        const aFav = state.modelUserData[a.name]?.isFavorite ?? false;
+        const bFav = state.modelUserData[b.name]?.isFavorite ?? false;
+        if (aFav !== bFav) return aFav ? -1 : 1;
+        return 0;
+      });
+    },
+    isFavorite: (state) => (name: string) =>
+      state.modelUserData[name]?.isFavorite ?? false,
+    getUserTags: (state) => (name: string) =>
+      state.modelUserData[name]?.tags ?? [],
+    allUserTags: (state) => {
+      const tagSet = new Set<string>();
+      Object.values(state.modelUserData).forEach((d) =>
+        d.tags.forEach((t) => tagSet.add(t)),
+      );
+      return [...tagSet].sort((a, b) => a.localeCompare(b));
+    },
+    allFilterableTags: (state) => {
+      const tagSet = new Set<string>();
+      // User-defined tags
+      Object.values(state.modelUserData).forEach((d) =>
+        d.tags.forEach((t) => tagSet.add(t)),
+      );
+      // Ollama capability tags present on at least one installed model
+      Object.values(state.capabilities).forEach((caps) => {
+        if (caps.vision) tagSet.add("vision");
+        if (caps.tools) tagSet.add("tools");
+        if (caps.thinking) tagSet.add("thinking");
+        if (caps.embedding) tagSet.add("embed");
+        if (caps.cloud) tagSet.add("cloud");
+        if (caps.audio) tagSet.add("audio");
+      });
+      return [...tagSet].sort((a, b) => a.localeCompare(b));
+    },
   },
   actions: {
     async fetchModels() {
@@ -46,6 +113,8 @@ export const useModelStore = defineStore("models", {
       try {
         const models = await invoke<Model[]>("list_models");
         this.models = models;
+
+        this.fetchModelUserData();
 
         // Fetch capabilities for all models in parallel
         Promise.all(models.map((m) => this.fetchCapabilities(m.name))).catch(
@@ -69,6 +138,53 @@ export const useModelStore = defineStore("models", {
         console.error("[models] fetchModels failed:", e);
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    async fetchModelUserData(): Promise<void> {
+      try {
+        const rows = await invoke<
+          Array<{ name: string; is_favorite: boolean; tags: string[] }>
+        >("list_model_user_data");
+        const map: Record<string, ModelUserData> = {};
+        for (const row of rows) {
+          map[row.name] = {
+            name: row.name,
+            isFavorite: row.is_favorite,
+            tags: row.tags,
+          };
+        }
+        this.modelUserData = map;
+      } catch (e) {
+        console.error("[models] fetchModelUserData failed:", e);
+      }
+    },
+
+    async toggleFavorite(name: string): Promise<void> {
+      try {
+        const newState = await invoke<boolean>("toggle_model_favorite", {
+          name,
+        });
+        if (this.modelUserData[name]) {
+          this.modelUserData[name].isFavorite = newState;
+        } else {
+          this.modelUserData[name] = { name, isFavorite: newState, tags: [] };
+        }
+      } catch (e) {
+        console.error("[models] toggleFavorite failed:", e);
+      }
+    },
+
+    async setModelTags(name: string, tags: string[]): Promise<void> {
+      try {
+        await invoke<void>("set_model_tags", { name, tags });
+        if (this.modelUserData[name]) {
+          this.modelUserData[name].tags = tags;
+        } else {
+          this.modelUserData[name] = { name, isFavorite: false, tags };
+        }
+      } catch (e) {
+        console.error("[models] setModelTags failed:", e);
       }
     },
 

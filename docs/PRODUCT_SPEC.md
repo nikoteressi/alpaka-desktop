@@ -80,7 +80,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | MO-04 | **Delete models** | P0 | ✅ | Individual deletion with size indicator |
 | MO-05 | **Model details view** | P0 | ✅ | Capabilities, README, tags via library API |
 | MO-06 | **Custom model creation** | P1 | Backlog | Create from Modelfile |
-| MO-07 | **Model tags/favorites** | P1 | Backlog | User tags and quick-access favorites |
+| MO-07 | **Model tags/favorites** | P1 | ✅ | User tags and quick-access favorites |
 | MO-08 | **Configurable storage path** | P0 | Backlog | Choose where model blobs are stored |
 | MO-09 | **Model update notifications** | P1 | Backlog | Detect newer versions of pulled models |
 

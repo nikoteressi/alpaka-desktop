@@ -26,6 +26,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "model_settings table",
         sql: include_str!("sql/002_model_settings.sql"),
     },
+    Migration {
+        version: 11,
+        description: "model_user_data table",
+        sql: include_str!("sql/003_model_user_data.sql"),
+    },
 ];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────

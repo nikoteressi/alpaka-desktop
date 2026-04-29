@@ -171,6 +171,21 @@ pub(crate) fn parse_library_html(html: &str) -> Vec<LibraryModel> {
 const USER_AGENT: &str =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36";
 
+fn validate_slug(slug: &str) -> Result<(), AppError> {
+    if slug.is_empty()
+        || slug.len() > 128
+        || !slug
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':')
+    {
+        return Err(AppError::Internal(format!(
+            "Invalid model slug: '{}'",
+            slug
+        )));
+    }
+    Ok(())
+}
+
 pub async fn search(
     client: &reqwest::Client,
     query: &str,
@@ -223,6 +238,7 @@ pub async fn search(
 }
 
 pub async fn get_tags(client: &reqwest::Client, slug: &str) -> Result<Vec<LibraryTag>, AppError> {
+    validate_slug(slug)?;
     let url = format!("https://ollama.com/library/{}/tags", slug);
     let resp = client
         .get(&url)
@@ -296,6 +312,7 @@ pub async fn get_readme(
     client: &reqwest::Client,
     slug: &str,
 ) -> Result<LibraryModelDetails, AppError> {
+    validate_slug(slug)?;
     let url = format!("https://ollama.com/library/{}", slug);
     let resp = client
         .get(&url)

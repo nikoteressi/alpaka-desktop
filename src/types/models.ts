@@ -83,3 +83,9 @@ export interface PullHistoryEntry {
   started_at: string;
   finished_at?: string;
 }
+
+export interface ModelUserData {
+  name: string;
+  isFavorite: boolean;
+  tags: string[];
+}

@@ -76,6 +76,18 @@ fn count_models(base: &std::path::Path) -> u32 {
     count
 }
 
+/// Reject paths that would break the systemd unit-file format.
+/// A newline would inject an extra directive; a double-quote would close
+/// the Environment= value and allow further injection.
+fn validate_path_for_unit_file(path: &str) -> Result<(), AppError> {
+    if path.contains('\n') || path.contains('\r') || path.contains('"') {
+        return Err(AppError::Internal(
+            "Model path must not contain newlines or double-quote characters".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Generate the content of a systemd service override that sets `OLLAMA_MODELS`.
 fn override_file_content(resolved_path: &str) -> String {
     format!("[Service]\nEnvironment=\"OLLAMA_MODELS={resolved_path}\"\n")
@@ -230,6 +242,8 @@ async fn clear_system_service() -> Result<ApplyModelPathResult, AppError> {
 }
 
 async fn apply_user_service(resolved_path: &str) -> Result<ApplyModelPathResult, AppError> {
+    validate_path_for_unit_file(resolved_path)?;
+
     let home =
         std::env::var("HOME").map_err(|_| AppError::Internal("HOME env var not set".into()))?;
 
@@ -277,6 +291,8 @@ async fn apply_user_service(resolved_path: &str) -> Result<ApplyModelPathResult,
 }
 
 async fn apply_system_service(resolved_path: &str) -> Result<ApplyModelPathResult, AppError> {
+    validate_path_for_unit_file(resolved_path)?;
+
     // Use $XDG_RUNTIME_DIR (mode 0700, per-user) to avoid a world-writable /tmp symlink attack.
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR")
         .unwrap_or_else(|_| std::env::temp_dir().to_string_lossy().into_owned());

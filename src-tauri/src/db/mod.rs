@@ -4,6 +4,7 @@ pub mod hosts;
 pub mod messages;
 pub mod migrations;
 pub mod model_settings;
+pub mod model_user_data;
 pub mod repo;
 pub mod settings;
 

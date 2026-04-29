@@ -191,7 +191,7 @@
         :model-value="modelValue.top_k ?? settingsStore.chatOptions.top_k"
         @update:model-value="updateOption('top_k', $event)"
         :min="0"
-        :max="100"
+        :max="500"
         :step="1"
         compact
       />
@@ -215,7 +215,7 @@
         "
         @update:model-value="updateOption('repeat_last_n', $event)"
         :min="0"
-        :max="128"
+        :max="512"
         :step="8"
         compact
       />

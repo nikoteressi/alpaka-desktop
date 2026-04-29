@@ -67,6 +67,24 @@ pub async fn set_async(
     .await?
 }
 
+pub fn delete(conn: &Connection, model_name: &str) -> Result<(), AppError> {
+    conn.execute(
+        "DELETE FROM model_settings WHERE model_name = ?1",
+        rusqlite::params![model_name],
+    )?;
+    Ok(())
+}
+
+pub async fn delete_async(db: DbConn, model_name: String) -> Result<(), AppError> {
+    tokio::task::spawn_blocking(move || {
+        let conn = db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        delete(&conn, &model_name)
+    })
+    .await?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

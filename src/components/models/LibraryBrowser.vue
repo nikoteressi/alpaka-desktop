@@ -51,16 +51,44 @@
       </div>
     </div>
 
+    <!-- Tag filter chips (only when results exist with tags) -->
+    <div v-if="uniqueTags.length > 0" class="flex flex-wrap gap-1.5 -mt-2">
+      <button
+        class="text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-colors"
+        :class="
+          activeTagFilter === null
+            ? 'bg-[var(--accent)]/20 text-[var(--accent)] border-[var(--accent)]/30'
+            : 'text-[var(--text-dim)] border-[var(--border)] hover:text-[var(--text)]'
+        "
+        @click="activeTagFilter = null"
+      >
+        All
+      </button>
+      <button
+        v-for="tag in uniqueTags"
+        :key="tag"
+        class="text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-colors"
+        :class="
+          activeTagFilter === tag
+            ? 'bg-[var(--accent)]/20 text-[var(--accent)] border-[var(--accent)]/30'
+            : 'text-[var(--text-dim)] border-[var(--border)] hover:text-[var(--text)]'
+        "
+        @click="activeTagFilter = tag"
+      >
+        {{ tag }}
+      </button>
+    </div>
+
     <!-- Results Grid -->
     <div class="relative min-h-[400px]">
       <Transition name="fade-up" mode="out-in">
         <div
-          v-if="results.length > 0"
+          v-if="filteredResults.length > 0"
           key="results"
           class="grid grid-cols-1 sm:grid-cols-2 gap-4"
         >
           <ModelCard
-            v-for="model in results"
+            v-for="model in filteredResults"
             :key="model.slug"
             :name="model.name"
             :description="model.description"
@@ -84,6 +112,21 @@
           >
             Searching repository...
           </p>
+        </div>
+        <div
+          v-else-if="activeTagFilter && results.length > 0"
+          key="tag-empty"
+          class="flex flex-col items-center justify-center py-20 bg-[var(--bg-input)] border border-dashed border-[var(--border)] rounded-2xl"
+        >
+          <p class="text-[14px] text-[var(--text-dim)] font-medium">
+            No models tagged "{{ activeTagFilter }}"
+          </p>
+          <button
+            @click="activeTagFilter = null"
+            class="mt-4 text-[12px] text-[var(--accent)] hover:underline font-bold"
+          >
+            Show all results
+          </button>
         </div>
         <div
           v-else-if="searchQuery.length > 0"
@@ -129,6 +172,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from "vue";
 import { useModelStore } from "../../stores/models";
 import { storeToRefs } from "pinia";
 import ModelCard from "./ModelCard.vue";
@@ -145,7 +189,26 @@ const {
   searchQuery,
 } = storeToRefs(modelStore);
 
+const activeTagFilter = ref<string | null>(null);
+
+const uniqueTags = computed(() => {
+  const tagSet = new Set<string>();
+  for (const m of results.value) {
+    for (const t of m.tags ?? []) tagSet.add(t);
+  }
+  return [...tagSet].sort((a, b) => a.localeCompare(b));
+});
+
+const filteredResults = computed(() => {
+  if (!activeTagFilter.value) return results.value;
+  const f = activeTagFilter.value.toLowerCase();
+  return results.value.filter((m) =>
+    (m.tags ?? []).some((t) => t.toLowerCase() === f),
+  );
+});
+
 function onSearchInput() {
+  activeTagFilter.value = null;
   modelStore.searchLibrary(searchQuery.value);
 }
 </script>

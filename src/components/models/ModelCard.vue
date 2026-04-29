@@ -96,6 +96,22 @@
               >{{ tagLabel(t) }}</span
             >
           </div>
+
+          <!-- User-defined custom tags -->
+          <div
+            v-if="userTags && userTags.length > 0"
+            class="model-card__user-tags flex flex-wrap gap-1 mt-1"
+          >
+            <span
+              v-for="tag in userTags.slice(0, 3)"
+              :key="'user-' + tag"
+              class="model-tag tag-user"
+              >{{ tag }}</span
+            >
+            <span v-if="userTags.length > 3" class="model-tag tag-generic"
+              >+{{ userTags.length - 3 }}</span
+            >
+          </div>
         </div>
       </div>
 
@@ -131,28 +147,101 @@
         </div>
 
         <div class="model-card__footer-right flex items-center gap-1.5">
-          <button
-            v-if="onDelete"
-            class="model-card__delete bg-none border-none text-[var(--text-dim)] p-1 flex transition-opacity duration-200"
-            :class="hovered ? 'opacity-70' : 'opacity-30'"
-            @click.stop="onDelete?.()"
-            title="Delete model"
+          <!-- Star / favorite button -->
+          <CustomTooltip
+            v-if="onFavorite"
+            :text="isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+            wrapper-class="flex"
           >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
+            <button
+              class="model-card__favorite p-1 flex transition-all duration-200"
+              :class="[
+                isFavorite
+                  ? 'text-amber-400 opacity-100'
+                  : hovered
+                    ? 'text-[var(--text-dim)] opacity-60'
+                    : 'text-[var(--text-dim)] opacity-20',
+              ]"
+              @click.stop="onFavorite?.()"
             >
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6M14 11v6" />
-              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-            </svg>
-          </button>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                :fill="isFavorite ? 'currentColor' : 'none'"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                />
+              </svg>
+            </button>
+          </CustomTooltip>
+
+          <!-- Tag edit button -->
+          <CustomTooltip
+            v-if="onEditTags"
+            :text="userTags && userTags.length > 0 ? 'Edit tags' : 'Add tags'"
+            wrapper-class="flex"
+          >
+            <button
+              class="model-card__tags p-1 flex transition-all duration-200"
+              :class="[
+                userTags && userTags.length > 0
+                  ? 'text-[var(--accent)] opacity-80'
+                  : hovered
+                    ? 'text-[var(--text-dim)] opacity-60'
+                    : 'text-[var(--text-dim)] opacity-20',
+              ]"
+              @click.stop="onEditTags?.()"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"
+                />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
+              </svg>
+            </button>
+          </CustomTooltip>
+
+          <CustomTooltip
+            v-if="onDelete"
+            text="Delete model"
+            wrapper-class="flex"
+          >
+            <button
+              class="model-card__delete bg-none border-none text-[var(--text-dim)] p-1 flex transition-opacity duration-200"
+              :class="hovered ? 'opacity-70' : 'opacity-30'"
+              @click.stop="onDelete?.()"
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6M14 11v6" />
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              </svg>
+            </button>
+          </CustomTooltip>
 
           <button
             v-if="onAction && actionLabel"
@@ -198,6 +287,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import CustomTooltip from "../shared/CustomTooltip.vue";
 
 const props = defineProps<{
   name: string;
@@ -215,6 +305,10 @@ const props = defineProps<{
   onDelete?: () => void;
   pullingPct?: number;
   glowColor?: string;
+  isFavorite?: boolean;
+  onFavorite?: () => void;
+  onEditTags?: () => void;
+  userTags?: string[];
 }>();
 
 const hovered = ref(false);

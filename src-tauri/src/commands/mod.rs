@@ -5,6 +5,7 @@ pub mod hosts;
 pub mod library;
 pub mod model_path;
 pub mod model_settings;
+pub mod model_user_data;
 pub mod models;
 pub mod service;
 pub mod settings;

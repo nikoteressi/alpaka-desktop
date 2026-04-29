@@ -259,6 +259,9 @@ tauri::generate_handler![
     commands::models::delete_model,
     commands::models::pull_model,          // streams model:pull-progress events
     commands::models::get_model_capabilities,
+    commands::model_user_data::toggle_model_favorite,
+    commands::model_user_data::set_model_tags,
+    commands::model_user_data::list_model_user_data,
 
     // ── Hosts ─────────────────────────────────────────────────────────────
     commands::hosts::list_hosts,
@@ -795,6 +798,14 @@ CREATE TABLE IF NOT EXISTS model_cache (
     quantization      TEXT    NOT NULL DEFAULT '',
     capabilities_json TEXT    NOT NULL DEFAULT '[]',
     last_synced_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- model_user_data
+CREATE TABLE IF NOT EXISTS model_user_data (
+    name        TEXT    PRIMARY KEY NOT NULL,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    tags_json   TEXT    NOT NULL DEFAULT '[]',
+    updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 -- folder_contexts

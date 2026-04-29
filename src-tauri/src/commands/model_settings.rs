@@ -23,6 +23,14 @@ pub async fn set_model_defaults(
     db::model_settings::set_async(state.db.clone(), model_name, defaults).await
 }
 
+#[command]
+pub async fn reset_model_defaults(
+    state: State<'_, AppState>,
+    model_name: String,
+) -> Result<(), AppError> {
+    db::model_settings::delete_async(state.db.clone(), model_name).await
+}
+
 pub(crate) fn validate_chat_options(opts: &ChatOptions) -> Result<(), AppError> {
     if let Some(t) = opts.temperature {
         if !(0.0..=2.0).contains(&t) {

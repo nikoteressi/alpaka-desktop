@@ -49,12 +49,37 @@
             · {{ model.details.parameter_size }}</template
           >
         </p>
-        <div class="flex gap-1.5 mt-2 flex-wrap">
+        <div class="flex gap-1.5 mt-2 flex-wrap items-center">
           <span v-if="caps?.vision" class="model-tag tag-vision">vision</span>
           <span v-if="caps?.tools" class="model-tag tag-tools">tools</span>
           <span v-if="caps?.thinking" class="model-tag tag-thinking"
             >think</span
           >
+          <template v-if="!editingTags">
+            <span
+              v-for="tag in userTags"
+              :key="'user-' + tag"
+              class="model-tag tag-user"
+              >{{ tag }}</span
+            >
+            <button
+              class="model-tag tag-generic cursor-pointer hover:opacity-80 transition-opacity"
+              @click="openTagEdit"
+            >
+              {{ userTags.length > 0 ? "edit tags" : "+ add tags" }}
+            </button>
+          </template>
+          <template v-else>
+            <input
+              ref="tagInputRef"
+              v-model="tagInputValue"
+              class="text-[11px] bg-[var(--bg-input)] border border-[var(--accent)]/50 rounded-lg px-2 py-0.5 text-[var(--text)] outline-none w-40"
+              placeholder="tag1, tag2…"
+              @keydown.enter="saveTags"
+              @keydown.escape="editingTags = false"
+              @blur="saveTags"
+            />
+          </template>
         </div>
       </div>
       <button
@@ -106,7 +131,7 @@
           :model-value="edited.top_k ?? settingsStore.chatOptions.top_k"
           @update:model-value="edited = { ...edited, top_k: $event }"
           :min="0"
-          :max="100"
+          :max="500"
           :step="1"
         />
         <SettingsSlider
@@ -126,7 +151,7 @@
           "
           @update:model-value="edited = { ...edited, repeat_last_n: $event }"
           :min="0"
-          :max="128"
+          :max="512"
           :step="8"
         />
         <SettingsSlider
@@ -167,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useSettingsStore } from "../../stores/settings";
 import { useModelStore } from "../../stores/models";
@@ -184,14 +209,36 @@ const router = useRouter();
 const settingsStore = useSettingsStore();
 const modelStore = useModelStore();
 const { startNewChat } = useAppOrchestration();
-const { applyModelDefaults, saveAsModelDefault } = useModelDefaults();
+const { applyModelDefaults, saveAsModelDefault, resetModelDefaults } =
+  useModelDefaults();
 
 const loading = ref(true);
 const edited = ref<Partial<ChatOptions>>({});
 const saved = ref(false);
 const saveError = ref(false);
+const editingTags = ref(false);
+const tagInputValue = ref("");
+const tagInputRef = ref<HTMLInputElement | null>(null);
 
 const caps = modelStore.getCapabilities(props.model.name);
+const userTags = computed(() => modelStore.getUserTags(props.model.name));
+
+async function openTagEdit() {
+  tagInputValue.value = userTags.value.join(", ");
+  editingTags.value = true;
+  await nextTick();
+  tagInputRef.value?.focus();
+}
+
+async function saveTags() {
+  if (!editingTags.value) return;
+  editingTags.value = false;
+  const tags = tagInputValue.value
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  await modelStore.setModelTags(props.model.name, tags);
+}
 
 onMounted(async () => {
   try {
@@ -204,8 +251,9 @@ onMounted(async () => {
   }
 });
 
-function resetToGlobal() {
-  edited.value = { ...settingsStore.chatOptions };
+async function resetToGlobal() {
+  await resetModelDefaults(props.model.name);
+  edited.value = {};
 }
 
 async function saveDefaults() {

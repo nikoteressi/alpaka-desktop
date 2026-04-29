@@ -66,6 +66,8 @@
   --tag-generic-text: #94a3b8;
   --tag-quant-bg: rgba(255, 255, 255, 0.04);
   --tag-quant-text: #64748b;
+  --tag-user-bg: rgba(251, 146, 60, 0.12);
+  --tag-user-text: #fb923c;
 
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
@@ -128,6 +130,8 @@
   --tag-generic-text: #64748b;
   --tag-quant-bg: rgba(0, 0, 0, 0.04);
   --tag-quant-text: #94a3b8;
+  --tag-user-bg: rgba(234, 88, 12, 0.1);
+  --tag-user-text: #ea580c;
 
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.07);
   --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.1);
@@ -280,6 +284,11 @@ body {
   color: var(--tag-quant-text);
   font-family: var(--mono);
   font-weight: 400;
+}
+
+.tag-user {
+  background: var(--tag-user-bg);
+  color: var(--tag-user-text);
 }
 
 /* ── CLOUD / ACTION BUTTON ──────────────────────────────────── */

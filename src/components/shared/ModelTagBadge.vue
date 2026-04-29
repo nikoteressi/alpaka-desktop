@@ -1,5 +1,5 @@
 <template>
-  <span :class="badgeClasses" :title="tag">{{ displayText }}</span>
+  <span :class="badgeClasses">{{ displayText }}</span>
 </template>
 
 <script setup lang="ts">
