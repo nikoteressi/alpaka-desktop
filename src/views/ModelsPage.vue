@@ -790,7 +790,13 @@ function openLocalModel(name: string) {
 }
 
 async function openEditModelfile(name: string) {
-  const modelfile = await invoke<string>("get_modelfile", { name });
+  let modelfile = "";
+  try {
+    modelfile = await invoke<string>("get_modelfile", { name });
+  } catch (e) {
+    console.error("Failed to fetch modelfile for", name, e);
+    // Fall through with empty modelfile — user can write from scratch
+  }
   selectedLocalModel.value = null;
   createModelMode.value = { name, modelfile };
 }
