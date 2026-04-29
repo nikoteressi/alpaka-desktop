@@ -32,12 +32,16 @@ describe("useModelDefaults", () => {
     const { invoke } = await import("@tauri-apps/api/core");
     vi.mocked(invoke).mockResolvedValue(null);
 
+    // Set a known value in the store so we can assert the fallback exactly
+    const { useSettingsStore } = await import("../stores/settings");
+    const settingsStore = useSettingsStore();
+    settingsStore.chatOptions.temperature = 0.42;
+
     const { useModelDefaults } = await import("./useModelDefaults");
     const { applyModelDefaults } = useModelDefaults();
     const result = await applyModelDefaults("llama3");
 
-    expect(result).toBeDefined();
-    expect(typeof result.temperature).toBe("number");
+    expect(result.temperature).toBe(0.42);
   });
 
   it("saveAsModelDefault invokes set_model_defaults with correct payload", async () => {
