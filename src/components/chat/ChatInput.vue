@@ -209,6 +209,19 @@ function resetChatOptions() {
   }
 }
 
+function resetChatOptions() {
+  const defaultPreset = settingsStore.presets.find(
+    (p) => p.id === settingsStore.defaultPresetId,
+  );
+  if (defaultPreset) {
+    chatOptions.value = { ...defaultPreset.options };
+    presetId.value = defaultPreset.id;
+  } else {
+    chatOptions.value = {};
+    presetId.value = "";
+  }
+}
+
 watch(
   activeModelName,
   async (name) => {
