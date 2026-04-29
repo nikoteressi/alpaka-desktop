@@ -275,8 +275,20 @@ async function commitSave() {
 
 async function handleSaveAsModelDefault() {
   if (!props.model) return;
+  const effective: Partial<ChatOptions> = {
+    temperature:
+      props.modelValue.temperature ?? settingsStore.chatOptions.temperature,
+    top_p: props.modelValue.top_p ?? settingsStore.chatOptions.top_p,
+    top_k: props.modelValue.top_k ?? settingsStore.chatOptions.top_k,
+    num_ctx: props.modelValue.num_ctx ?? settingsStore.chatOptions.num_ctx,
+    repeat_penalty:
+      props.modelValue.repeat_penalty ??
+      settingsStore.chatOptions.repeat_penalty,
+    repeat_last_n:
+      props.modelValue.repeat_last_n ?? settingsStore.chatOptions.repeat_last_n,
+  };
   try {
-    await saveAsModelDefault(props.model, props.modelValue);
+    await saveAsModelDefault(props.model, effective);
     savedAsDefault.value = true;
     setTimeout(() => {
       savedAsDefault.value = false;
