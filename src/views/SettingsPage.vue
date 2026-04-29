@@ -640,9 +640,11 @@ import AccountSettings from "../components/settings/AccountSettings.vue";
 import HostSettings from "../components/settings/HostSettings.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
 import { useSettingsStore } from "../stores/settings";
+import { useModelsStore } from "../stores/models";
 import { useConfirmationModal } from "../composables/useConfirmationModal";
 
 const settingsStore = useSettingsStore();
+const modelsStore = useModelsStore();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
 
 // ── Model path feature ────────────────────────────────────────────────────────
@@ -754,6 +756,10 @@ async function applyModelPath(path: string) {
       pathApply.value = { status: "manual", message: result.message };
     } else {
       pathApply.value = { status: "success", message: result.message };
+      if (result.restarted) {
+        // Give Ollama a moment to come back up before re-fetching
+        setTimeout(() => modelsStore.fetchModels(), 2000);
+      }
     }
   } catch (err: unknown) {
     const msg =
