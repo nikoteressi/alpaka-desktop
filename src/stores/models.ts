@@ -55,7 +55,17 @@ export const useModelStore = defineStore("models", {
             console.error("Failed to fetch capabilities for some models:", err),
         );
       } catch (e: unknown) {
-        this.error = e instanceof Error ? e.message : String(e);
+        // Tauri AppError serializes as a tagged object, e.g. {"Http":"connection refused"}
+        if (e && typeof e === "object" && !Array.isArray(e)) {
+          const entries = Object.entries(e as Record<string, unknown>);
+          this.error =
+            entries.length > 0
+              ? entries.map(([k, v]) => `${k}: ${v}`).join("; ")
+              : JSON.stringify(e);
+        } else {
+          this.error = e instanceof Error ? e.message : String(e);
+        }
+        console.error("[models] fetchModels failed:", e);
       } finally {
         this.isLoading = false;
       }
