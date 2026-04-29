@@ -135,9 +135,14 @@ const saved = ref(false);
 const caps = modelStore.getCapabilities(props.model.name);
 
 onMounted(async () => {
-  const stored = await applyModelDefaults(props.model.name);
-  edited.value = { ...stored };
-  loading.value = false;
+  try {
+    const stored = await applyModelDefaults(props.model.name);
+    edited.value = { ...stored };
+  } catch {
+    // fall back to empty defaults on IPC failure
+  } finally {
+    loading.value = false;
+  }
 });
 
 function resetToGlobal() {
