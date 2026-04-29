@@ -697,7 +697,7 @@ watch(
           };
         } else if (!info.accessible) {
           pathValidation.value = {
-            status: "ok",
+            status: "warning",
             message:
               "System path — Alpaka will request elevated access to configure Ollama",
             modelCount: 0,
@@ -952,6 +952,10 @@ async function browseModelPath() {
     }
   } catch (err) {
     console.error("Failed to pick directory:", err);
+    pathApply.value = {
+      status: "error",
+      message: "Could not open directory picker",
+    };
   }
 }
 
