@@ -124,7 +124,6 @@ async fn run_systemctl(args: &[&str]) -> bool {
         .unwrap_or(false)
 }
 
-#[allow(dead_code)]
 async fn detect_service_type() -> ServiceType {
     // Prefer user service — no elevated privileges needed
     let user_checks: &[&[&str]] = &[
@@ -196,6 +195,68 @@ async fn apply_user_service(resolved_path: &str) -> Result<ApplyModelPathResult,
             "Model path configured. Start Ollama to apply.".into()
         },
     })
+}
+
+async fn apply_system_service(resolved_path: &str) -> Result<ApplyModelPathResult, AppError> {
+    let tmp_path = "/tmp/alpaka_ollama_override.conf";
+    std::fs::write(tmp_path, override_file_content(resolved_path))?;
+
+    // Single pkexec call = single polkit password prompt.
+    // The model path lives in the file content, not in shell args, preventing injection.
+    let script = format!(
+        "mkdir -p /etc/systemd/system/ollama.service.d && \
+         cp {tmp} /etc/systemd/system/ollama.service.d/override.conf && \
+         systemctl daemon-reload && \
+         systemctl restart ollama",
+        tmp = tmp_path
+    );
+
+    let result = Command::new("pkexec")
+        .args(["sh", "-c", &script])
+        .status()
+        .await;
+
+    let _ = std::fs::remove_file(tmp_path);
+
+    match result {
+        Ok(s) if s.success() => Ok(ApplyModelPathResult {
+            service_type: "system".into(),
+            applied: true,
+            restarted: true,
+            message: "Ollama restarted with new model path".into(),
+        }),
+        Ok(_) => Err(AppError::Service(
+            "Elevated access was denied or failed. Model path not applied.".into(),
+        )),
+        Err(e) => Err(AppError::Service(format!(
+            "pkexec not available: {}. Install polkit to configure the system service.",
+            e
+        ))),
+    }
+}
+
+#[tauri::command]
+pub async fn apply_model_path(
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<ApplyModelPathResult, AppError> {
+    let resolved = expand_tilde(&path);
+    let resolved_str = resolved.to_string_lossy().to_string();
+
+    db::settings::set_async(state.db.clone(), "modelPath".to_string(), path).await?;
+
+    match detect_service_type().await {
+        ServiceType::User => apply_user_service(&resolved_str).await,
+        ServiceType::System => apply_system_service(&resolved_str).await,
+        ServiceType::None => Ok(ApplyModelPathResult {
+            service_type: "none".into(),
+            applied: false,
+            restarted: false,
+            message: format!(
+                "Path saved. Set OLLAMA_MODELS={resolved_str} in your environment before starting Ollama."
+            ),
+        }),
+    }
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
