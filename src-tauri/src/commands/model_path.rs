@@ -33,6 +33,7 @@ pub struct ApplyModelPathResult {
 
 // ── Internal helpers ───────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 enum ServiceType {
     User,
@@ -84,11 +85,12 @@ pub fn count_models(base: &std::path::Path) -> u32 {
 
 /// Generate the content of a systemd service override that sets `OLLAMA_MODELS`.
 pub fn override_file_content(resolved_path: &str) -> String {
-    format!("[Service]\nEnvironment=\"OLLAMA_MODELS={}\"\n", resolved_path)
+    format!("[Service]\nEnvironment=\"OLLAMA_MODELS={resolved_path}\"\n")
 }
 
 // ── Placeholder stubs (filled in later tasks) ─────────────────────────────────
 
+#[allow(dead_code)]
 async fn detect_service_type() -> ServiceType {
     ServiceType::None
 }
