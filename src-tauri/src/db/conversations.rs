@@ -132,12 +132,15 @@ pub fn update_title(conn: &Connection, id: &str, title: &str) -> Result<(), AppE
 
 /// Update the model for a conversation and bump updated_at.
 pub fn update_model(conn: &Connection, id: &str, model: &str) -> Result<(), AppError> {
-    conn.execute(
+    let changed = conn.execute(
         "UPDATE conversations
          SET model = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
          WHERE id = ?2",
         rusqlite::params![model, id],
     )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
+    }
     Ok(())
 }
 
