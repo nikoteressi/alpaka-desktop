@@ -45,6 +45,25 @@
           <LocalModelDetails
             :model="selectedLocalModel"
             @back="selectedLocalModel = null"
+            @edit-modelfile="openEditModelfile"
+          />
+        </div>
+
+        <div
+          v-else-if="createModelMode"
+          key="create"
+          class="flex flex-col h-full"
+        >
+          <CreateModelPage
+            :initial-name="createModelMode.name"
+            :initial-modelfile="createModelMode.modelfile"
+            @back="createModelMode = null"
+            @view-model="
+              (name: string) => {
+                createModelMode = null;
+                openLocalModel(name);
+              }
+            "
           />
         </div>
 
@@ -57,11 +76,34 @@
           </div>
 
           <!-- Glassy Horizontal Tabs -->
-          <AppTabs
-            v-model="activeTab"
-            :tabs="tabs"
-            aria-label="Models categories"
-          />
+          <div class="flex items-center gap-2 mb-1">
+            <div class="flex-1">
+              <AppTabs
+                v-model="activeTab"
+                :tabs="tabs"
+                aria-label="Models categories"
+              />
+            </div>
+            <button
+              @click="createModelMode = { name: '', modelfile: '' }"
+              class="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-[var(--accent)] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity flex-shrink-0"
+            >
+              <svg
+                class="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Create
+            </button>
+          </div>
 
           <div class="flex flex-col gap-4">
             <!-- Global Active Pulls -->
@@ -96,6 +138,52 @@
                     class="bg-[#4a80d0] h-1 rounded-sm transition-all shadow-[0_0_8px_rgba(74,128,208,0.5)]"
                     :style="{ width: prog.percent + '%' }"
                   />
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Creates -->
+            <div
+              v-if="Object.keys(modelStore.creating).length > 0"
+              class="flex flex-col gap-2 mb-2"
+            >
+              <p
+                class="text-[11px] text-[var(--accent)] font-bold uppercase tracking-wider px-1"
+              >
+                Active Creates
+              </p>
+              <div
+                v-for="cs in modelStore.creating"
+                :key="'creating-' + cs.name"
+                class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-[10px_14px] cursor-pointer hover:border-[var(--accent)] transition-colors"
+                @click="
+                  createModelMode = { name: cs.name, modelfile: cs.modelfile }
+                "
+              >
+                <div class="flex items-center justify-between mb-1">
+                  <span
+                    class="text-[13px] text-[var(--text)] font-medium truncate"
+                    >{{ cs.name }}</span
+                  >
+                  <span
+                    class="text-[12px] text-[var(--text-muted)] ml-2 flex-shrink-0"
+                    >{{ cs.status }}</span
+                  >
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <div
+                    class="w-2 h-2 rounded-full flex-shrink-0"
+                    :class="{
+                      'bg-[var(--accent)] animate-pulse':
+                        cs.phase === 'running',
+                      'bg-green-400': cs.phase === 'done',
+                      'bg-red-400': cs.phase === 'error',
+                      'bg-yellow-400': cs.phase === 'cancelled',
+                    }"
+                  />
+                  <span class="text-[11px] text-[var(--text-dim)] capitalize">{{
+                    cs.phase
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -501,7 +589,9 @@ import LibraryModelDetails from "../components/models/LibraryModelDetails.vue";
 import LocalModelDetails from "../components/models/LocalModelDetails.vue";
 import LibraryBrowser from "../components/models/LibraryBrowser.vue";
 import CloudTagSelector from "../components/models/CloudTagSelector.vue";
+import CreateModelPage from "../components/models/CreateModelPage.vue";
 import { useModelStore, modelMatchesTag } from "../stores/models";
+import { invoke } from "@tauri-apps/api/core";
 import { useAppOrchestration } from "../composables/useAppOrchestration";
 import { useConfirmationModal } from "../composables/useConfirmationModal";
 import { useModelLibrary } from "../composables/useModelLibrary";
@@ -512,6 +602,11 @@ const modelStore = useModelStore();
 const { selectedModel } = storeToRefs(modelStore);
 
 const selectedLocalModel = ref<Model | null>(null);
+
+const createModelMode = ref<{
+  name: string;
+  modelfile: string;
+} | null>(null);
 
 const modelStoreErrorMessage = computed(() => modelStore.error ?? "");
 const orchestration = useAppOrchestration();
@@ -692,6 +787,12 @@ function confirmDelete(name: string) {
 function openLocalModel(name: string) {
   const model = modelStore.models.find((m) => m.name === name);
   if (model) selectedLocalModel.value = model;
+}
+
+async function openEditModelfile(name: string) {
+  const modelfile = await invoke<string>("get_modelfile", { name });
+  selectedLocalModel.value = null;
+  createModelMode.value = { name, modelfile };
 }
 
 // Subpage details
