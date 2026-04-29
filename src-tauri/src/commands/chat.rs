@@ -171,6 +171,7 @@ pub async fn update_conversation_settings(
     conversation_id: String,
     settings: ChatOptions,
 ) -> Result<(), AppError> {
+    super::model_settings::validate_chat_options(&settings)?;
     let json = serde_json::to_string(&settings).map_err(|e| AppError::Serialization(e.to_string()))?;
     let db = state.db.clone();
     tokio::task::spawn_blocking(move || {

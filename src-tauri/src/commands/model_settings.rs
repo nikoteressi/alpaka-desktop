@@ -23,7 +23,7 @@ pub async fn set_model_defaults(
     db::model_settings::set_async(state.db.clone(), model_name, defaults).await
 }
 
-fn validate_chat_options(opts: &ChatOptions) -> Result<(), AppError> {
+pub(crate) fn validate_chat_options(opts: &ChatOptions) -> Result<(), AppError> {
     if let Some(t) = opts.temperature {
         if !(0.0..=2.0).contains(&t) {
             return Err(AppError::Validation(
@@ -59,6 +59,14 @@ fn validate_chat_options(opts: &ChatOptions) -> Result<(), AppError> {
         if !(0..=512).contains(&rn) {
             return Err(AppError::Validation(
                 "repeat_last_n must be in [0, 512]".into(),
+            ));
+        }
+    }
+    if let Some(np) = opts.num_predict {
+        // -1 is the Ollama sentinel for "generate until stop token"; cap positive values
+        if np != -1 && !(1..=32768).contains(&np) {
+            return Err(AppError::Validation(
+                "num_predict must be -1 (unlimited) or in [1, 32768]".into(),
             ));
         }
     }

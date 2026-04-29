@@ -196,6 +196,25 @@ const isAdvancedOptionsOpen = ref(false);
 const chatOptions = ref<ChatOptions>({});
 const presetId = ref<string>("");
 
+function parseChatOptionsJson(raw: string): Partial<ChatOptions> | null {
+  try {
+    const obj = JSON.parse(raw);
+    if (typeof obj !== "object" || obj === null) return null;
+    const out: Partial<ChatOptions> = {};
+    if (typeof obj.temperature === "number") out.temperature = obj.temperature;
+    if (typeof obj.top_p === "number") out.top_p = obj.top_p;
+    if (typeof obj.top_k === "number") out.top_k = obj.top_k;
+    if (typeof obj.num_ctx === "number") out.num_ctx = obj.num_ctx;
+    if (typeof obj.repeat_penalty === "number")
+      out.repeat_penalty = obj.repeat_penalty;
+    if (typeof obj.repeat_last_n === "number")
+      out.repeat_last_n = obj.repeat_last_n;
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 function resetChatOptions() {
   const defaultPreset = settingsStore.presets.find(
     (p) => p.id === settingsStore.defaultPresetId,
@@ -426,13 +445,7 @@ function loadDraft() {
       (c) => c.id === activeConvId.value,
     );
     const savedSettings = conv?.settings_json
-      ? (() => {
-          try {
-            return JSON.parse(conv.settings_json) as ChatOptions;
-          } catch {
-            return null;
-          }
-        })()
+      ? parseChatOptionsJson(conv.settings_json)
       : null;
     if (savedSettings && Object.keys(savedSettings).length > 0) {
       chatOptions.value = savedSettings;
