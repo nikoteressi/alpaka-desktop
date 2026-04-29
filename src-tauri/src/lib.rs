@@ -24,6 +24,8 @@ pub fn run() {
             commands::models::delete_model,
             commands::models::pull_model,
             commands::models::get_model_capabilities,
+            commands::model_path::validate_model_path,
+            commands::model_path::apply_model_path,
             commands::auth::login,
             commands::auth::logout,
             commands::auth::get_auth_status,
