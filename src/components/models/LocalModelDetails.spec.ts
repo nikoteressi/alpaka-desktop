@@ -78,6 +78,9 @@ describe("LocalModelDetails", () => {
     await resetBtn.trigger("click");
 
     // set_model_defaults should NOT have been called (reset is not auto-save)
-    expect(invoke).not.toHaveBeenCalledWith("set_model_defaults", expect.anything());
+    expect(invoke).not.toHaveBeenCalledWith(
+      "set_model_defaults",
+      expect.anything(),
+    );
   });
 });

@@ -1,36 +1,70 @@
 <template>
-  <div class="flex flex-col h-full animate-in fade-in slide-in-from-left-2 duration-300">
+  <div
+    class="flex flex-col h-full animate-in fade-in slide-in-from-left-2 duration-300"
+  >
     <!-- Breadcrumb -->
     <div class="flex items-center gap-2.5 mb-5">
       <button
         @click="$emit('back')"
         class="flex items-center gap-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text)] transition-all py-1 px-2 rounded-md hover:bg-[var(--bg-hover)]"
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+        >
           <path d="M19 12H5M12 19l-7-7 7-7" />
         </svg>
         <span>Local Models</span>
       </button>
       <span class="text-[var(--text-dim)] text-[12px] opacity-60">/</span>
-      <span class="text-[13px] text-[var(--text)] font-semibold">{{ model.name }}</span>
+      <span class="text-[13px] text-[var(--text)] font-semibold">{{
+        model.name
+      }}</span>
     </div>
 
     <!-- Model header -->
-    <div class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5 mb-4 flex items-start gap-4">
-      <div class="w-11 h-11 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-strong)] flex items-center justify-center font-bold text-[18px] text-[var(--text)] flex-shrink-0">
+    <div
+      class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5 mb-4 flex items-start gap-4"
+    >
+      <div
+        class="w-11 h-11 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-strong)] flex items-center justify-center font-bold text-[18px] text-[var(--text)] flex-shrink-0"
+      >
         {{ model.name.charAt(0).toUpperCase() }}
       </div>
       <div class="flex-1 min-w-0">
-        <p class="text-[15px] font-bold text-[var(--text)] mb-1">{{ model.name }}</p>
+        <p class="text-[15px] font-bold text-[var(--text)] mb-1">
+          {{ model.name }}
+        </p>
         <p class="text-[12px] text-[var(--text-muted)]">
           {{ formatSize(model.size) }}
-          <template v-if="model.details.quantization_level"> · {{ model.details.quantization_level }}</template>
-          <template v-if="model.details.parameter_size"> · {{ model.details.parameter_size }}</template>
+          <template v-if="model.details.quantization_level">
+            · {{ model.details.quantization_level }}</template
+          >
+          <template v-if="model.details.parameter_size">
+            · {{ model.details.parameter_size }}</template
+          >
         </p>
         <div class="flex gap-1.5 mt-2 flex-wrap">
-          <span v-if="caps?.vision" class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">vision</span>
-          <span v-if="caps?.tools" class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">tools</span>
-          <span v-if="caps?.thinking" class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">thinking</span>
+          <span
+            v-if="caps?.vision"
+            class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20"
+            >vision</span
+          >
+          <span
+            v-if="caps?.tools"
+            class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20"
+            >tools</span
+          >
+          <span
+            v-if="caps?.thinking"
+            class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20"
+            >thinking</span
+          >
         </div>
       </div>
       <button
@@ -42,52 +76,81 @@
     </div>
 
     <!-- Default generation settings -->
-    <div class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5">
-      <p class="text-[12px] font-bold text-[var(--text)] uppercase tracking-wider mb-4">
+    <div
+      class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-2xl p-5"
+    >
+      <p
+        class="text-[12px] font-bold text-[var(--text)] uppercase tracking-wider mb-4"
+      >
         Default Generation Settings
       </p>
 
-      <div v-if="loading" class="text-[13px] text-[var(--text-dim)] text-center py-4">Loading…</div>
+      <div
+        v-if="loading"
+        class="text-[13px] text-[var(--text-dim)] text-center py-4"
+      >
+        Loading…
+      </div>
 
       <div v-else class="flex flex-col gap-5">
         <SettingsSlider
           label="Temperature"
-          :model-value="edited.temperature ?? settingsStore.chatOptions.temperature"
+          :model-value="
+            edited.temperature ?? settingsStore.chatOptions.temperature
+          "
           @update:model-value="edited = { ...edited, temperature: $event }"
-          :min="0" :max="1" :step="0.05"
+          :min="0"
+          :max="1"
+          :step="0.05"
         />
         <SettingsSlider
           label="Context (tokens)"
           :model-value="edited.num_ctx ?? settingsStore.chatOptions.num_ctx"
           @update:model-value="edited = { ...edited, num_ctx: $event }"
-          :min="512" :max="131072" :step="512"
+          :min="512"
+          :max="131072"
+          :step="512"
         />
         <SettingsSlider
           label="Top P"
           :model-value="edited.top_p ?? settingsStore.chatOptions.top_p"
           @update:model-value="edited = { ...edited, top_p: $event }"
-          :min="0" :max="1" :step="0.05"
+          :min="0"
+          :max="1"
+          :step="0.05"
         />
         <SettingsSlider
           label="Top K"
           :model-value="edited.top_k ?? settingsStore.chatOptions.top_k"
           @update:model-value="edited = { ...edited, top_k: $event }"
-          :min="0" :max="100" :step="1"
+          :min="0"
+          :max="100"
+          :step="1"
         />
         <SettingsSlider
           label="Repeat Penalty"
-          :model-value="edited.repeat_penalty ?? settingsStore.chatOptions.repeat_penalty"
+          :model-value="
+            edited.repeat_penalty ?? settingsStore.chatOptions.repeat_penalty
+          "
           @update:model-value="edited = { ...edited, repeat_penalty: $event }"
-          :min="1" :max="2" :step="0.05"
+          :min="1"
+          :max="2"
+          :step="0.05"
         />
         <SettingsSlider
           label="Repeat Last N"
-          :model-value="edited.repeat_last_n ?? settingsStore.chatOptions.repeat_last_n"
+          :model-value="
+            edited.repeat_last_n ?? settingsStore.chatOptions.repeat_last_n
+          "
           @update:model-value="edited = { ...edited, repeat_last_n: $event }"
-          :min="0" :max="128" :step="8"
+          :min="0"
+          :max="128"
+          :step="8"
         />
 
-        <div class="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)]">
+        <div
+          class="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)]"
+        >
           <button
             data-testid="reset-defaults"
             @click="resetToGlobal"

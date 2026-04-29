@@ -106,7 +106,11 @@
           @click="handleSaveAsModelDefault"
           class="text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors cursor-pointer"
         >
-          {{ savedAsDefault ? "Saved as model default ✓" : "Save as model default" }}
+          {{
+            savedAsDefault
+              ? "Saved as model default ✓"
+              : "Save as model default"
+          }}
         </button>
       </div>
     </div>

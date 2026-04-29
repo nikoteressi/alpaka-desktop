@@ -426,7 +426,8 @@ describe("ChatInput — Model defaults on selection", () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "get_model_defaults")
         return Promise.resolve({ temperature: 0.1, num_ctx: 8192 });
-      if (cmd === "update_conversation_model") return Promise.resolve(undefined);
+      if (cmd === "update_conversation_model")
+        return Promise.resolve(undefined);
       if (cmd === "get_model_capabilities")
         return Promise.resolve({
           vision: false,
@@ -459,7 +460,8 @@ describe("ChatInput — Model defaults on selection", () => {
   it("GIVEN no model defaults stored — selectModel does not throw", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "get_model_defaults") return Promise.resolve(null);
-      if (cmd === "update_conversation_model") return Promise.resolve(undefined);
+      if (cmd === "update_conversation_model")
+        return Promise.resolve(undefined);
       if (cmd === "get_model_capabilities")
         return Promise.resolve({
           vision: false,
