@@ -159,6 +159,82 @@ async fn detect_service_type() -> ServiceType {
 
 // ── Service application ────────────────────────────────────────────────────────
 
+/// Remove the user-service override and restart Ollama so it falls back to its default model path.
+async fn clear_user_service() -> Result<ApplyModelPathResult, AppError> {
+    let home = std::env::var("HOME")
+        .map_err(|_| AppError::Internal("HOME env var not set".into()))?;
+
+    let override_path = PathBuf::from(&home)
+        .join(".config/systemd/user/ollama.service.d/override.conf");
+
+    // Best-effort removal; if the file doesn't exist, that's fine.
+    let _ = std::fs::remove_file(&override_path);
+
+    let reload_ok = Command::new("systemctl")
+        .args(["--user", "daemon-reload"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    if !reload_ok {
+        return Err(AppError::Service(
+            "systemctl --user daemon-reload failed".into(),
+        ));
+    }
+
+    let restarted = Command::new("systemctl")
+        .args(["--user", "restart", "ollama"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    Ok(ApplyModelPathResult {
+        service_type: "user".into(),
+        applied: true,
+        restarted,
+        message: if restarted {
+            "Ollama restarted with default model path".into()
+        } else {
+            "Model path override removed. Start Ollama to apply.".into()
+        },
+    })
+}
+
+/// Remove the system-service override via pkexec and restart Ollama.
+async fn clear_system_service() -> Result<ApplyModelPathResult, AppError> {
+    let script =
+        "rm -f /etc/systemd/system/ollama.service.d/override.conf && \
+         systemctl daemon-reload && \
+         systemctl restart ollama";
+
+    let result = Command::new("pkexec")
+        .args(["sh", "-c", script])
+        .status()
+        .await;
+
+    match result {
+        Ok(s) if s.success() => Ok(ApplyModelPathResult {
+            service_type: "system".into(),
+            applied: true,
+            restarted: true,
+            message: "Ollama restarted with default model path".into(),
+        }),
+        Ok(_) => Err(AppError::Service(
+            "Elevated access was denied or failed. Override not removed.".into(),
+        )),
+        Err(e) => Err(AppError::Service(format!(
+            "pkexec not available: {}. Install polkit to remove the system service override.",
+            e
+        ))),
+    }
+}
+
 async fn apply_user_service(resolved_path: &str) -> Result<ApplyModelPathResult, AppError> {
     let home = std::env::var("HOME")
         .map_err(|_| AppError::Internal("HOME env var not set".into()))?;
@@ -253,10 +329,24 @@ pub async fn apply_model_path(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<ApplyModelPathResult, AppError> {
+    db::settings::set_async(state.db.clone(), "modelPath".to_string(), path.clone()).await?;
+
+    // Empty path = clear the override so Ollama reverts to its default model path.
+    if path.trim().is_empty() {
+        return match detect_service_type().await {
+            ServiceType::User => clear_user_service().await,
+            ServiceType::System => clear_system_service().await,
+            ServiceType::None => Ok(ApplyModelPathResult {
+                service_type: "none".into(),
+                applied: true,
+                restarted: false,
+                message: "Model path cleared.".into(),
+            }),
+        };
+    }
+
     let resolved = expand_tilde(&path);
     let resolved_str = resolved.to_string_lossy().to_string();
-
-    db::settings::set_async(state.db.clone(), "modelPath".to_string(), path).await?;
 
     match detect_service_type().await {
         ServiceType::User => apply_user_service(&resolved_str).await,

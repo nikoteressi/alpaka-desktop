@@ -757,8 +757,9 @@ async function applyModelPath(path: string) {
     } else {
       pathApply.value = { status: "success", message: result.message };
       if (result.restarted) {
-        // Give Ollama a moment to come back up before re-fetching
+        // Attempt twice: once after 2s, again after 5s in case restart is slow
         setTimeout(() => modelsStore.fetchModels(), 2000);
+        setTimeout(() => modelsStore.fetchModels(), 5000);
       }
     }
   } catch (err: unknown) {
@@ -1000,7 +1001,11 @@ function confirmReset() {
     confirmLabel: "Reset",
     kind: "danger",
     onConfirm: async () => {
+      const hadCustomPath = !!settingsStore.modelPath;
       await settingsStore.resetToDefaults();
+      if (hadCustomPath) {
+        await applyModelPath("");
+      }
     },
   });
 }
