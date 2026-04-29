@@ -760,6 +760,7 @@ async function applyModelPath(path: string) {
     } else {
       pathApply.value = { status: "success", message: result.message };
       if (result.restarted) {
+        // Hostname check used until Host gains a kind field (CL-host-type)
         const isCloudUrl = (url: string) => {
           try {
             return new URL(url).hostname === "api.ollama.com";
