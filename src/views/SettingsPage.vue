@@ -543,7 +543,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, markRaw, h, type Component } from "vue";
+import { ref, computed, watch, onBeforeUnmount, markRaw, h, type Component } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import ConfirmationModal from "../components/shared/ConfirmationModal.vue";
@@ -640,7 +640,8 @@ watch(
             modelCount: info.model_count,
           };
         }
-      } catch {
+      } catch (err) {
+        console.error("Model path validation failed:", err);
         pathValidation.value = {
           status: "error",
           message: "Validation failed",
@@ -650,6 +651,10 @@ watch(
     }, 500);
   },
 );
+
+onBeforeUnmount(() => {
+  if (_validateTimer) clearTimeout(_validateTimer);
+});
 
 const themeOptions = [
   { id: "system" as const, label: "System", sub: "Follows OS" },
