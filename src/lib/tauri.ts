@@ -6,7 +6,7 @@ import type {
   LibraryModel,
   LaunchApp,
 } from "../types/models";
-import type { SettingsState } from "../types/settings";
+import type { SettingsState, ChatOptions } from "../types/settings";
 import type { FolderContextPayload } from "../types/chat";
 
 // ── Host types ────────────────────────────────────────────────────────────────
@@ -90,6 +90,12 @@ export const tauriApi = {
 
   getModelCapabilities: (name: string) =>
     invoke<ModelCapabilities>("get_model_capabilities", { name }),
+
+  getModelDefaults: (modelName: string) =>
+    invoke<Partial<ChatOptions> | null>("get_model_defaults", { modelName }),
+
+  setModelDefaults: (modelName: string, defaults: Partial<ChatOptions>) =>
+    invoke<void>("set_model_defaults", { modelName, defaults }),
 
   searchOllamaLibrary: (query: string) =>
     invoke<LibraryModel[]>("search_ollama_library", { query }),
