@@ -2,6 +2,7 @@ export interface Host {
   id: string;
   name: string;
   url: string;
+  kind: "local" | "cloud";
   is_default: boolean;
   is_active: boolean;
   last_ping_status: "online" | "offline" | "unknown";

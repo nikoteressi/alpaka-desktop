@@ -760,19 +760,11 @@ async function applyModelPath(path: string) {
     } else {
       pathApply.value = { status: "success", message: result.message };
       if (result.restarted) {
-        // Hostname check used until Host gains a kind field (CL-host-type)
-        const isCloudUrl = (url: string) => {
-          try {
-            return new URL(url).hostname === "api.ollama.com";
-          } catch {
-            return false;
-          }
-        };
         const ensureLocalHost = async () => {
           await hostStore.fetchHosts();
           const active = hostStore.activeHost;
-          if (active && isCloudUrl(active.url)) {
-            const local = hostStore.hosts.find((h) => !isCloudUrl(h.url));
+          if (active && active.kind === "cloud") {
+            const local = hostStore.hosts.find((h) => h.kind === "local");
             if (local) await hostStore.setActiveHost(local.id);
           }
         };

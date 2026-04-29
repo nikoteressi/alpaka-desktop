@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::error::AppError;
+use crate::ollama::client::is_cloud_host;
 
 // ── Domain type ────────────────────────────────────────────────────────────────
 
@@ -12,6 +13,7 @@ pub struct Host {
     pub id: String,
     pub name: String,
     pub url: String,
+    pub kind: String,
     pub is_default: bool,
     pub is_active: bool,
     pub last_ping_status: PingStatus,
@@ -64,11 +66,19 @@ fn row_to_host(row: &rusqlite::Row<'_>) -> rusqlite::Result<Host> {
     let last_ping_status = status_str
         .parse::<PingStatus>()
         .unwrap_or(PingStatus::Unknown);
+    let url: String = row.get(2)?;
+    let kind = if is_cloud_host(&url) {
+        "cloud"
+    } else {
+        "local"
+    }
+    .to_string();
 
     Ok(Host {
         id: row.get(0)?,
         name: row.get(1)?,
-        url: row.get(2)?,
+        url,
+        kind,
         is_default: row.get::<_, i64>(3)? != 0,
         is_active: row.get::<_, i64>(5)? != 0,
         last_ping_status,

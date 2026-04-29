@@ -48,8 +48,13 @@ vi.mock("../components/settings/AccountSettings.vue", () => ({
 function makeHost(
   overrides: Partial<Host> & { id: string; url: string },
 ): Host {
+  const url = overrides.url;
+  const kind: "local" | "cloud" = url.includes("api.ollama.com")
+    ? "cloud"
+    : "local";
   return {
     name: "local",
+    kind,
     is_default: true,
     is_active: true,
     last_ping_status: "online",
@@ -343,7 +348,6 @@ describe("SettingsPage — applyModelPath", () => {
         });
       }
       if (cmd === "list_hosts") {
-        // Return cloud host as active so ensureLocalHost triggers switch
         return Promise.resolve([
           { ...cloudHost, is_active: true },
           { ...localHost, is_active: false },
