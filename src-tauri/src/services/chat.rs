@@ -134,6 +134,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     load_duration_ms: None,
                     prompt_eval_duration_ms: None,
                     eval_duration_ms: None,
+                    seed: None,
                 },
             )?;
 
@@ -317,6 +318,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         load_duration_ms: m.load_duration_ms,
                         prompt_eval_duration_ms: m.prompt_eval_duration_ms,
                         eval_duration_ms: m.eval_duration_ms,
+                        seed: m.seed,
                     },
                 )
             })
@@ -531,6 +533,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         load_duration_ms: msg.load_duration_ms,
                         prompt_eval_duration_ms: msg.prompt_eval_duration_ms,
                         eval_duration_ms: msg.eval_duration_ms,
+                        seed: msg.seed,
                     },
                 )?;
             }
@@ -712,6 +715,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             }
         }
 
+        metrics.seed = options.as_ref().and_then(|o| o.seed);
+
         // Emit final done event after all agent turns are complete
         let _ = self.app.emit(
             "chat:done",
@@ -725,6 +730,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 "load_duration_ms": metrics.load_duration_ms,
                 "prompt_eval_duration_ms": metrics.prompt_eval_duration_ms,
                 "eval_duration_ms": metrics.eval_duration_ms,
+                "seed": metrics.seed,
             }),
         );
 

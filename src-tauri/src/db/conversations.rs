@@ -208,6 +208,7 @@ pub fn update_system_prompt(
                 load_duration_ms: None,
                 prompt_eval_duration_ms: None,
                 eval_duration_ms: None,
+                seed: None,
             },
         )?;
     }

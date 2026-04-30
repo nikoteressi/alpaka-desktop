@@ -416,6 +416,7 @@ const settingsStore = useSettingsStore();
       :input-tokens="message.prompt_tokens || 0"
       :generation-time-ms="message.generation_time_ms || 0"
       :message-key="messageId"
+      :seed="message.seed"
     />
   </div>
 </template>

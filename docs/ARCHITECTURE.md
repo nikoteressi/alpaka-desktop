@@ -439,7 +439,7 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:thinking-start` | Rust → Vue | `{ conversation_id }` | Opening `<think>` tag detected |
 | `chat:thinking-token` | Rust → Vue | `{ conversation_id, content }` | Token inside a `<think>` block |
 | `chat:thinking-end` | Rust → Vue | `{ conversation_id }` | Closing `</think>` tag detected |
-| `chat:done` | Rust → Vue | `{ conversation_id, total_tokens?, duration_ms?, tokens_per_sec? }` | Generation complete, message persisted |
+| `chat:done` | Rust → Vue | `{ conversation_id, total_tokens?, duration_ms?, tokens_per_sec?, seed? }` | Generation complete, message persisted; `seed` present only when a fixed seed was used |
 | `chat:error` | Rust → Vue | `{ conversation_id, error }` | Stream or generation error |
 | `chat:tool-call` | Rust → Vue | `{ conversation_id, tool_name, arguments }` | LLM requested a tool call (web search) |
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |

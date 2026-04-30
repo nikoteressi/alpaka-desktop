@@ -255,6 +255,40 @@
         :step="8"
         compact
       />
+
+      <!-- Seed -->
+      <div
+        class="flex flex-col gap-2 pt-1 border-t border-[var(--border-subtle)]"
+      >
+        <div>
+          <p class="text-[11px] font-bold text-[var(--text)]">Seed</p>
+          <p class="text-[10px] text-[var(--text-dim)] mt-0.5">
+            Fixed integer for reproducible generation. Leave empty for random
+            output.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            :value="props.modelValue.seed ?? ''"
+            @change="updateSeed(($event.target as HTMLInputElement).value)"
+            placeholder="empty = random"
+            class="flex-1 bg-[var(--bg-input)] border text-[var(--text)] rounded-lg px-2 py-1 text-[11px] outline-none transition-colors"
+            :class="
+              props.modelValue.seed !== undefined
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-[var(--border)] focus:border-[var(--accent)]'
+            "
+          />
+          <button
+            v-if="props.modelValue.seed !== undefined"
+            @click="updateSeed('')"
+            class="text-[10px] px-2 py-1 rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-strong)] transition-colors cursor-pointer whitespace-nowrap"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -337,6 +371,15 @@ function updateOption(key: keyof ChatOptions, value: number) {
 
 function updateMirostat(value: 0 | 1 | 2) {
   emit("update:modelValue", { ...props.modelValue, mirostat: value });
+  emit("update:presetId", "");
+}
+
+function updateSeed(raw: string) {
+  const parsed = raw === "" ? undefined : Number.parseInt(raw, 10);
+  emit("update:modelValue", {
+    ...props.modelValue,
+    seed: Number.isNaN(parsed) ? undefined : parsed,
+  });
   emit("update:presetId", "");
 }
 

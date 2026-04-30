@@ -14,6 +14,7 @@ export interface Message {
   load_duration_ms?: number;
   prompt_eval_duration_ms?: number;
   eval_duration_ms?: number;
+  seed?: number;
   created_at?: string;
 }
 
@@ -32,6 +33,7 @@ export interface BackendMessage {
   load_duration_ms: number | null;
   prompt_eval_duration_ms: number | null;
   eval_duration_ms: number | null;
+  seed: number | null;
   created_at: string;
 }
 
@@ -115,6 +117,7 @@ export interface DonePayload {
   load_duration_ms: number;
   prompt_eval_duration_ms: number;
   eval_duration_ms: number;
+  seed?: number | null;
 }
 
 export interface ToolCallPayload {

@@ -73,6 +73,28 @@
           </span>
         </CustomTooltip>
 
+        <!-- Seed (only when a fixed seed was used) -->
+        <CustomTooltip
+          v-if="seed !== undefined"
+          text="Fixed seed — generation is reproducible"
+        >
+          <span class="stat-badge stat-badge--seed" data-testid="seed-badge">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            {{ seed }}
+          </span>
+        </CustomTooltip>
+
         <span class="more-label">
           {{ isOpen ? "Hide" : "More" }}
           <svg
@@ -143,6 +165,10 @@
                 <td>Eval Rate (Generation)</td>
                 <td>{{ (tokensPerSec || 0).toFixed(1) }} tokens/s</td>
               </tr>
+              <tr v-if="seed !== undefined" data-testid="seed-row">
+                <td>Seed</td>
+                <td>{{ seed }}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -167,6 +193,7 @@ const props = defineProps<{
   inputTokens: number;
   generationTimeMs: number;
   messageKey?: string;
+  seed?: number;
 }>();
 
 // suffix: 'stats' isolates this cache key from ThinkBlock (bare key) and SearchBlock ('search')
@@ -307,5 +334,12 @@ function toggle(event: MouseEvent) {
 
 .full-stats-table tr:not(:last-child) {
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.stat-badge--seed {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-active));
+  font-weight: 600;
 }
 </style>

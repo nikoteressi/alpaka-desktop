@@ -416,6 +416,7 @@ async fn test_create_conversation_and_get_messages() {
             load_duration_ms: None,
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
+            seed: None,
         },
     )
     .unwrap();
@@ -436,6 +437,7 @@ async fn test_create_conversation_and_get_messages() {
             load_duration_ms: None,
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
+            seed: None,
         },
     )
     .unwrap();
