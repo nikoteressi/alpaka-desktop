@@ -14,11 +14,14 @@ use std::{
 };
 
 use crate::error::AppError;
+#[cfg(not(feature = "test-mode"))]
 use keyring::Entry;
 use rusqlite::{params, Connection};
 use uuid::Uuid;
 
+#[cfg(not(feature = "test-mode"))]
 const DB_KEY_SERVICE: &str = "alpaka-desktop-internal";
+#[cfg(not(feature = "test-mode"))]
 const DB_KEY_ACCOUNT: &str = "database-encryption-key";
 
 /// A cloneable, thread-safe handle to the SQLite connection.
@@ -83,6 +86,7 @@ pub fn seed_default_host(conn: &Connection) -> Result<(), AppError> {
     Ok(())
 }
 
+#[cfg(not(feature = "test-mode"))]
 fn get_or_create_db_key() -> Result<String, AppError> {
     let entry = Entry::new(DB_KEY_SERVICE, DB_KEY_ACCOUNT)?;
     match entry.get_password() {
@@ -94,6 +98,12 @@ fn get_or_create_db_key() -> Result<String, AppError> {
         }
         Err(e) => Err(AppError::from(e)),
     }
+}
+
+// Fixed 32-char hex key for CI/e2e test builds — never touches the Secret Service daemon.
+#[cfg(feature = "test-mode")]
+fn get_or_create_db_key() -> Result<String, AppError> {
+    Ok("a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4".to_string())
 }
 
 /// Low-level SQLite backup: copies all pages from `src` into `dst` using the SQLite Backup API.
