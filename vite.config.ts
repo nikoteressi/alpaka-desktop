@@ -13,6 +13,7 @@ export default defineConfig({
       '**/dist/**',
       '**/cypress/**',
       '**/e2e/**',
+      '**/e2e-desktop/**',
       '**/.{idea,git,cache,output,temp}/**',
       '**/.tabs/**',
     ],

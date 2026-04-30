@@ -6,6 +6,7 @@
       <button
         v-for="tab in tabs"
         :key="tab.id"
+        :data-testid="'settings-tab-' + tab.id"
         @click="$emit('update:modelValue', tab.id)"
         class="app-tab relative inline-flex items-center gap-1.5 px-3 pb-[9px] pt-[7px] rounded-t-md text-[13px] border-none cursor-pointer font-[inherit]"
         :class="modelValue === tab.id ? 'app-tab--active' : 'app-tab--inactive'"

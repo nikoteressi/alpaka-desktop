@@ -16,7 +16,11 @@ const options = [
 </script>
 
 <template>
-  <div class="flex flex-col" :class="compact ? 'gap-1.5' : 'gap-2'">
+  <div
+    class="flex flex-col"
+    :class="compact ? 'gap-1.5' : 'gap-2'"
+    data-testid="mirostat-selector"
+  >
     <span
       class="font-medium text-[var(--text-muted)]"
       :class="compact ? 'text-[11px]' : 'text-[12px]'"

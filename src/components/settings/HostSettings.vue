@@ -3,6 +3,7 @@
     class="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg overflow-hidden"
   >
     <button
+      data-testid="hosts-expand-btn"
       @click="hostsExpanded = !hostsExpanded"
       class="w-full flex items-center justify-between px-3.5 py-[11px] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
     >
@@ -57,6 +58,7 @@
         >
           <div class="flex items-center gap-2.5 min-w-0">
             <span
+              data-testid="host-status"
               class="w-2 h-2 rounded-full flex-shrink-0"
               :class="
                 host.last_ping_status === 'online'
@@ -77,7 +79,10 @@
                   >Active</span
                 >
               </p>
-              <p class="text-[11px] text-[var(--text-dim)] font-mono truncate">
+              <p
+                data-testid="host-url"
+                class="text-[11px] text-[var(--text-dim)] font-mono truncate"
+              >
                 {{ host.url }}
               </p>
             </div>

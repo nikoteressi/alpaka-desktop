@@ -1,9 +1,11 @@
+#[cfg(not(feature = "test-mode"))]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     AppHandle, Manager,
 };
 
+#[cfg(not(feature = "test-mode"))]
 pub fn setup(app: &AppHandle) -> Result<tauri::tray::TrayIcon, Box<dyn std::error::Error>> {
     let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
     let hide_i = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
@@ -70,6 +72,7 @@ pub fn setup(app: &AppHandle) -> Result<tauri::tray::TrayIcon, Box<dyn std::erro
     Ok(tray)
 }
 
+#[cfg(not(feature = "test-mode"))]
 pub fn update_icon(
     tray: &tauri::tray::TrayIcon,
     theme: tauri::Theme,

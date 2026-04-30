@@ -2,6 +2,7 @@ import MarkdownIt from "markdown-it";
 import footnote from "markdown-it-footnote";
 import mk from "@traptitech/markdown-it-katex";
 import { createHighlighter, type Highlighter } from "shiki";
+import DOMPurify from "dompurify";
 
 let highlighter: Highlighter | null = null;
 let initPromise: Promise<void> | null = null;
@@ -128,7 +129,7 @@ md.use(footnote);
 md.use(mk, { throwOnError: false, errorColor: "#ef4444" });
 
 export function renderMarkdown(content: string): string {
-  return md.render(content);
+  return DOMPurify.sanitize(md.render(content));
 }
 
 export function renderInline(content: string): string {

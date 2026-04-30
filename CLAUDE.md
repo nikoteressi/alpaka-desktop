@@ -94,7 +94,7 @@ Token streaming path: Ollama NDJSON stream → `src-tauri/src/ollama/streaming.r
 | Markdown | markdown-it + Shiki + KaTeX |
 | Backend | Rust, Tauri v2, Tokio, reqwest (streaming), rusqlite |
 | Auth | keyring (Secret Service API) |
-| Tests | Vitest (frontend), cargo integration tests (backend), Playwright (e2e in `/e2e`) |
+| Tests | Vitest (frontend), cargo integration tests (backend) |
 
 ## Code Style
 

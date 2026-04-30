@@ -82,6 +82,7 @@
       </div>
 
       <button
+        data-testid="pull-model-btn"
         @click="onPullLatest"
         class="bg-[var(--text)] text-[var(--bg-base)] px-5 py-2.5 rounded-[9px] text-[13px] font-[700] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg flex-shrink-0"
       >

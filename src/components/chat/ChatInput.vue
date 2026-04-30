@@ -688,6 +688,7 @@ onUnmounted(() => {
       <AttachmentList :attachments="attachments" @remove="removeAttachment" />
 
       <textarea
+        data-testid="chat-input"
         v-model="inputContent"
         @keydown.enter.prevent="handleEnter"
         @paste="onPaste"
@@ -1001,7 +1002,13 @@ onUnmounted(() => {
             @pull="selectLibraryModel"
           />
 
+          <div
+            v-if="isStreaming"
+            data-testid="streaming-indicator"
+            style="display: none"
+          />
           <button
+            data-testid="send-btn"
             @click="handleSubmit"
             :disabled="
               !isStreaming && !inputContent.trim() && attachments.length === 0

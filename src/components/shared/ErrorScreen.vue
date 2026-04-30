@@ -1,5 +1,6 @@
 <template>
   <div
+    data-testid="error-screen"
     class="fixed inset-0 bg-[#F9FAFB] dark:bg-[#0F0F0F] flex items-center justify-center p-4 z-50"
   >
     <div

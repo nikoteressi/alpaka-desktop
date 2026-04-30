@@ -17,7 +17,11 @@
     "lint": "eslint src --ext .ts,.vue --fix",
     "lint:check": "eslint src --ext .ts,.vue",
     "format": "prettier --write \"src/**/*.{ts,vue,css}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,vue,css}\""
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css}\"",
+    "e2e:build": "pnpm tauri build --features test-mode --config src-tauri/tauri.test.conf.json",
+    "e2e:smoke": "NODE_OPTIONS='--import tsx' wdio run e2e-desktop/wdio.smoke.conf.ts",
+    "e2e:integration": "NODE_OPTIONS='--import tsx' wdio run e2e-desktop/wdio.integration.conf.ts",
+    "e2e:all": "pnpm e2e:smoke && pnpm e2e:integration"
   },
   "dependencies": {
     "@codemirror/language": "^6.12.3",
@@ -33,6 +37,7 @@
     "@types/markdown-it": "^14.1.0",
     "@vueuse/core": "^11.0.0",
     "codemirror": "^6.0.2",
+    "dompurify": "^3.4.2",
     "katex": "^0.16.0",
     "lodash.throttle": "^4.1.1",
     "markdown-it": "^14.1.0",
@@ -45,7 +50,6 @@
     "vue-virtual-scroller": "^2.0.0-beta.8"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2.0.0",
     "@types/lodash.throttle": "^4.1.9",
@@ -56,20 +60,35 @@
     "@vitest/ui": "^2.1.0",
     "@vue/test-utils": "^2.4.0",
     "@vue/tsconfig": "^0.9.1",
+    "@wdio/cli": "^8",
+    "@wdio/local-runner": "^8",
+    "@wdio/mocha-framework": "^8",
+    "@wdio/spec-reporter": "^8",
+    "@wdio/types": "^8",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^9.0.0",
     "happy-dom": "^20.8.9",
-    "playwright": "^1.58.2",
     "prettier": "^3.3.0",
     "tailwindcss": "^4.0.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.6.0",
     "vite": "^6.4.2",
     "vitest": "^2.1.0",
-    "vue-tsc": "^2.1.0"
+    "vue-tsc": "^2.1.0",
+    "webdriverio": "^8"
   },
   "engines": {
     "node": ">=20",
     "pnpm": ">=9"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "minimatch@<3.1.2": "3.1.5",
+      "serialize-javascript@<7.0.0": "7.0.5",
+      "tar-fs@<3.1.2": "3.1.2",
+      "ws@<8.17.1": "8.17.1"
+    }
+  }
 }

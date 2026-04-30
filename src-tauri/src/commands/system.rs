@@ -22,6 +22,11 @@ pub async fn report_active_view(
 
 #[command]
 pub async fn open_browser(app: tauri::AppHandle, url: String) -> Result<(), AppError> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err(AppError::Internal(
+            "only http/https URLs are permitted".into(),
+        ));
+    }
     use tauri_plugin_opener::OpenerExt;
     app.opener()
         .open_url(url, None::<String>)

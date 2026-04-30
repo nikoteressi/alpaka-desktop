@@ -40,10 +40,9 @@ jobs:
               - 'Cargo.lock'
             frontend:
               - 'src/**'
-              - 'e2e/**'
+              - 'e2e-desktop/**'
               - 'index.html'
               - 'vite.config.ts'
-              - 'playwright.config.ts'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - '.github/**'
@@ -385,17 +384,45 @@ jobs:
           retention-days: 30
 
   # ─────────────────────────────────────────────────────────────────────── #
-  # E2E — Playwright tests (browser-mode, Tauri IPC mocked)                #
+  # E2E Smoke — binary launches and navigates (no Ollama required)          #
+  # Required PR gate.                                                        #
   # ─────────────────────────────────────────────────────────────────────── #
-  e2e:
-    name: E2E Tests
+  e2e-smoke:
+    name: E2E Smoke Tests
     runs-on: ubuntu-22.04
     needs: [changes, build-check]
-    if: needs.changes.outputs.frontend == 'true'
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.rust == 'true'
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            webkit2gtk-driver \
+            xvfb
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: e2e
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
 
       - name: Setup pnpm
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -406,22 +433,99 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install dependencies
+      - name: Install npm dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install chromium --with-deps
+      - name: Build test binary
+        run: pnpm e2e:build
 
-      - name: Run Playwright E2E tests
-        run: pnpm exec playwright test
-        continue-on-error: true
+      - name: Run smoke tests
+        run: xvfb-run -a pnpm e2e:smoke
         env:
-          CI: true
+          DISPLAY: ':99'
 
-      - name: Upload Playwright report
+      - name: Upload smoke test artifacts
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-report
-          path: playwright-report/
+          name: smoke-artifacts
+          path: e2e-desktop/.artifacts/
           retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────── #
+  # E2E Integration — full Ollama integration (post-merge only)             #
+  # Non-blocking — does not gate PRs.                                       #
+  # ─────────────────────────────────────────────────────────────────────── #
+  e2e-integration:
+    name: E2E Integration Tests
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && contains(fromJSON('["develop","main"]'), github.ref_name)
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            webkit2gtk-driver \
+            xvfb
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: e2e
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install npm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start Ollama and pull test model
+        run: |
+          ollama serve &
+          sleep 5
+          ollama pull qwen2:0.5b
+
+      - name: Build test binary
+        run: pnpm e2e:build
+
+      - name: Run integration tests
+        run: xvfb-run -a pnpm e2e:integration
+        env:
+          DISPLAY: ':99'
+
+      - name: Upload integration test artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: integration-artifacts
+          path: e2e-desktop/.artifacts/
+          retention-days: 7
+

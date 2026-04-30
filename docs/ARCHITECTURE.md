@@ -205,7 +205,6 @@ alpaka-desktop/
 │       ├── models.ts
 │       └── settings.ts
 │
-├── e2e/                          # Playwright end-to-end tests
 ├── packaging/
 │   ├── aur/PKGBUILD              # alpaka-desktop-bin (pre-built binary)
 │   └── aur-git/PKGBUILD          # alpaka-desktop-git (build from source)
