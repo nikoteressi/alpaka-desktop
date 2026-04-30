@@ -57,6 +57,7 @@
         >
           <div class="flex items-center gap-2.5 min-w-0">
             <span
+              data-testid="host-status"
               class="w-2 h-2 rounded-full flex-shrink-0"
               :class="
                 host.last_ping_status === 'online'

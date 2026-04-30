@@ -1,5 +1,6 @@
 <template>
   <div
+    data-testid="model-card"
     class="model-card group"
     :class="{
       'model-card--clickable': !!onClick,

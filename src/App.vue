@@ -1,5 +1,6 @@
 <template>
   <div
+    data-testid="app-root"
     class="h-screen w-screen overflow-hidden flex"
     style="
       background: var(--bg-base);

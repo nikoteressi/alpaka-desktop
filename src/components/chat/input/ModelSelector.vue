@@ -104,7 +104,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative" ref="modelSelectorRef">
+  <div class="relative" ref="modelSelectorRef" data-testid="model-selector">
     <button
       @click="openModelDropdown"
       class="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-2xl px-2.5 py-1 text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors flex-shrink-0 whitespace-nowrap"
@@ -200,6 +200,7 @@ onUnmounted(() => {
             <div
               v-for="m in filteredInstalledModels"
               :key="'installed-' + m.name"
+              :data-testid="'model-option-' + m.name"
               class="group flex flex-col px-4 py-3 cursor-pointer transition-colors border-b border-[var(--border-subtle)] last:border-b-0"
               :class="
                 m.name === activeModelName
