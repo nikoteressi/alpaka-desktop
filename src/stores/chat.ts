@@ -156,6 +156,7 @@ export const useChatStore = defineStore("chat", {
       loadDurationMs?: number,
       promptEvalDurationMs?: number,
       evalDurationMs?: number,
+      seed?: number,
     ) {
       if (!this.messages[conversationId]) {
         this.messages[conversationId] = [];
@@ -177,6 +178,7 @@ export const useChatStore = defineStore("chat", {
         load_duration_ms: loadDurationMs ?? 0,
         prompt_eval_duration_ms: promptEvalDurationMs ?? 0,
         eval_duration_ms: evalDurationMs ?? 0,
+        seed: seed ?? undefined,
       });
 
       this.streaming.buffer = "";
@@ -285,6 +287,7 @@ export const useChatStore = defineStore("chat", {
             load_duration_ms: m.load_duration_ms ?? 0,
             prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
             eval_duration_ms: m.eval_duration_ms ?? 0,
+            seed: m.seed ?? undefined,
           };
         });
 

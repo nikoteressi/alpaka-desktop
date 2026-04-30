@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- S-07: Seed control — fixed-seed input in Advanced Options and Settings for reproducible generation; active seed shown in message performance metadata (#20)
 - S-08: Mirostat v1/v2 sampling controls in Advanced Chat Options — Mirostat mode selector (Off/Mirostat 1/Mirostat 2) with tau (default 5.0) and eta (default 0.1) sliders; top-p/top-k hidden when Mirostat is active
 - S-06: Custom stop sequences — Settings → Advanced tab with a tag-input for up to 4 stop tokens (e.g. `###`, `<END>`). Sequences are sent as `options.stop` in every Ollama chat request; empty list omits the field entirely. Setting key allowlist added to the backend `set_setting` command.
 - MO-06: Custom model creation from Modelfile — create and edit Ollama models directly in the app with a CodeMirror editor, streaming progress, background creation, desktop notifications, and mid-stream cancellation (#22)

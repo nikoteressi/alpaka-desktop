@@ -84,6 +84,7 @@ export function useStreamingEvents() {
           payload.load_duration_ms,
           payload.prompt_eval_duration_ms,
           payload.eval_duration_ms,
+          payload.seed,
         );
         chatStore.streaming.isStreaming = false;
         chatStore.streaming.tokensPerSec = payload.tokens_per_sec;

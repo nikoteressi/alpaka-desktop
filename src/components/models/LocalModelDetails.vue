@@ -212,6 +212,40 @@
           :step="512"
         />
 
+        <!-- Seed -->
+        <div class="flex flex-col gap-2">
+          <div>
+            <p class="text-[13px] font-semibold text-[var(--text)]">Seed</p>
+            <p class="text-[11.5px] text-[var(--text-dim)] mt-0.5">
+              Fixed integer for reproducible generation. Leave empty for random
+              output.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              :value="edited.seed ?? ''"
+              @change="
+                updateEditedSeed(($event.target as HTMLInputElement).value)
+              "
+              placeholder="empty = random"
+              class="flex-1 bg-[var(--bg-input)] border text-[var(--text)] rounded-lg px-2 py-1.5 text-[12px] outline-none transition-colors"
+              :class="
+                edited.seed !== undefined
+                  ? 'border-[var(--accent)] text-[var(--accent)]'
+                  : 'border border-[var(--border)] focus:border-[var(--accent)]'
+              "
+            />
+            <button
+              v-if="edited.seed !== undefined"
+              @click="edited = { ...edited, seed: undefined }"
+              class="text-[11px] px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-strong)] transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
         <div
           class="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)]"
         >
@@ -311,6 +345,14 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+function updateEditedSeed(raw: string) {
+  const n = Number.parseInt(raw, 10);
+  edited.value = {
+    ...edited.value,
+    seed: raw === "" || Number.isNaN(n) ? undefined : n,
+  };
+}
 
 async function resetToGlobal() {
   await resetModelDefaults(props.model.name);

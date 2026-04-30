@@ -55,6 +55,7 @@ impl ConversationRepository {
                 load_duration_ms: None,
                 prompt_eval_duration_ms: None,
                 eval_duration_ms: None,
+                seed: None,
             };
 
             messages::create(&tx, new_user_msg)?;
@@ -99,6 +100,7 @@ impl ConversationRepository {
                     load_duration_ms: metrics.load_duration_ms,
                     prompt_eval_duration_ms: metrics.prompt_eval_duration_ms,
                     eval_duration_ms: metrics.eval_duration_ms,
+                    seed: metrics.seed,
                 },
             )?;
             Ok(())
@@ -118,4 +120,5 @@ pub struct AssistantMetrics {
     pub load_duration_ms: Option<i64>,
     pub prompt_eval_duration_ms: Option<i64>,
     pub eval_duration_ms: Option<i64>,
+    pub seed: Option<i64>,
 }

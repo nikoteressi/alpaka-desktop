@@ -42,6 +42,7 @@ fn test_export_conversation_to_path_red() {
             load_duration_ms: None,
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
+            seed: None,
         },
     )
     .unwrap();

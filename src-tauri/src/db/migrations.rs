@@ -31,6 +31,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "model_user_data table",
         sql: include_str!("sql/003_model_user_data.sql"),
     },
+    Migration {
+        version: 12,
+        description: "message seed column",
+        sql: include_str!("sql/004_message_seed.sql"),
+    },
 ];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────
