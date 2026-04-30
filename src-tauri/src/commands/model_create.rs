@@ -28,7 +28,26 @@ pub async fn core_get_modelfile(client: &OllamaClient, name: &str) -> Result<Str
     }
 
     let info: ModelInfo = resp.json().await?;
-    Ok(info.modelfile.unwrap_or_default())
+    let modelfile = info.modelfile.unwrap_or_default();
+
+    // /api/show returns FROM with an internal blob path (e.g. /root/.ollama/models/blobs/sha256-...)
+    // or a sha256 digest. Replace it with the actual model name so the modelfile is reusable.
+    let sanitized = modelfile
+        .lines()
+        .map(|line| {
+            let t = line.trim();
+            if t.to_uppercase().starts_with("FROM ") {
+                let from_val = t[5..].trim();
+                if from_val.starts_with('/') || from_val.starts_with("sha256:") {
+                    return format!("FROM {}", name);
+                }
+            }
+            line.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Ok(sanitized)
 }
 
 #[tauri::command]
@@ -307,6 +326,35 @@ mod tests {
 
         assert!(result.is_ok());
         assert!(result.unwrap().contains("FROM llama3"));
+    }
+
+    #[tokio::test]
+    async fn test_get_modelfile_sanitizes_blob_path() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/show")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{"modelfile":"FROM /root/.ollama/models/blobs/sha256-abc123\nSYSTEM \"hi\"\n"}"#,
+            )
+            .create_async()
+            .await;
+
+        let client = reqwest::Client::new();
+        let ollama = OllamaClient::new(client, server.url(), None);
+        let result = core_get_modelfile(&ollama, "qwen2.5:7b").await;
+        mock.assert_async().await;
+
+        let mf = result.unwrap();
+        assert!(
+            mf.contains("FROM qwen2.5:7b"),
+            "blob path should be replaced with model name"
+        );
+        assert!(
+            !mf.contains("/root/.ollama"),
+            "internal path should be removed"
+        );
     }
 
     #[tokio::test]
