@@ -30,7 +30,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CI: `dependency-review` workflow — blocks PRs introducing high-severity CVEs
 - CI: `cargo-deny` — enforces license compliance, banned crates, and registry source restrictions
 - CI: MSRV verification job — compiles with rust-version `1.88.0` (bumped from 1.77.2; `darling`, `image`, `serde_with`, `time` require 1.88)
-- CI: E2E tests now run in CI via Playwright (browser-mode, Tauri IPC mocked)
 - CI: `typos` spell check on source code and docs
 - CI: `Swatinem/rust-cache` in all CI jobs for faster incremental Rust builds
 - Release: SBOM (`alpaka-desktop-vX.Y.Z.spdx.json`) attached to GitHub Releases

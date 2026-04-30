@@ -86,7 +86,6 @@ alpaka-desktop/
 │   │   ├── ollama/       # HTTP client + SSE streaming
 │   │   └── auth/         # Keyring integration
 │   └── tests/            # Integration tests
-└── e2e/                  # Playwright end-to-end tests
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full detail on command signatures, the event catalog, and ADRs.
@@ -124,14 +123,6 @@ cd src-tauri
 cargo test                    # all tests
 cargo test chat               # tests matching "chat"
 cargo test -- --nocapture     # show println! output
-```
-
-### End-to-end (Playwright)
-
-E2E tests live in `e2e/`. They require the app to be running (`pnpm tauri dev`).
-
-```bash
-pnpm exec playwright test
 ```
 
 ---
