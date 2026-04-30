@@ -79,7 +79,10 @@
                   >Active</span
                 >
               </p>
-              <p class="text-[11px] text-[var(--text-dim)] font-mono truncate">
+              <p
+                data-testid="host-url"
+                class="text-[11px] text-[var(--text-dim)] font-mono truncate"
+              >
                 {{ host.url }}
               </p>
             </div>

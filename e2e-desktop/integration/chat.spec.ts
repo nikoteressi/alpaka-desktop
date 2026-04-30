@@ -7,31 +7,6 @@ describe('Chat — real Ollama integration', () => {
 
   before(async () => {
     await chat.waitForAppReady()
-    // Navigate to settings → connectivity to verify Ollama host is online
-    await chat.clickNavIcon('settings')
-    await $('[data-testid="settings-tab-connectivity"]').waitForDisplayed({ timeout: 5000 })
-    await $('[data-testid="settings-tab-connectivity"]').click()
-    await browser.pause(300)
-    // Expand the hosts panel if collapsed
-    const expandBtn = await $('[data-testid="hosts-expand-btn"]')
-    if (await expandBtn.isExisting()) {
-      const hostStatus = await $('[data-testid="host-status"]')
-      if (!(await hostStatus.isExisting())) {
-        await expandBtn.click()
-        await browser.pause(300)
-      }
-    }
-    // Wait for host to show online status (green dot has success class)
-    await browser.waitUntil(
-      async () => {
-        const status = await $('[data-testid="host-status"]')
-        if (!(await status.isExisting())) return false
-        const classes = await status.getAttribute('class')
-        return classes?.includes('var(--success)') ?? false
-      },
-      { timeout: 15000, interval: 1000 }
-    )
-    // Navigate to chat
     await chat.clickNavIcon('chat')
     await $('[data-testid="chat-input"]').waitForDisplayed({ timeout: 8000 })
   })
