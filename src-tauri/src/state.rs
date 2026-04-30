@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot};
 
 use crate::db::DbConn;
 
@@ -25,6 +26,10 @@ pub struct AppState {
     /// Send on this channel to interrupt an in-progress generation.
     /// Set to `None` when no generation is running.
     pub cancel_tx: Mutex<Option<broadcast::Sender<()>>>,
+
+    /// Per-model cancellation senders for in-progress create_model commands.
+    /// Key is the model name; dropping the sender also cancels the stream.
+    pub model_create_cancel_tx: Mutex<HashMap<String, oneshot::Sender<()>>>,
 
     /// Send on this channel to shut down the host health loop task.
     /// Stored here so the loop can be terminated cleanly on app exit.
@@ -52,6 +57,7 @@ impl AppState {
             db_path,
             http_client,
             cancel_tx: Mutex::new(None),
+            model_create_cancel_tx: Mutex::new(HashMap::new()),
             health_loop_shutdown: Mutex::new(None),
             health_loop_handle: std::sync::Mutex::new(None),
             is_chat_view: Mutex::new(true),

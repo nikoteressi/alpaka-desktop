@@ -45,15 +45,53 @@
           <LocalModelDetails
             :model="selectedLocalModel"
             @back="selectedLocalModel = null"
+            @edit-modelfile="openEditModelfile"
+          />
+        </div>
+
+        <div
+          v-else-if="createModelMode"
+          key="create"
+          class="flex flex-col h-full"
+        >
+          <CreateModelPage
+            :initial-name="createModelMode.name"
+            :initial-modelfile="createModelMode.modelfile"
+            @back="createModelMode = null"
+            @view-model="
+              (name: string) => {
+                createModelMode = null;
+                openLocalModel(name);
+              }
+            "
           />
         </div>
 
         <div v-else class="flex flex-col h-full">
           <!-- Header row -->
-          <div class="flex items-center gap-3 mb-1">
+          <div class="flex items-center justify-between mb-1">
             <h1 class="text-[17px] font-semibold text-[var(--text)]">
               Models Management
             </h1>
+            <button
+              @click="createModelMode = { name: '', modelfile: '' }"
+              class="flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent)] border border-[var(--accent-border)] px-3 py-1.5 rounded-lg hover:bg-[var(--accent-muted)] transition-colors"
+            >
+              <svg
+                class="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Create model
+            </button>
           </div>
 
           <!-- Glassy Horizontal Tabs -->
@@ -97,6 +135,85 @@
                     :style="{ width: prog.percent + '%' }"
                   />
                 </div>
+              </div>
+            </div>
+
+            <!-- Active Creates — running or errored only; cancelled/done don't appear here -->
+            <div
+              v-if="activeCreates.length > 0"
+              class="flex flex-col gap-2 mb-2"
+            >
+              <p
+                class="text-[11px] text-[var(--accent)] font-bold uppercase tracking-wider px-1"
+              >
+                Active Creates
+              </p>
+              <div
+                v-for="cs in activeCreates"
+                :key="'creating-' + cs.name"
+                class="bg-[var(--bg-surface)] border rounded-xl p-[10px_14px] transition-colors"
+                :class="
+                  cs.phase === 'error'
+                    ? 'border-[var(--danger)]/40'
+                    : 'border-[var(--border)] cursor-pointer hover:border-[var(--accent)]'
+                "
+                @click="
+                  cs.phase !== 'error' &&
+                  (createModelMode = {
+                    name: cs.name,
+                    modelfile: cs.modelfile,
+                  })
+                "
+              >
+                <div class="flex items-center justify-between mb-1">
+                  <span
+                    class="text-[13px] text-[var(--text)] font-medium truncate"
+                    >{{ cs.name }}</span
+                  >
+                  <div class="flex items-center gap-2 ml-2 flex-shrink-0">
+                    <span class="text-[12px] text-[var(--text-muted)]">{{
+                      cs.status
+                    }}</span>
+                    <!-- Dismiss error -->
+                    <button
+                      v-if="cs.phase === 'error'"
+                      @click.stop="modelStore.clearCreateState(cs.name)"
+                      class="w-4 h-4 flex items-center justify-center rounded text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-hover)] transition-colors"
+                      title="Dismiss"
+                    >
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      >
+                        <path d="M1 1l10 10M11 1L1 11" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <!-- Running: pulsing indicator -->
+                <div
+                  v-if="cs.phase === 'running'"
+                  class="flex items-center gap-1.5"
+                >
+                  <div
+                    class="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse flex-shrink-0"
+                  />
+                  <span class="text-[11px] text-[var(--text-dim)]"
+                    >Creating…</span
+                  >
+                </div>
+                <!-- Error: show message -->
+                <p
+                  v-else-if="cs.phase === 'error'"
+                  class="text-[11px] text-[var(--danger)] leading-snug mt-0.5"
+                >
+                  {{ cs.error }}
+                </p>
               </div>
             </div>
 
@@ -501,7 +618,9 @@ import LibraryModelDetails from "../components/models/LibraryModelDetails.vue";
 import LocalModelDetails from "../components/models/LocalModelDetails.vue";
 import LibraryBrowser from "../components/models/LibraryBrowser.vue";
 import CloudTagSelector from "../components/models/CloudTagSelector.vue";
+import CreateModelPage from "../components/models/CreateModelPage.vue";
 import { useModelStore, modelMatchesTag } from "../stores/models";
+import { invoke } from "@tauri-apps/api/core";
 import { useAppOrchestration } from "../composables/useAppOrchestration";
 import { useConfirmationModal } from "../composables/useConfirmationModal";
 import { useModelLibrary } from "../composables/useModelLibrary";
@@ -513,7 +632,20 @@ const { selectedModel } = storeToRefs(modelStore);
 
 const selectedLocalModel = ref<Model | null>(null);
 
+const createModelMode = ref<{
+  name: string;
+  modelfile: string;
+} | null>(null);
+
 const modelStoreErrorMessage = computed(() => modelStore.error ?? "");
+
+// Only show running and errored creates in the active-creates bar.
+// Cancelled and done are handled on the CreateModelPage itself.
+const activeCreates = computed(() =>
+  Object.values(modelStore.creating).filter(
+    (cs) => cs.phase === "running" || cs.phase === "error",
+  ),
+);
 const orchestration = useAppOrchestration();
 const router = useRouter();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
@@ -692,6 +824,18 @@ function confirmDelete(name: string) {
 function openLocalModel(name: string) {
   const model = modelStore.models.find((m) => m.name === name);
   if (model) selectedLocalModel.value = model;
+}
+
+async function openEditModelfile(name: string) {
+  let modelfile = "";
+  try {
+    modelfile = await invoke<string>("get_modelfile", { name });
+  } catch (e) {
+    console.error("Failed to fetch modelfile for", name, e);
+    // Fall through with empty modelfile — user can write from scratch
+  }
+  selectedLocalModel.value = null;
+  createModelMode.value = { name, modelfile };
 }
 
 // Subpage details

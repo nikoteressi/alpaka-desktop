@@ -89,3 +89,27 @@ export interface ModelUserData {
   isFavorite: boolean;
   tags: string[];
 }
+
+export interface CreateProgressPayload {
+  model: string;
+  status: string;
+}
+
+export interface CreateDonePayload {
+  model: string;
+}
+
+export interface CreateErrorPayload {
+  model: string;
+  error: string;
+  cancelled: boolean;
+}
+
+export interface CreateState {
+  name: string;
+  modelfile: string;
+  status: string;
+  phase: "running" | "done" | "error" | "cancelled";
+  error?: string;
+  logLines: string[];
+}

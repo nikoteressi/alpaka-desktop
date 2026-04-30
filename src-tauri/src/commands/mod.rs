@@ -3,6 +3,7 @@ pub mod chat;
 pub mod folders;
 pub mod hosts;
 pub mod library;
+pub mod model_create;
 pub mod model_path;
 pub mod model_settings;
 pub mod model_user_data;

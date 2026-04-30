@@ -37,6 +37,10 @@ import type {
   LibraryTag,
   LaunchApp,
   ModelUserData,
+  CreateState,
+  CreateProgressPayload,
+  CreateDonePayload,
+  CreateErrorPayload,
 } from "../types/models";
 
 export type { ModelCapabilities };
@@ -45,6 +49,7 @@ export const useModelStore = defineStore("models", {
   state: () => ({
     models: [] as Model[],
     pulling: {} as Record<string, PullProgressPayload>,
+    creating: {} as Record<string, CreateState>,
     isLoading: false,
     error: null as string | null,
     listenersInitialized: false,
@@ -319,6 +324,37 @@ export const useModelStore = defineStore("models", {
         this.fetchModels();
         this.fetchCapabilities(payload.model);
       });
+      await listen<CreateProgressPayload>("model:create-progress", (event) => {
+        const { model, status } = event.payload;
+        if (this.creating[model]) {
+          this.creating[model].status = status;
+          this.creating[model].logLines.push(status);
+        }
+      });
+      await listen<CreateDonePayload>("model:create-done", (event) => {
+        const { model } = event.payload;
+        if (this.creating[model]) {
+          this.creating[model].phase = "done";
+        }
+        this.fetchModels();
+      });
+      await listen<CreateErrorPayload>("model:create-error", (event) => {
+        const { model, error, cancelled } = event.payload;
+        if (this.creating[model]) {
+          if (cancelled) {
+            // No reason to keep cancelled state in memory — delete immediately.
+            // CreateModelPage captures the phase locally before this fires.
+            delete this.creating[model];
+          } else {
+            this.creating[model].phase = "error";
+            this.creating[model].error = error;
+          }
+        }
+      });
+    },
+
+    clearCreateState(name: string) {
+      delete this.creating[name];
     },
 
     formatBytes(bytes: number) {
