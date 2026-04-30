@@ -84,3 +84,70 @@ describe("LocalModelDetails", () => {
     );
   });
 });
+
+describe("LocalModelDetails — Mirostat controls (S-08)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it("renders Sampling Mode selector with Off/Mirostat1/Mirostat2 buttons", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockResolvedValue(null);
+
+    const wrapper = mount(LocalModelDetails, { props: { model: mockModel } });
+    await flushPromises();
+
+    const buttons = wrapper
+      .findAll("button")
+      .filter((b) => ["Off", "Mirostat 1", "Mirostat 2"].includes(b.text()));
+    expect(buttons).toHaveLength(3);
+  });
+
+  it("clicking Mirostat 2 sets effectiveMirostat to 2", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockResolvedValue(null);
+
+    const wrapper = mount(LocalModelDetails, { props: { model: mockModel } });
+    await flushPromises();
+
+    const btn = wrapper
+      .findAll("button")
+      .find((b) => b.text() === "Mirostat 2")!;
+    await btn.trigger("click");
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as { effectiveMirostat: number };
+    expect(vm.effectiveMirostat).toBe(2);
+  });
+
+  it("loads mirostat defaults from stored model settings", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockResolvedValue({
+      mirostat: 1,
+      mirostat_tau: 6.0,
+      mirostat_eta: 0.2,
+    });
+
+    const wrapper = mount(LocalModelDetails, { props: { model: mockModel } });
+    await flushPromises();
+
+    const vm = wrapper.vm as unknown as {
+      effectiveMirostat: number;
+      edited: { mirostat?: number; mirostat_tau?: number };
+    };
+    expect(vm.effectiveMirostat).toBe(1);
+    expect(vm.edited.mirostat_tau).toBe(6.0);
+  });
+
+  it("effectiveMirostat defaults to 0 when no stored defaults", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockResolvedValue(null);
+
+    const wrapper = mount(LocalModelDetails, { props: { model: mockModel } });
+    await flushPromises();
+
+    const vm = wrapper.vm as unknown as { effectiveMirostat: number };
+    expect(vm.effectiveMirostat).toBe(0);
+  });
+});

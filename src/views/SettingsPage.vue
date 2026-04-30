@@ -380,6 +380,12 @@
               <div
                 class="flex flex-col gap-4 pt-3 border-t border-[var(--border-subtle)]"
               >
+                <MirostatSelector
+                  :model-value="localMirostat"
+                  compact
+                  @update:model-value="updateLocalMirostat"
+                />
+
                 <SettingsSlider
                   label="Temperature"
                   :model-value="localOptions.temperature"
@@ -390,6 +396,7 @@
                   compact
                 />
                 <SettingsSlider
+                  v-if="localMirostat === 0"
                   label="Top P"
                   :model-value="localOptions.top_p"
                   @update:model-value="updateLocalOption('top_p', $event)"
@@ -399,12 +406,37 @@
                   compact
                 />
                 <SettingsSlider
+                  v-if="localMirostat === 0"
                   label="Top K"
                   :model-value="localOptions.top_k"
                   @update:model-value="updateLocalOption('top_k', $event)"
                   :min="0"
                   :max="100"
                   :step="1"
+                  compact
+                />
+                <SettingsSlider
+                  v-if="localMirostat !== 0"
+                  label="Mirostat Tau"
+                  :model-value="localOptions.mirostat_tau ?? 5"
+                  @update:model-value="
+                    updateLocalOption('mirostat_tau', $event)
+                  "
+                  :min="0.1"
+                  :max="10"
+                  :step="0.1"
+                  compact
+                />
+                <SettingsSlider
+                  v-if="localMirostat !== 0"
+                  label="Mirostat Eta"
+                  :model-value="localOptions.mirostat_eta ?? 0.1"
+                  @update:model-value="
+                    updateLocalOption('mirostat_eta', $event)
+                  "
+                  :min="0.01"
+                  :max="1"
+                  :step="0.01"
                   compact
                 />
                 <SettingsSlider
@@ -692,6 +724,7 @@ import AccountSettings from "../components/settings/AccountSettings.vue";
 import HostSettings from "../components/settings/HostSettings.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
 import StopSequencesInput from "../components/settings/StopSequencesInput.vue";
+import MirostatSelector from "../components/shared/MirostatSelector.vue";
 import { useSettingsStore } from "../stores/settings";
 import type { PresetOptions } from "../types/settings";
 import { useModelStore } from "../stores/models";
@@ -720,6 +753,9 @@ const localOptions = ref<PresetOptions>(
         num_ctx: settingsStore.chatOptions.num_ctx,
         repeat_penalty: settingsStore.chatOptions.repeat_penalty,
         repeat_last_n: settingsStore.chatOptions.repeat_last_n,
+        mirostat: settingsStore.chatOptions.mirostat,
+        mirostat_tau: settingsStore.chatOptions.mirostat_tau,
+        mirostat_eta: settingsStore.chatOptions.mirostat_eta,
       }
     );
   })(),
@@ -734,6 +770,13 @@ function selectPreviewPreset(id: string) {
 function updateLocalOption(key: keyof PresetOptions, value: number) {
   previewPresetId.value = "";
   localOptions.value = { ...localOptions.value, [key]: value };
+}
+
+const localMirostat = computed(() => localOptions.value.mirostat ?? 0);
+
+function updateLocalMirostat(value: 0 | 1 | 2) {
+  previewPresetId.value = "";
+  localOptions.value = { ...localOptions.value, mirostat: value };
 }
 
 const savingPreset = ref(false);

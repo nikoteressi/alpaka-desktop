@@ -23,6 +23,9 @@ pub fn get(conn: &Connection, model_name: &str) -> Result<Option<ChatOptions>, A
                 && opts.repeat_last_n.is_none()
                 && opts.seed.is_none()
                 && opts.stop.is_none()
+                && opts.mirostat.is_none()
+                && opts.mirostat_tau.is_none()
+                && opts.mirostat_eta.is_none()
             {
                 Ok(None)
             } else {
@@ -175,5 +178,25 @@ mod tests {
             .unwrap();
         assert!(result.is_some());
         assert_eq!(result.unwrap().temperature, Some(0.3));
+    }
+
+    #[test]
+    fn test_mirostat_only_settings_not_treated_as_empty() {
+        let conn = in_memory_db();
+        let opts = ChatOptions {
+            mirostat: Some(2),
+            mirostat_tau: Some(5.0),
+            mirostat_eta: Some(0.1),
+            ..Default::default()
+        };
+        set(&conn, "mirostat-model:latest", &opts).unwrap();
+        let result = get(&conn, "mirostat-model:latest").unwrap();
+        assert!(
+            result.is_some(),
+            "mirostat-only settings should not be treated as empty"
+        );
+        let retrieved = result.unwrap();
+        assert_eq!(retrieved.mirostat, Some(2));
+        assert_eq!(retrieved.mirostat_tau, Some(5.0));
     }
 }

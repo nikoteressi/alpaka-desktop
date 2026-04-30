@@ -9,6 +9,9 @@ export interface ChatOptions {
   repeat_last_n?: number;
   seed?: number;
   stop?: string[];
+  mirostat?: 0 | 1 | 2;
+  mirostat_tau?: number;
+  mirostat_eta?: number;
 }
 
 export type PresetOptions = Required<
@@ -21,7 +24,11 @@ export type PresetOptions = Required<
     | "repeat_penalty"
     | "repeat_last_n"
   >
->;
+> & {
+  mirostat?: 0 | 1 | 2;
+  mirostat_tau?: number;
+  mirostat_eta?: number;
+};
 
 export interface Preset {
   id: string;

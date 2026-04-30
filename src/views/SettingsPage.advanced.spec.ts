@@ -145,3 +145,83 @@ describe("SettingsPage — Advanced tab (S-06 stop sequences)", () => {
     expect(store.chatOptions.stop).toBeUndefined();
   });
 });
+
+describe("SettingsPage — Engine Presets mirostat controls (S-08)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockReset();
+    mockInvoke.mockResolvedValue([]);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  // The Presets editor (with MirostatSelector) lives in the 'models' tab ("Engine")
+  async function mountPageOnEngine() {
+    const wrapper = mountPage();
+    const vm = wrapper.vm as unknown as { activeTab: string };
+    vm.activeTab = "models";
+    await wrapper.vm.$nextTick();
+    return wrapper;
+  }
+
+  it("renders Sampling Mode selector with Off/Mirostat1/Mirostat2 buttons in preset editor", async () => {
+    const wrapper = await mountPageOnEngine();
+
+    const buttons = wrapper
+      .findAll("button")
+      .filter((b) => ["Off", "Mirostat 1", "Mirostat 2"].includes(b.text()));
+    expect(buttons).toHaveLength(3);
+  });
+
+  it("updateLocalMirostat(1) sets localMirostat to 1", async () => {
+    const wrapper = await mountPageOnEngine();
+    const vm = wrapper.vm as unknown as {
+      localMirostat: number;
+      updateLocalMirostat: (v: 0 | 1 | 2) => void;
+    };
+
+    vm.updateLocalMirostat(1);
+    await wrapper.vm.$nextTick();
+
+    expect(vm.localMirostat).toBe(1);
+  });
+
+  it("updateLocalMirostat(2) sets localMirostat to 2", async () => {
+    const wrapper = await mountPageOnEngine();
+    const vm = wrapper.vm as unknown as {
+      localMirostat: number;
+      updateLocalMirostat: (v: 0 | 1 | 2) => void;
+    };
+
+    vm.updateLocalMirostat(2);
+    await wrapper.vm.$nextTick();
+
+    expect(vm.localMirostat).toBe(2);
+  });
+
+  it("updateLocalMirostat(0) resets localMirostat to 0", async () => {
+    const wrapper = await mountPageOnEngine();
+    const vm = wrapper.vm as unknown as {
+      localMirostat: number;
+      updateLocalMirostat: (v: 0 | 1 | 2) => void;
+    };
+
+    vm.updateLocalMirostat(2);
+    await wrapper.vm.$nextTick();
+    vm.updateLocalMirostat(0);
+    await wrapper.vm.$nextTick();
+
+    expect(vm.localMirostat).toBe(0);
+  });
+
+  it("localMirostat defaults to 0 when preset has no mirostat field", async () => {
+    const wrapper = await mountPageOnEngine();
+    const vm = wrapper.vm as unknown as { localMirostat: number };
+    expect(vm.localMirostat).toBe(0);
+  });
+});

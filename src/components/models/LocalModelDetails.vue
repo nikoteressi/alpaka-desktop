@@ -129,6 +129,10 @@
       </div>
 
       <div v-else class="flex flex-col gap-5">
+        <MirostatSelector
+          :model-value="effectiveMirostat"
+          @update:model-value="updateMirostat"
+        />
         <SettingsSlider
           label="Temperature"
           :model-value="
@@ -140,6 +144,7 @@
           :step="0.05"
         />
         <SettingsSlider
+          v-if="effectiveMirostat === 0"
           label="Top P"
           :model-value="edited.top_p ?? settingsStore.chatOptions.top_p"
           @update:model-value="edited = { ...edited, top_p: $event }"
@@ -148,12 +153,35 @@
           :step="0.05"
         />
         <SettingsSlider
+          v-if="effectiveMirostat === 0"
           label="Top K"
           :model-value="edited.top_k ?? settingsStore.chatOptions.top_k"
           @update:model-value="edited = { ...edited, top_k: $event }"
           :min="0"
           :max="500"
           :step="1"
+        />
+        <SettingsSlider
+          v-if="effectiveMirostat !== 0"
+          label="Mirostat Tau"
+          :model-value="
+            edited.mirostat_tau ?? settingsStore.chatOptions.mirostat_tau ?? 5
+          "
+          @update:model-value="edited = { ...edited, mirostat_tau: $event }"
+          :min="0.1"
+          :max="10"
+          :step="0.1"
+        />
+        <SettingsSlider
+          v-if="effectiveMirostat !== 0"
+          label="Mirostat Eta"
+          :model-value="
+            edited.mirostat_eta ?? settingsStore.chatOptions.mirostat_eta ?? 0.1
+          "
+          @update:model-value="edited = { ...edited, mirostat_eta: $event }"
+          :min="0.01"
+          :max="1"
+          :step="0.01"
         />
         <SettingsSlider
           label="Repeat Penalty"
@@ -220,6 +248,7 @@ import { useModelStore } from "../../stores/models";
 import { useAppOrchestration } from "../../composables/useAppOrchestration";
 import { useModelDefaults } from "../../composables/useModelDefaults";
 import SettingsSlider from "../settings/SettingsSlider.vue";
+import MirostatSelector from "../shared/MirostatSelector.vue";
 import type { Model } from "../../types/models";
 import type { ChatOptions } from "../../types/settings";
 
@@ -238,6 +267,14 @@ const { applyModelDefaults, saveAsModelDefault, resetModelDefaults } =
 
 const loading = ref(true);
 const edited = ref<Partial<ChatOptions>>({});
+
+const effectiveMirostat = computed(
+  () => edited.value.mirostat ?? settingsStore.chatOptions.mirostat ?? 0,
+);
+
+function updateMirostat(value: 0 | 1 | 2) {
+  edited.value = { ...edited.value, mirostat: value };
+}
 const saved = ref(false);
 const saveError = ref(false);
 const editingTags = ref(false);

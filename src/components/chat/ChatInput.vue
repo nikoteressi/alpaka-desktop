@@ -209,6 +209,12 @@ function parseChatOptionsJson(raw: string): Partial<ChatOptions> | null {
       out.repeat_penalty = obj.repeat_penalty;
     if (typeof obj.repeat_last_n === "number")
       out.repeat_last_n = obj.repeat_last_n;
+    if (obj.mirostat === 0 || obj.mirostat === 1 || obj.mirostat === 2)
+      out.mirostat = obj.mirostat;
+    if (typeof obj.mirostat_tau === "number")
+      out.mirostat_tau = obj.mirostat_tau;
+    if (typeof obj.mirostat_eta === "number")
+      out.mirostat_eta = obj.mirostat_eta;
     return out;
   } catch {
     return null;
@@ -405,56 +411,77 @@ async function handleCompact() {
 
 // ---- Draft Sync Logic ----
 
-function loadDraft() {
-  if (!activeConvId.value) return;
-  isSyncingDraft.value = true;
-  const draft = chatStore.drafts[activeConvId.value];
-  if (draft) {
-    inputContent.value = draft.content;
-    webSearchEnabled.value = draft.webSearchEnabled;
-    thinkEnabled.value = draft.thinkEnabled;
-    thinkLevel.value = draft.thinkLevel;
-    chatOptions.value = draft.chatOptions || {};
-    presetId.value = draft.presetId ?? "";
+function applyDraft(
+  draft: (typeof chatStore.drafts)[string],
+  convIdAtLoad: string,
+) {
+  inputContent.value = draft.content;
+  webSearchEnabled.value = draft.webSearchEnabled;
+  thinkEnabled.value = draft.thinkEnabled;
+  thinkLevel.value = draft.thinkLevel;
+  chatOptions.value = draft.chatOptions || {};
+  presetId.value = draft.presetId ?? "";
+  clearAttachments();
+  attachments.value = draft.attachments.map((a) => {
+    const data = base64ToUint8Array(a.data);
+    const blob = new Blob([data], { type: a.type });
+    return {
+      file: new File([blob], a.name, { type: a.type }),
+      previewUrl: URL.createObjectURL(blob),
+      data,
+    };
+  });
+  if (draft.linkedContexts) {
+    chatStore.folderContexts[convIdAtLoad] = draft.linkedContexts;
+  }
+}
 
-    // Restore attachments
-    clearAttachments();
-    attachments.value = draft.attachments.map((a) => {
-      const data = base64ToUint8Array(a.data);
-      const blob = new Blob([data], { type: a.type });
-      const previewUrl = URL.createObjectURL(blob);
-      return {
-        file: new File([blob], a.name, { type: a.type }),
-        previewUrl,
-        data,
-      };
-    });
-
-    // Restore linked contexts
-    if (draft.linkedContexts) {
-      chatStore.folderContexts[activeConvId.value] = draft.linkedContexts;
-    }
-  } else {
-    // Reset if no draft — restore chatOptions from conversation's settings_json if present
-    inputContent.value = "";
-    clearAttachments();
-    webSearchEnabled.value = false;
-    thinkEnabled.value = false;
-    thinkLevel.value = "medium";
-    const conv = chatStore.conversations.find(
-      (c) => c.id === activeConvId.value,
-    );
-    const savedSettings = conv?.settings_json
-      ? parseChatOptionsJson(conv.settings_json)
-      : null;
-    if (savedSettings && Object.keys(savedSettings).length > 0) {
-      chatOptions.value = savedSettings;
+async function applyNoDraftSettings(convIdAtLoad: string) {
+  inputContent.value = "";
+  clearAttachments();
+  webSearchEnabled.value = false;
+  thinkEnabled.value = false;
+  thinkLevel.value = "medium";
+  const conv = chatStore.conversations.find((c) => c.id === convIdAtLoad);
+  const savedSettings = conv?.settings_json
+    ? parseChatOptionsJson(conv.settings_json)
+    : null;
+  if (savedSettings && Object.keys(savedSettings).length > 0) {
+    chatOptions.value = savedSettings;
+    presetId.value = "";
+    return;
+  }
+  // No saved settings — apply model defaults so per-model options (e.g. mirostat)
+  // survive across conversation switches even when the model name hasn't changed.
+  const modelName = activeModelName.value;
+  if (!modelName || modelName === "Select model") {
+    resetChatOptions();
+    return;
+  }
+  try {
+    const defaults = await applyModelDefaults(modelName);
+    if (activeConvId.value !== convIdAtLoad) return;
+    if (Object.keys(defaults).length > 0) {
+      chatOptions.value = defaults;
       presetId.value = "";
     } else {
       resetChatOptions();
     }
+  } catch {
+    resetChatOptions();
   }
+}
 
+async function loadDraft() {
+  if (!activeConvId.value) return;
+  const convIdAtLoad = activeConvId.value;
+  isSyncingDraft.value = true;
+  const draft = chatStore.drafts[convIdAtLoad];
+  if (draft) {
+    applyDraft(draft, convIdAtLoad);
+  } else {
+    await applyNoDraftSettings(convIdAtLoad);
+  }
   nextTick(() => {
     isSyncingDraft.value = false;
   });

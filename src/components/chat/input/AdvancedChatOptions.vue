@@ -164,6 +164,12 @@
     <div
       class="border-t border-[var(--border-subtle)] pt-2 flex flex-col gap-4"
     >
+      <MirostatSelector
+        :model-value="effectiveMirostat"
+        compact
+        @update:model-value="updateMirostat"
+      />
+
       <SettingsSlider
         label="Temperature"
         :model-value="
@@ -177,6 +183,7 @@
       />
 
       <SettingsSlider
+        v-if="effectiveMirostat === 0"
         label="Top P"
         :model-value="modelValue.top_p ?? settingsStore.chatOptions.top_p"
         @update:model-value="updateOption('top_p', $event)"
@@ -187,12 +194,41 @@
       />
 
       <SettingsSlider
+        v-if="effectiveMirostat === 0"
         label="Top K"
         :model-value="modelValue.top_k ?? settingsStore.chatOptions.top_k"
         @update:model-value="updateOption('top_k', $event)"
         :min="0"
         :max="500"
         :step="1"
+        compact
+      />
+
+      <SettingsSlider
+        v-if="effectiveMirostat !== 0"
+        label="Mirostat Tau"
+        :model-value="
+          modelValue.mirostat_tau ?? settingsStore.chatOptions.mirostat_tau ?? 5
+        "
+        @update:model-value="updateOption('mirostat_tau', $event)"
+        :min="0.1"
+        :max="10"
+        :step="0.1"
+        compact
+      />
+
+      <SettingsSlider
+        v-if="effectiveMirostat !== 0"
+        label="Mirostat Eta"
+        :model-value="
+          modelValue.mirostat_eta ??
+          settingsStore.chatOptions.mirostat_eta ??
+          0.1
+        "
+        @update:model-value="updateOption('mirostat_eta', $event)"
+        :min="0.01"
+        :max="1"
+        :step="0.01"
         compact
       />
 
@@ -228,6 +264,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
 import { useSettingsStore } from "../../../stores/settings";
 import type { ChatOptions, PresetOptions } from "../../../types/settings";
 import SettingsSlider from "../../settings/SettingsSlider.vue";
+import MirostatSelector from "../../shared/MirostatSelector.vue";
 import { useModelDefaults } from "../../../composables/useModelDefaults";
 
 const props = defineProps<{
@@ -254,6 +291,10 @@ const saveDefaultError = ref(false);
 
 const isPresetOpen = ref(false);
 const presetDropdownRef = ref<HTMLElement | null>(null);
+
+const effectiveMirostat = computed(
+  () => props.modelValue.mirostat ?? settingsStore.chatOptions.mirostat ?? 0,
+);
 
 const currentPresetLabel = computed(() => {
   if (!props.presetId) return "Custom";
@@ -294,6 +335,27 @@ function updateOption(key: keyof ChatOptions, value: number) {
   emit("update:presetId", "");
 }
 
+function updateMirostat(value: 0 | 1 | 2) {
+  emit("update:modelValue", { ...props.modelValue, mirostat: value });
+  emit("update:presetId", "");
+}
+
+function resolveCurrentOptions(): PresetOptions {
+  const mv = props.modelValue;
+  const defaults = settingsStore.chatOptions;
+  return {
+    temperature: mv.temperature ?? defaults.temperature,
+    top_p: mv.top_p ?? defaults.top_p,
+    top_k: mv.top_k ?? defaults.top_k,
+    num_ctx: mv.num_ctx ?? defaults.num_ctx,
+    repeat_penalty: mv.repeat_penalty ?? defaults.repeat_penalty,
+    repeat_last_n: mv.repeat_last_n ?? defaults.repeat_last_n,
+    mirostat: mv.mirostat ?? defaults.mirostat,
+    mirostat_tau: mv.mirostat_tau ?? defaults.mirostat_tau,
+    mirostat_eta: mv.mirostat_eta ?? defaults.mirostat_eta,
+  };
+}
+
 async function startSave() {
   saving.value = true;
   saveName.value = "";
@@ -303,37 +365,14 @@ async function startSave() {
 
 async function commitSave() {
   if (!saveName.value.trim()) return;
-  const options: PresetOptions = {
-    temperature:
-      props.modelValue.temperature ?? settingsStore.chatOptions.temperature,
-    top_p: props.modelValue.top_p ?? settingsStore.chatOptions.top_p,
-    top_k: props.modelValue.top_k ?? settingsStore.chatOptions.top_k,
-    num_ctx: props.modelValue.num_ctx ?? settingsStore.chatOptions.num_ctx,
-    repeat_penalty:
-      props.modelValue.repeat_penalty ??
-      settingsStore.chatOptions.repeat_penalty,
-    repeat_last_n:
-      props.modelValue.repeat_last_n ?? settingsStore.chatOptions.repeat_last_n,
-  };
-  await settingsStore.saveAsPreset(saveName.value, options);
+  await settingsStore.saveAsPreset(saveName.value, resolveCurrentOptions());
   saving.value = false;
   saveName.value = "";
 }
 
 async function handleSaveAsModelDefault() {
   if (!props.model || savingDefault.value) return;
-  const effective: Partial<ChatOptions> = {
-    temperature:
-      props.modelValue.temperature ?? settingsStore.chatOptions.temperature,
-    top_p: props.modelValue.top_p ?? settingsStore.chatOptions.top_p,
-    top_k: props.modelValue.top_k ?? settingsStore.chatOptions.top_k,
-    num_ctx: props.modelValue.num_ctx ?? settingsStore.chatOptions.num_ctx,
-    repeat_penalty:
-      props.modelValue.repeat_penalty ??
-      settingsStore.chatOptions.repeat_penalty,
-    repeat_last_n:
-      props.modelValue.repeat_last_n ?? settingsStore.chatOptions.repeat_last_n,
-  };
+  const effective = resolveCurrentOptions();
   savingDefault.value = true;
   saveDefaultError.value = false;
   savedAsDefault.value = false;

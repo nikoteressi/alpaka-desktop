@@ -72,6 +72,9 @@ const DEFAULT_CHAT_OPTIONS: SettingsState["chatOptions"] = {
   num_ctx: 4096,
   repeat_penalty: 1.1,
   repeat_last_n: 64,
+  mirostat: 0,
+  mirostat_tau: 5,
+  mirostat_eta: 0.1,
 };
 
 const getInitialState = (): SettingsState => ({

@@ -213,6 +213,7 @@ import { useSettingsStore } from "../../stores/settings";
 import { useAppOrchestration } from "../../composables/useAppOrchestration";
 import { useSendMessage } from "../../composables/useSendMessage";
 import type { Message } from "../../types/chat";
+import type { ChatOptions } from "../../types/settings";
 
 interface ScrollerItem {
   id: string;
@@ -369,9 +370,10 @@ async function onSend(
   images?: Uint8Array[],
   webSearchEnabled?: boolean,
   thinkMode?: string,
+  chatOptions?: ChatOptions,
 ) {
   isAutoScrollEnabled.value = true;
-  await sendMessage(text, images, webSearchEnabled, thinkMode);
+  await sendMessage(text, images, webSearchEnabled, thinkMode, chatOptions);
 }
 
 async function onStop() {

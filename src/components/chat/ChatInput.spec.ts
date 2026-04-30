@@ -412,6 +412,115 @@ describe("ChatInput — Submission", () => {
   });
 });
 
+describe("ChatInput — parseChatOptionsJson mirostat fields", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation(() => Promise.resolve(undefined));
+  });
+
+  it("restores mirostat=1 from settings_json when loading a conversation", async () => {
+    const chatStore = useChatStore();
+    const conv = makeConversation("llama3");
+    conv.settings_json = JSON.stringify({
+      mirostat: 1,
+      mirostat_tau: 3.5,
+      mirostat_eta: 0.05,
+    });
+    chatStore.conversations.push(conv);
+    chatStore.activeConversationId = "conv-test-1";
+
+    const wrapper = mountInput();
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as {
+      chatOptions: Record<string, unknown>;
+    };
+    expect(vm.chatOptions.mirostat).toBe(1);
+    expect(vm.chatOptions.mirostat_tau).toBe(3.5);
+    expect(vm.chatOptions.mirostat_eta).toBe(0.05);
+  });
+
+  it("restores mirostat=0 (Off) from settings_json", async () => {
+    const chatStore = useChatStore();
+    const conv = makeConversation("llama3");
+    conv.settings_json = JSON.stringify({ mirostat: 0, temperature: 0.5 });
+    chatStore.conversations.push(conv);
+    chatStore.activeConversationId = "conv-test-1";
+
+    const wrapper = mountInput();
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as {
+      chatOptions: Record<string, unknown>;
+    };
+    expect(vm.chatOptions.mirostat).toBe(0);
+    expect(vm.chatOptions.temperature).toBe(0.5);
+  });
+
+  it("ignores invalid mirostat values from settings_json", async () => {
+    const chatStore = useChatStore();
+    const conv = makeConversation("llama3");
+    conv.settings_json = JSON.stringify({ mirostat: 99, temperature: 0.7 });
+    chatStore.conversations.push(conv);
+    chatStore.activeConversationId = "conv-test-1";
+
+    const wrapper = mountInput();
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as {
+      chatOptions: Record<string, unknown>;
+    };
+    expect(vm.chatOptions.mirostat).toBeUndefined();
+    expect(vm.chatOptions.temperature).toBe(0.7);
+  });
+});
+
+describe("ChatInput — loadDraft applies model defaults when no settings_json", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it("applies model defaults (including mirostat) when conversation has no settings_json", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_defaults")
+        return Promise.resolve({
+          mirostat: 2,
+          mirostat_tau: 4.0,
+          mirostat_eta: 0.1,
+        });
+      if (cmd === "get_model_capabilities")
+        return Promise.resolve({
+          vision: false,
+          tools: false,
+          thinking: false,
+          thinking_toggleable: false,
+          thinking_levels: [],
+        });
+      return Promise.resolve(undefined);
+    });
+
+    const chatStore = useChatStore();
+    const conv = makeConversation("qwen2.5:7b");
+    conv.settings_json = "{}";
+    chatStore.conversations.push(conv);
+    chatStore.activeConversationId = "conv-test-1";
+
+    const wrapper = mountInput();
+    await wrapper.vm.$nextTick();
+    // allow async loadDraft to resolve
+    await new Promise((r) => setTimeout(r, 0));
+
+    const vm = wrapper.vm as unknown as {
+      chatOptions: Record<string, unknown>;
+    };
+    expect(mockInvoke).toHaveBeenCalledWith("get_model_defaults", {
+      modelName: "qwen2.5:7b",
+    });
+    expect(vm.chatOptions.mirostat).toBe(2);
+    expect(vm.chatOptions.mirostat_tau).toBe(4.0);
+  });
+});
+
 describe("ChatInput — Model defaults on selection", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
