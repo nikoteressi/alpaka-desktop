@@ -97,6 +97,7 @@ pub fn run() {
             )?;
 
             // ── Keyring health check ───────────────────────────────────────────
+            #[cfg(not(feature = "test-mode"))]
             if !crate::auth::keyring::check_keyring_available() {
                 log::warn!(
                     "System keyring is unavailable. Credentials cannot be stored securely. \
@@ -129,23 +130,31 @@ pub fn run() {
             app.manage(state);
 
             // ── System Tray ────────────────────────────────────────────────────
-            let tray = system::tray::setup(app.handle()).expect("Failed to setup system tray");
+            #[cfg(not(feature = "test-mode"))]
+            {
+                let tray = system::tray::setup(app.handle()).expect("Failed to setup system tray");
 
-            // Listen for theme changes on any window to update the tray icon
-            if let Some(window) = app.webview_windows().values().next() {
-                let tray_handle = tray.clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::ThemeChanged(theme) = event {
-                        // On Linux, the window theme is the best proxy we have for the tray
-                        let _ = system::tray::update_icon(&tray_handle, *theme);
-                    }
-                });
+                // Listen for theme changes on any window to update the tray icon
+                if let Some(window) = app.webview_windows().values().next() {
+                    let tray_handle = tray.clone();
+                    window.on_window_event(move |event| {
+                        if let tauri::WindowEvent::ThemeChanged(theme) = event {
+                            // On Linux, the window theme is the best proxy we have for the tray
+                            let _ = system::tray::update_icon(&tray_handle, *theme);
+                        }
+                    });
+                }
             }
 
             // ── Hosts Manager ──────────────────────────────────────────────────
-            let health_handle =
-                commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
-            *app.state::<AppState>().health_loop_handle.lock().unwrap() = Some(health_handle);
+            #[cfg(feature = "test-mode")]
+            let _ = shutdown_rx;
+            #[cfg(not(feature = "test-mode"))]
+            {
+                let health_handle =
+                    commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
+                *app.state::<AppState>().health_loop_handle.lock().unwrap() = Some(health_handle);
+            }
 
             Ok(())
         })

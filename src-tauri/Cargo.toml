@@ -11,6 +11,9 @@ rust-version = "1.88.0"   # darling/image/serde_with/time require 1.88; CVE-2024
 name = "alpaka_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+test-mode = []
+
 [build-dependencies]
 tauri-build = { version = "2.5", features = [] }
 

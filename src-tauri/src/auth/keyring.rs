@@ -1,5 +1,23 @@
 use crate::error::AppError;
+#[cfg(not(feature = "test-mode"))]
 use keyring::Entry;
+
+#[cfg(feature = "test-mode")]
+use std::collections::HashMap;
+#[cfg(feature = "test-mode")]
+use std::sync::Mutex;
+
+#[cfg(feature = "test-mode")]
+static TEST_KEYRING: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+
+#[cfg(feature = "test-mode")]
+fn test_store() -> std::sync::MutexGuard<'static, Option<HashMap<String, String>>> {
+    let mut guard = TEST_KEYRING.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(HashMap::new());
+    }
+    guard
+}
 
 pub const SERVICE_NAME: &str = "ollama-desktop";
 
@@ -12,9 +30,19 @@ pub const API_KEY_ACCOUNT: &str = "ollama-api-key";
 /// Sets a bearer token in the system's secure credential store (keyring).
 ///
 /// Under Linux, this uses the Secret Service API.
+#[cfg(not(feature = "test-mode"))]
 pub fn set_token(host_id: &str, token: &str) -> Result<(), AppError> {
     let entry = Entry::new(SERVICE_NAME, host_id)?;
     entry.set_password(token)?;
+    Ok(())
+}
+
+#[cfg(feature = "test-mode")]
+pub fn set_token(host_id: &str, token: &str) -> Result<(), AppError> {
+    test_store()
+        .as_mut()
+        .unwrap()
+        .insert(host_id.to_string(), token.to_string());
     Ok(())
 }
 
@@ -22,6 +50,7 @@ pub fn set_token(host_id: &str, token: &str) -> Result<(), AppError> {
 ///
 /// We first check our own service 'ollama-desktop'.
 /// If not found, we check the official client's service 'ollama' (account 'cloud').
+#[cfg(not(feature = "test-mode"))]
 pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
     // 1. Try our own service/identifier first
     let entry = Entry::new(SERVICE_NAME, host_id)?;
@@ -48,7 +77,13 @@ pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
     Ok(None)
 }
 
+#[cfg(feature = "test-mode")]
+pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
+    Ok(test_store().as_ref().unwrap().get(host_id).cloned())
+}
+
 /// Returns true if the system keyring is accessible.
+#[cfg(not(feature = "test-mode"))]
 pub fn check_keyring_available() -> bool {
     match keyring::Entry::new("alpaka-desktop-health-check", "probe") {
         Ok(entry) => match entry.get_password() {
@@ -65,9 +100,15 @@ pub fn check_keyring_available() -> bool {
     }
 }
 
+#[cfg(feature = "test-mode")]
+pub fn check_keyring_available() -> bool {
+    true
+}
+
 /// Deletes a bearer token from the system's secure credential store.
 ///
 /// Returns `Ok(())` even if the token did not exist.
+#[cfg(not(feature = "test-mode"))]
 pub fn delete_token(host_id: &str) -> Result<(), AppError> {
     let entry = Entry::new(SERVICE_NAME, host_id)?;
     match entry.delete_credential() {
@@ -75,6 +116,12 @@ pub fn delete_token(host_id: &str) -> Result<(), AppError> {
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(AppError::from(e)),
     }
+}
+
+#[cfg(feature = "test-mode")]
+pub fn delete_token(host_id: &str) -> Result<(), AppError> {
+    test_store().as_mut().unwrap().remove(host_id);
+    Ok(())
 }
 
 #[cfg(test)]
