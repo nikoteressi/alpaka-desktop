@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useModelStore } from "../stores/models";
 
+async function cancel(name: string): Promise<void> {
+  await invoke("cancel_model_create", { name });
+}
+
 export function useModelCreate() {
   const modelStore = useModelStore();
 
@@ -23,10 +27,6 @@ export function useModelCreate() {
       }
       throw e;
     }
-  }
-
-  async function cancel(name: string): Promise<void> {
-    await invoke("cancel_model_create", { name });
   }
 
   return { start, cancel };

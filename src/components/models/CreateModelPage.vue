@@ -31,10 +31,12 @@
     <div v-if="phase === 'edit'" class="flex flex-col gap-4 flex-1 min-h-0">
       <div class="flex flex-col gap-1.5">
         <label
+          for="model-name-input"
           class="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider"
           >Model name</label
         >
         <input
+          id="model-name-input"
           v-model="modelName"
           type="text"
           placeholder="e.g. my-assistant"
@@ -57,10 +59,11 @@
       </div>
 
       <div class="flex flex-col gap-1.5 flex-1 min-h-0">
-        <label
+        <p
           class="text-[11px] font-bold text-[var(--text-dim)] uppercase tracking-wider"
-          >Modelfile</label
         >
+          Modelfile
+        </p>
         <div
           ref="editorContainer"
           class="flex-1 min-h-[300px] rounded-xl border border-[var(--border)] overflow-hidden text-[13px] font-mono"
@@ -198,7 +201,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
-import { StreamLanguage } from "@codemirror/language";
+import { StreamLanguage, StringStream } from "@codemirror/language";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { useModelStore } from "../../stores/models";
 import { useModelCreate } from "../../composables/useModelCreate";
@@ -213,45 +216,45 @@ PARAMETER temperature 0.7
 PARAMETER top_p 0.9
 `;
 
+const MODELFILE_KEYWORDS = [
+  "FROM",
+  "SYSTEM",
+  "PARAMETER",
+  "TEMPLATE",
+  "MESSAGE",
+  "ADAPTER",
+  "LICENSE",
+];
+
+function matchSolToken(stream: StringStream): string | null {
+  for (const kw of MODELFILE_KEYWORDS) {
+    if (stream.match(kw) && (stream.eol() || /\s/.test(stream.peek() ?? "")))
+      return "keyword";
+  }
+  if (stream.match("#")) {
+    stream.skipToEnd();
+    return "comment";
+  }
+  return null;
+}
+
+function scanString(stream: StringStream, delim: string): "string" {
+  while (!stream.match(delim)) {
+    if (stream.eol()) break;
+    stream.next();
+  }
+  return "string";
+}
+
 const modelfileLanguage = StreamLanguage.define({
   token(stream) {
     if (stream.sol()) {
-      const keywords = [
-        "FROM",
-        "SYSTEM",
-        "PARAMETER",
-        "TEMPLATE",
-        "MESSAGE",
-        "ADAPTER",
-        "LICENSE",
-      ];
-      for (const kw of keywords) {
-        if (
-          stream.match(kw) &&
-          (stream.eol() || /\s/.test(stream.peek() ?? ""))
-        )
-          return "keyword";
-      }
-      if (stream.match("#")) {
-        stream.skipToEnd();
-        return "comment";
-      }
+      const t = matchSolToken(stream);
+      if (t !== null) return t;
     }
-    if (stream.match('"""')) {
-      while (!stream.match('"""')) {
-        if (stream.eol()) break; // can't close on this line
-        stream.next();
-      }
-      return "string";
-    }
-    if (stream.match('"')) {
-      while (!stream.match('"')) {
-        if (stream.eol()) break;
-        stream.next();
-      }
-      return "string";
-    }
-    if (stream.match(/[0-9]+(\.[0-9]+)?/)) return "number";
+    if (stream.match('"""')) return scanString(stream, '"""');
+    if (stream.match('"')) return scanString(stream, '"');
+    if (stream.match(/\d+(\.\d+)?/)) return "number";
     stream.next();
     return null;
   },
