@@ -18,7 +18,7 @@
     "lint:check": "eslint src --ext .ts,.vue",
     "format": "prettier --write \"src/**/*.{ts,vue,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,vue,css}\"",
-    "e2e:build":       "pnpm tauri build --config src-tauri/tauri.test.conf.json -- --features test-mode",
+    "e2e:build":       "pnpm tauri build --features test-mode --config src-tauri/tauri.test.conf.json",
     "e2e:smoke":       "NODE_OPTIONS='--import tsx' wdio run e2e-desktop/wdio.smoke.conf.ts",
     "e2e:integration": "NODE_OPTIONS='--import tsx' wdio run e2e-desktop/wdio.integration.conf.ts",
     "e2e:all":         "pnpm e2e:smoke && pnpm e2e:integration"
