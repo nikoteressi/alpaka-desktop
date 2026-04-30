@@ -24,6 +24,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CI: merge duplicate `test` + `coverage` jobs into single `test-and-coverage` (tests now run once with instrumentation instead of twice)
 - CI: add path-based job skipping — Rust-only PRs skip Vitest/TS checks; frontend-only PRs skip Rust compilation/testing
 
+### Removed
+- Playwright e2e test suite — replaced by real desktop E2E tests running against a live Tauri process
+
 ### Added
 - CL-03: API key management UI — Settings → Account now includes an API Keys panel for entering, validating, and removing an Ollama Cloud API key stored via the system keyring (Secret Service API). Key is never written to SQLite.
 - CI: CodeQL Rust SAST analysis (GA since CodeQL 2.23.3, October 2025)
