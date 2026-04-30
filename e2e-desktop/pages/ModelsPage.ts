@@ -1,11 +1,11 @@
 import { BasePage } from './BasePage'
 
 export class ModelsPage extends BasePage {
-  get modelCards() {
+  get modelCards(): ReturnType<WebdriverIO.Browser['$$']> {
     return $$('[data-testid="model-card"]')
   }
 
-  get pullModelButton() {
+  get pullModelButton(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="pull-model-btn"]')
   }
 

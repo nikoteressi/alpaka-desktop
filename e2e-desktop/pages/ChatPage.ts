@@ -1,27 +1,27 @@
 import { BasePage } from './BasePage'
 
 export class ChatPage extends BasePage {
-  get messageInput() {
+  get messageInput(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="chat-input"]')
   }
 
-  get sendButton() {
+  get sendButton(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="send-btn"]')
   }
 
-  get modelSelector() {
+  get modelSelector(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="model-selector"]')
   }
 
-  get assistantMessages() {
+  get assistantMessages(): ReturnType<WebdriverIO.Browser['$$']> {
     return $$('[data-role="assistant"]')
   }
 
-  get userMessages() {
+  get userMessages(): ReturnType<WebdriverIO.Browser['$$']> {
     return $$('[data-role="user"]')
   }
 
-  get streamingIndicator() {
+  get streamingIndicator(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="streaming-indicator"]')
   }
 

@@ -1,15 +1,15 @@
 import { BasePage } from './BasePage'
 
 export class LaunchPage extends BasePage {
-  get hostUrlInput() {
+  get hostUrlInput(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="host-url-input"]')
   }
 
-  get connectButton() {
+  get connectButton(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="connect-btn"]')
   }
 
-  get hostStatus() {
+  get hostStatus(): ReturnType<WebdriverIO.Browser['$']> {
     return $('[data-testid="host-status"]')
   }
 

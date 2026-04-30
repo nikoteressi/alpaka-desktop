@@ -8,9 +8,15 @@ export class SettingsPage extends BasePage {
   }
 
   async getActiveTab(): Promise<string> {
-    const active = await $('.app-tab--active')
-    const testId = await active.getAttribute('data-testid')
-    return testId?.replace('settings-tab-', '') ?? ''
+    const tabs = await $$('[data-testid^="settings-tab-"]')
+    for (const tab of tabs) {
+      const classes = await tab.getAttribute('class')
+      if (classes?.includes('app-tab--active')) {
+        const testId = await tab.getAttribute('data-testid')
+        return testId?.replace('settings-tab-', '') ?? ''
+      }
+    }
+    return ''
   }
 
   async getMirostatValue(): Promise<string> {
