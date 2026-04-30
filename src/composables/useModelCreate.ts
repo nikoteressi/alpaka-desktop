@@ -12,7 +12,17 @@ export function useModelCreate() {
       phase: "running",
       logLines: [],
     };
-    await invoke("create_model", { name, modelfile });
+    try {
+      await invoke("create_model", { name, modelfile });
+    } catch (e) {
+      // invoke() rejected before the backend could emit model:create-error — mark as error
+      if (modelStore.creating[name]?.phase === "running") {
+        modelStore.creating[name].phase = "error";
+        modelStore.creating[name].error =
+          e instanceof Error ? e.message : String(e);
+      }
+      throw e;
+    }
   }
 
   async function cancel(name: string): Promise<void> {

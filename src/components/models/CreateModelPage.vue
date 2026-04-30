@@ -299,7 +299,7 @@ const nameError = computed(() => {
   if (!n) return "";
   if (/\s/.test(n)) return "Name cannot contain spaces";
   if (!/^[a-zA-Z0-9._:/-]+$/.test(n))
-    return "Only letters, digits, hyphens, underscores, dots, and colons are allowed";
+    return "Only letters, digits, hyphens, underscores, dots, colons, and slashes are allowed";
   return "";
 });
 const logText = computed(() => createState.value?.logLines.join("\n") ?? "");
@@ -345,11 +345,13 @@ async function handleCreate() {
   const name = modelName.value.trim();
   if (!name) return;
   const content = editorView?.state.doc.toString() ?? "";
+  editorView?.destroy();
+  editorView = null;
   phase.value = "progress";
   try {
     await start(name, content);
   } catch {
-    // Error is surfaced via model:create-error event handled in the store;
+    // Error is surfaced via store state (set by useModelCreate) or model:create-error event;
     // swallow here so Vue's global handler doesn't fire.
   }
 }

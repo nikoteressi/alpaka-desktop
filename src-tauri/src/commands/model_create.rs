@@ -4,8 +4,9 @@ use crate::ollama::client::OllamaClient;
 use crate::state::AppState;
 use futures_util::StreamExt;
 use serde::Deserialize;
+use std::collections::HashMap;
 use tauri::{Emitter, Runtime, State};
-use tokio::sync::broadcast;
+use tokio::sync::oneshot;
 
 #[derive(Debug, Deserialize)]
 struct CreateProgress {
@@ -64,7 +65,7 @@ fn build_create_payload(model_name: &str, modelfile: &str) -> serde_json::Value 
     let mut system: Option<String> = None;
     let mut template_val: Option<String> = None;
     let mut license: Option<String> = None;
-    let mut parameters: serde_json::Map<String, serde_json::Value> = Default::default();
+    let mut parameters: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
     let mut messages: Vec<serde_json::Value> = Vec::new();
 
     let lines: Vec<&str> = modelfile.lines().collect();
@@ -104,7 +105,10 @@ fn build_create_payload(model_name: &str, modelfile: &str) -> serde_json::Value 
             }
             "PARAMETER" => {
                 if let Some((key, val_str)) = rest.split_once(char::is_whitespace) {
-                    parameters.insert(key.to_string(), parse_param_value(val_str.trim()));
+                    parameters
+                        .entry(key.to_string())
+                        .or_default()
+                        .push(parse_param_value(val_str.trim()));
                 }
             }
             "MESSAGE" => {
@@ -132,7 +136,15 @@ fn build_create_payload(model_name: &str, modelfile: &str) -> serde_json::Value 
         payload["license"] = v.into();
     }
     if !parameters.is_empty() {
-        payload["parameters"] = serde_json::Value::Object(parameters);
+        let mut params_map = serde_json::Map::new();
+        for (k, mut vals) in parameters {
+            if vals.len() == 1 {
+                params_map.insert(k, vals.remove(0));
+            } else {
+                params_map.insert(k, serde_json::Value::Array(vals));
+            }
+        }
+        payload["parameters"] = serde_json::Value::Object(params_map);
     }
     if !messages.is_empty() {
         payload["messages"] = serde_json::Value::Array(messages);
@@ -159,15 +171,20 @@ fn parse_block(start: &str, remaining: &[&str]) -> (String, usize) {
             value.push_str(line);
         }
         (value.trim().to_string(), consumed)
-    } else if start.starts_with('"') && start.len() >= 2 {
-        let inner = &start[1..start.len().saturating_sub(1)];
-        (inner.trim_end_matches('"').to_string(), 0)
+    } else if start.starts_with('"') && start.ends_with('"') && start.len() >= 2 {
+        let inner = &start[1..start.len() - 1];
+        (inner.to_string(), 0)
     } else {
         (start.to_string(), 0)
     }
 }
 
 fn parse_param_value(s: &str) -> serde_json::Value {
+    let s = if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    };
     if let Ok(v) = s.parse::<i64>() {
         return v.into();
     }
@@ -184,7 +201,7 @@ pub async fn core_create_model<R: Runtime>(
     app: &tauri::AppHandle<R>,
     name: &str,
     modelfile: &str,
-    mut cancel_rx: broadcast::Receiver<()>,
+    cancel_rx: oneshot::Receiver<()>,
 ) -> Result<(), AppError> {
     let payload = build_create_payload(name, modelfile);
 
@@ -209,11 +226,12 @@ pub async fn core_create_model<R: Runtime>(
     let mut stream = resp.bytes_stream();
     let mut cancelled = false;
     let mut buf = String::new();
+    let mut cancel_rx = cancel_rx;
 
     loop {
         tokio::select! {
             biased;
-            _ = cancel_rx.recv() => {
+            _ = &mut cancel_rx => {
                 cancelled = true;
                 break;
             }
@@ -271,12 +289,17 @@ pub async fn create_model<R: Runtime>(
 ) -> Result<(), AppError> {
     let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
 
-    let (cancel_tx, cancel_rx) = broadcast::channel::<()>(1);
+    let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
     {
         let mut map = state
             .model_create_cancel_tx
             .lock()
             .map_err(|_| AppError::Internal("cancel lock poisoned".into()))?;
+        if map.contains_key(&name) {
+            return Err(AppError::Internal(format!(
+                "create already in progress for '{name}'"
+            )));
+        }
         map.insert(name.clone(), cancel_tx);
     }
 
@@ -297,7 +320,7 @@ pub async fn cancel_model_create(state: State<'_, AppState>, name: String) -> Re
         .lock()
         .map_err(|_| AppError::Internal("cancel lock poisoned".into()))?;
     if let Some(tx) = map.remove(&name) {
-        let _ = tx.send(());
+        let _ = tx.send(()); // error means receiver already dropped (stream finished), ignore
     }
     Ok(())
 }
@@ -306,7 +329,7 @@ pub async fn cancel_model_create(state: State<'_, AppState>, name: String) -> Re
 mod tests {
     use super::*;
     use mockito::Server;
-    use tokio::sync::broadcast;
+    use tokio::sync::oneshot;
 
     #[tokio::test]
     async fn test_get_modelfile_success() {
@@ -409,7 +432,7 @@ mod tests {
         let client = reqwest::Client::new();
         let ollama = OllamaClient::new(client, server.url(), None);
         let app = tauri::test::mock_app();
-        let (_cancel_tx, cancel_rx) = broadcast::channel::<()>(1);
+        let (_cancel_tx, cancel_rx) = oneshot::channel::<()>();
 
         let result =
             core_create_model(&ollama, app.handle(), "mymodel", "FROM llama3", cancel_rx).await;
@@ -431,7 +454,7 @@ mod tests {
         let client = reqwest::Client::new();
         let ollama = OllamaClient::new(client, server.url(), None);
         let app = tauri::test::mock_app();
-        let (_tx, cancel_rx) = broadcast::channel::<()>(1);
+        let (_tx, cancel_rx) = oneshot::channel::<()>();
 
         let result =
             core_create_model(&ollama, app.handle(), "mymodel", "FROM llama3", cancel_rx).await;
@@ -467,11 +490,8 @@ mod tests {
 
     #[test]
     fn test_cancel_removes_sender_from_map() {
-        use std::collections::HashMap;
-        use tokio::sync::broadcast;
-
-        let (tx, _rx) = broadcast::channel::<()>(1);
-        let mut map: HashMap<String, broadcast::Sender<()>> = HashMap::new();
+        let (tx, _rx) = oneshot::channel::<()>();
+        let mut map: HashMap<String, oneshot::Sender<()>> = HashMap::new();
         map.insert("mymodel".to_string(), tx);
 
         // Simulate what cancel_model_create does:
@@ -495,7 +515,7 @@ mod tests {
         let client = reqwest::Client::new();
         let ollama = OllamaClient::new(client, server.url(), None);
         let app = tauri::test::mock_app();
-        let (cancel_tx, cancel_rx) = broadcast::channel::<()>(1);
+        let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
         let _ = cancel_tx.send(()); // cancel immediately
 
         let result =
@@ -507,5 +527,24 @@ mod tests {
             result.is_ok(),
             "cancelled returns Ok(()) — cancel path emits model:create-error instead"
         );
+    }
+
+    #[test]
+    fn test_build_payload_quoted_stop_param() {
+        let modelfile = "FROM llama3\nPARAMETER stop \"<|im_end|>\"\n";
+        let payload = build_create_payload("m", modelfile);
+        assert_eq!(payload["parameters"]["stop"], "<|im_end|>");
+    }
+
+    #[test]
+    fn test_build_payload_duplicate_stop_params() {
+        let modelfile =
+            "FROM llama3\nPARAMETER stop \"<|im_end|>\"\nPARAMETER stop \"<|eot_id|>\"\n";
+        let payload = build_create_payload("m", modelfile);
+        assert!(payload["parameters"]["stop"].is_array());
+        let arr = payload["parameters"]["stop"].as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[0], "<|im_end|>");
+        assert_eq!(arr[1], "<|eot_id|>");
     }
 }
