@@ -78,5 +78,17 @@ pub(crate) fn validate_chat_options(opts: &ChatOptions) -> Result<(), AppError> 
             ));
         }
     }
+    if let Some(ref stops) = opts.stop {
+        if stops.len() > 4 {
+            return Err(AppError::Validation(
+                "stop must contain at most 4 sequences".into(),
+            ));
+        }
+        if stops.iter().any(|s| s.len() > 256) {
+            return Err(AppError::Validation(
+                "each stop sequence must be 256 characters or fewer".into(),
+            ));
+        }
+    }
     Ok(())
 }

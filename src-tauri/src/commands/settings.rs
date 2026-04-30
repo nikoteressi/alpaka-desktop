@@ -5,6 +5,37 @@ use crate::db;
 use crate::error::AppError;
 use crate::state::AppState;
 
+const ALLOWED_SETTING_KEYS: &[&str] = &[
+    "theme",
+    "sidebarCollapsed",
+    "fontSize",
+    "compactMode",
+    "chatOptions",
+    "cloud",
+    "autoUpdate",
+    "exposeNetwork",
+    "modelPath",
+    "serverUrl",
+    "showPerformanceMetrics",
+    "notificationsEnabled",
+    "globalSystemPrompt",
+    "systemFormattingEnabled",
+    "systemFormattingTemplate",
+    "systemSearchTemplate",
+    "systemFolderTemplate",
+    "presets",
+    "defaultPresetId",
+    "userPresets",
+];
+
+fn validate_setting_key(key: &str) -> Result<(), AppError> {
+    if ALLOWED_SETTING_KEYS.contains(&key) {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!("unknown setting key: {key}")))
+    }
+}
+
 #[command]
 pub async fn get_setting(
     state: State<'_, AppState>,
@@ -19,6 +50,7 @@ pub async fn set_setting(
     key: String,
     value: String,
 ) -> Result<(), AppError> {
+    validate_setting_key(&key)?;
     db::settings::set_async(state.db.clone(), key, value).await
 }
 
@@ -31,6 +63,7 @@ pub async fn get_all_settings(
 
 #[command]
 pub async fn delete_setting(state: State<'_, AppState>, key: String) -> Result<(), AppError> {
+    validate_setting_key(&key)?;
     db::settings::delete_async(state.db.clone(), key).await
 }
 
@@ -47,7 +80,6 @@ mod tests {
 
     use crate::db::migrations;
 
-    // Helper to create an in-memory db with schema
     fn in_memory_db() -> db::DbConn {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
@@ -61,11 +93,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_settings_commands() {
-        // Because Tauri's `State` isn't easily instantiable outside of a running app context,
-        // we test the core logic that the commands run, using the exact same closure blocks.
         let db_conn = in_memory_db();
 
-        // set_setting logic
         let set_db = db_conn.clone();
         tokio::task::spawn_blocking(move || {
             let conn = set_db.lock().unwrap();
@@ -75,7 +104,6 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        // get_setting logic
         let get_db = db_conn.clone();
         let val = tokio::task::spawn_blocking(move || {
             let conn = get_db.lock().unwrap();
@@ -86,7 +114,6 @@ mod tests {
         .unwrap();
         assert_eq!(val, Some("\"dark\"".to_owned()));
 
-        // get_all_settings logic
         let get_all_db = db_conn.clone();
         let all = tokio::task::spawn_blocking(move || {
             let conn = get_all_db.lock().unwrap();
@@ -97,5 +124,23 @@ mod tests {
         .unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all["theme"], "\"dark\"");
+    }
+
+    #[test]
+    fn test_validate_setting_key_known_keys_pass() {
+        for key in ALLOWED_SETTING_KEYS {
+            assert!(
+                validate_setting_key(key).is_ok(),
+                "expected {key} to be allowed"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_setting_key_unknown_key_rejected() {
+        assert!(validate_setting_key("__proto__").is_err());
+        assert!(validate_setting_key("constructor").is_err());
+        assert!(validate_setting_key("arbitrary_key").is_err());
+        assert!(validate_setting_key("").is_err());
     }
 }

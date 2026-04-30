@@ -104,7 +104,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | S-03 | **System prompt editor** | P0 | ✅ | Per-conversation; stored as system role message |
 | S-04 | **Top-P / Top-K** | P0 | ✅ | Fine-grained sampling control |
 | S-05 | **Repeat penalty** | P0 | ✅ | repeat_penalty, repeat_last_n |
-| S-06 | **Stop sequences** | P1 | Backlog | Custom stop tokens |
+| S-06 | **Stop sequences** | P1 | ✅ | Custom stop tokens |
 | S-07 | **Seed control** | P1 | Backlog | Fixed seed for reproducible outputs |
 | S-08 | **Mirostat** | P1 | Backlog | Mirostat 1/2 with tau and eta |
 | S-09 | **Preset profiles** | P1 | Backlog | Save/load parameter presets |

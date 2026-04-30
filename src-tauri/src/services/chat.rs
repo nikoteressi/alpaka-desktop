@@ -852,6 +852,52 @@ mod tests {
     }
 
     #[test]
+    fn stop_serializes_and_omitted_when_none() {
+        use crate::ollama::types::ChatOptions;
+        let opts = ChatOptions {
+            stop: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(
+            !json.contains("stop"),
+            "stop must be omitted from JSON when None"
+        );
+    }
+
+    #[test]
+    fn stop_merge_custom_wins_fallback_fills() {
+        use crate::ollama::types::ChatOptions;
+        let global = ChatOptions {
+            stop: Some(vec!["###".to_string()]),
+            ..Default::default()
+        };
+        // custom with its own stop → custom wins
+        let custom_with_stop = ChatOptions {
+            stop: Some(vec!["<END>".to_string()]),
+            ..Default::default()
+        };
+        let merged = custom_with_stop.merge_with_fallback(&global);
+        assert_eq!(
+            merged.stop,
+            Some(vec!["<END>".to_string()]),
+            "custom stop wins"
+        );
+
+        // custom with no stop → global fills in
+        let custom_no_stop = ChatOptions {
+            stop: None,
+            ..Default::default()
+        };
+        let merged2 = custom_no_stop.merge_with_fallback(&global);
+        assert_eq!(
+            merged2.stop,
+            Some(vec!["###".to_string()]),
+            "global stop fills when custom absent"
+        );
+    }
+
+    #[test]
     fn sliding_window_keeps_system_and_recent_messages() {
         use crate::ollama::types::Message;
 

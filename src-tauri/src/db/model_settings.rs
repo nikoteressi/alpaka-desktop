@@ -22,6 +22,7 @@ pub fn get(conn: &Connection, model_name: &str) -> Result<Option<ChatOptions>, A
                 && opts.repeat_penalty.is_none()
                 && opts.repeat_last_n.is_none()
                 && opts.seed.is_none()
+                && opts.stop.is_none()
             {
                 Ok(None)
             } else {

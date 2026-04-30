@@ -1,6 +1,6 @@
 <template>
   <div class="h-full overflow-y-auto px-6 py-5 no-scrollbar">
-    <div class="max-w-[620px] mx-auto">
+    <div class="max-w-[740px] mx-auto">
       <!-- Header row -->
       <div class="flex items-center gap-3 mb-1">
         <h1 class="text-[17px] font-bold text-[var(--text-heading)]">
@@ -625,6 +625,34 @@
               </template>
             </SettingsRow>
           </div>
+
+          <!-- Advanced Section -->
+          <div
+            v-else-if="activeTab === 'advanced'"
+            key="advanced"
+            class="flex flex-col gap-[8px]"
+          >
+            <div class="settings-card">
+              <div>
+                <p class="text-[13.5px] font-bold text-[var(--text)]">
+                  Stop Sequences
+                </p>
+                <p class="text-[12px] text-[var(--text-dim)] mt-0.5">
+                  Custom tokens that end generation early. Up to 4 sequences.
+                </p>
+              </div>
+              <div class="mt-3">
+                <StopSequencesInput
+                  :model-value="settingsStore.chatOptions.stop ?? []"
+                  @update:model-value="
+                    settingsStore.updateChatOptions({
+                      stop: $event.length ? $event : undefined,
+                    })
+                  "
+                />
+              </div>
+            </div>
+          </div>
         </Transition>
       </div>
     </div>
@@ -663,6 +691,7 @@ import SettingsRow from "../components/settings/SettingsRow.vue";
 import AccountSettings from "../components/settings/AccountSettings.vue";
 import HostSettings from "../components/settings/HostSettings.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
+import StopSequencesInput from "../components/settings/StopSequencesInput.vue";
 import { useSettingsStore } from "../stores/settings";
 import type { PresetOptions } from "../types/settings";
 import { useModelStore } from "../stores/models";
@@ -1056,6 +1085,31 @@ const IconBackup = markRaw({
   },
 });
 
+const IconAdvanced = markRaw({
+  setup() {
+    return () =>
+      h(
+        "svg",
+        {
+          width: 14,
+          height: 14,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": 2,
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+        },
+        [
+          h("circle", { cx: 12, cy: 12, r: 3 }),
+          h("path", {
+            d: "M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14",
+          }),
+        ],
+      );
+  },
+});
+
 const tabs: Tab[] = [
   { id: "general", name: "General", icon: IconGeneral },
   { id: "connectivity", name: "Connection", icon: IconConnect },
@@ -1063,6 +1117,7 @@ const tabs: Tab[] = [
   { id: "prompts", name: "Prompts", icon: IconPrompts },
   { id: "account", name: "Account", icon: IconAccount },
   { id: "maintenance", name: "Maintenance", icon: IconBackup },
+  { id: "advanced", name: "Advanced", icon: IconAdvanced },
 ];
 
 // ---- Model path ----

@@ -86,6 +86,8 @@ pub struct ChatOptions {
     pub repeat_last_n: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop: Option<Vec<String>>,
 }
 
 impl ChatOptions {
@@ -99,6 +101,7 @@ impl ChatOptions {
             repeat_penalty: self.repeat_penalty.or(fallback.repeat_penalty),
             repeat_last_n: self.repeat_last_n.or(fallback.repeat_last_n),
             seed: self.seed.or(fallback.seed),
+            stop: self.stop.clone().or_else(|| fallback.stop.clone()),
         }
     }
 }

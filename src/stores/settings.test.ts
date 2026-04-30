@@ -44,6 +44,33 @@ describe("useSettingsStore", () => {
     expect(store.chatOptions.top_p).toBe(0.9);
   });
 
+  it("initialize restores stop sequences from chatOptions JSON blob", async () => {
+    const store = useSettingsStore();
+    mockInvoke.mockResolvedValue({
+      chatOptions: JSON.stringify({ temperature: 0.5, stop: ["###", "<END>"] }),
+    });
+
+    await store.initialize();
+
+    expect(store.chatOptions.stop).toEqual(["###", "<END>"]);
+  });
+
+  it("updateChatOptions serializes stop array into chatOptions JSON blob", async () => {
+    const store = useSettingsStore();
+    mockInvoke.mockResolvedValue({});
+    await store.initialize();
+
+    mockInvoke.mockResolvedValue(undefined);
+    await store.updateChatOptions({ stop: ["\\n\\n", "END"] });
+
+    const call = mockInvoke.mock.calls.find(
+      ([cmd]: [string]) => cmd === "set_setting",
+    );
+    expect(call).toBeDefined();
+    const serialized = JSON.parse(call![1].value as string);
+    expect(serialized.stop).toEqual(["\\n\\n", "END"]);
+  });
+
   it("initialize loads defaultPresetId from db", async () => {
     const store = useSettingsStore();
     mockInvoke.mockResolvedValue({ defaultPresetId: "code" });

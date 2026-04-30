@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- S-06: Custom stop sequences — Settings → Advanced tab with a tag-input for up to 4 stop tokens (e.g. `###`, `<END>`). Sequences are sent as `options.stop` in every Ollama chat request; empty list omits the field entirely. Setting key allowlist added to the backend `set_setting` command.
 - MO-06: Custom model creation from Modelfile — create and edit Ollama models directly in the app with a CodeMirror editor, streaming progress, background creation, desktop notifications, and mid-stream cancellation (#22)
 - S-10: Per-model default generation settings — each installed model can have its own temperature, context window, and other generation defaults. Edit from the model detail page (Models → Local tab → click a model). Defaults auto-apply when selecting a model for a new or existing conversation. Save current chat settings as model defaults from the Advanced Options panel.
 - S-09: Per-conversation preset profiles for generation settings — four built-in presets (Creative, Balanced, Precise, Code), user-defined presets with save/delete, preset selection persisted per-chat via draft, default preset applied to new conversations. Advanced Options popover shows the active preset name.
