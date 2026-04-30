@@ -1,0 +1,53 @@
+import path from 'path'
+import type { Options } from '@wdio/types'
+import { startTauriDriver, stopTauriDriver } from './helpers/tauri-driver'
+import { clearTestDataDir } from './fixtures/db'
+
+const APP_BINARY = path.resolve(__dirname, '../src-tauri/target/release/alpaka-desktop')
+const OLLAMA_URL = 'http://localhost:11434'
+
+export const config: Options.Testrunner = {
+  runner: 'local',
+  autoCompileOpts: {
+    autoCompile: true,
+    tsNodeOpts: {
+      project: path.resolve(__dirname, 'tsconfig.json'),
+      transpileOnly: true,
+    },
+  },
+  specs: ['./integration/**/*.spec.ts'],
+  maxInstances: 1,
+  capabilities: [
+    {
+      maxInstances: 1,
+      browserName: 'wry',
+      'tauri:options': {
+        application: APP_BINARY,
+      },
+    },
+  ],
+  logLevel: 'warn',
+  bail: 0,
+  waitforTimeout: 15000,
+  connectionRetryTimeout: 120000,
+  connectionRetryCount: 3,
+  framework: 'mocha',
+  reporters: ['spec'],
+  mochaOpts: {
+    ui: 'bdd',
+    timeout: 60000,
+  },
+  async onPrepare() {
+    const res = await fetch(`${OLLAMA_URL}/api/tags`).catch(() => null)
+    if (!res || !res.ok) {
+      throw new Error(
+        `Ollama is not running at ${OLLAMA_URL}. Start it with: ollama serve`
+      )
+    }
+    clearTestDataDir()
+    return startTauriDriver()
+  },
+  onComplete() {
+    return stopTauriDriver()
+  },
+}
