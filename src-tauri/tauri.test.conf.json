@@ -1,6 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "io.alpaka.desktop.test",
+  "bundle": {
+    "active": false
+  },
   "app": {
     "windows": [
       {
@@ -11,7 +14,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: https://ipc.localhost http://localhost:11434;"
+      "csp": "default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' ipc: https://ipc.localhost http://localhost:11434; frame-ancestors 'none'; base-uri 'self'; form-action 'none';"
     }
   }
 }

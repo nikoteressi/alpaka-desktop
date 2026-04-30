@@ -9,9 +9,10 @@ export function getTestDataDir(): string {
 }
 
 export function clearTestDb(): void {
-  const dbPath = join(getTestDataDir(), 'alpaka-desktop.db')
-  if (existsSync(dbPath)) {
-    rmSync(dbPath)
+  const base = join(getTestDataDir(), 'alpaka-desktop.db')
+  for (const suffix of ['', '-wal', '-shm']) {
+    const f = base + suffix
+    if (existsSync(f)) rmSync(f)
   }
 }
 
