@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "io.alpaka.desktop.test",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Alpaka Desktop (Test)",
+        "width": 1200,
+        "height": 800
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: https://ipc.localhost http://localhost:11434;"
+    }
+  }
+}
