@@ -133,13 +133,13 @@ describe("useAttachments", () => {
     expect(onLinkFile).toHaveBeenCalledWith("/home/user/notes.md");
   });
 
-  it("handleDroppedPaths skips unknown extensions silently", async () => {
-    const onLinkFile = vi.fn();
+  it("handleDroppedPaths passes unknown extensions to onLinkFile", async () => {
+    const onLinkFile = vi.fn().mockResolvedValue(undefined);
     const { useAttachments } = await import("./useAttachments");
     const { attachments, handleDroppedPaths } = useAttachments({ onLinkFile });
     await handleDroppedPaths(["/home/user/archive.zip"]);
     expect(attachments.value).toHaveLength(0);
-    expect(onLinkFile).not.toHaveBeenCalled();
+    expect(onLinkFile).toHaveBeenCalledWith("/home/user/archive.zip");
   });
 
   it("handleDroppedPaths handles multiple files in one call", async () => {
@@ -148,9 +148,9 @@ describe("useAttachments", () => {
     const onLinkFile = vi.fn().mockResolvedValue(undefined);
     const { useAttachments } = await import("./useAttachments");
     const { attachments, handleDroppedPaths } = useAttachments({ onLinkFile });
-    await handleDroppedPaths(["/a.png", "/b.md", "/c.txt"]);
+    await handleDroppedPaths(["/a.png", "/b.md", "/c.zip"]);
     expect(attachments.value).toHaveLength(1); // only the image
-    expect(onLinkFile).toHaveBeenCalledTimes(2); // .md and .txt
+    expect(onLinkFile).toHaveBeenCalledTimes(2); // .md and .zip
   });
 
   // onGlobalPaste tests

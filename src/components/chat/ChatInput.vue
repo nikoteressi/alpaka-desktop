@@ -557,6 +557,7 @@ onBeforeUnmount(() => {
         data-testid="chat-input"
         v-model="inputContent"
         @keydown.enter.prevent="handleEnter"
+        @paste.stop="onGlobalPaste"
         placeholder="Type a message or paste an image..."
         class="w-full bg-transparent focus:outline-none resize-none overflow-hidden text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
         :disabled="isStreaming"

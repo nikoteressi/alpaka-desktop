@@ -19,30 +19,6 @@ const IMAGE_EXTS = new Set([
   ".bmp",
   ".tiff",
 ]);
-const TEXT_EXTS = new Set([
-  ".txt",
-  ".md",
-  ".py",
-  ".rs",
-  ".js",
-  ".ts",
-  ".jsx",
-  ".tsx",
-  ".json",
-  ".yaml",
-  ".yml",
-  ".toml",
-  ".html",
-  ".css",
-  ".sh",
-  ".csv",
-  ".xml",
-  ".go",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-]);
 
 const MIME_MAP: Record<string, string> = {
   ".png": "image/png",
@@ -121,10 +97,8 @@ export function useAttachments(options: AttachmentsOptions = {}) {
           const file = new File([bytes], name, { type: mimeFromExt(ext) });
           const previewUrl = URL.createObjectURL(file);
           attachments.value.push({ file, previewUrl, data: bytes });
-        } else if (TEXT_EXTS.has(ext)) {
-          if (options.onLinkFile) {
-            await options.onLinkFile(path);
-          }
+        } else if (options.onLinkFile) {
+          await options.onLinkFile(path);
         }
       }),
     );
