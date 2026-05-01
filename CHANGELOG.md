@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Documentation: VitePress site deployed to https://nikoteressi.github.io/alpaka-desktop — landing page with hero, feature grid, demo gallery (placeholder), and install tabs; full user guide (Getting Started, Chat, Models, Settings hierarchy with three-layer diagram, Ollama Cloud, Multi-Host, System Integration, Keyboard Shortcuts); developer reference (Architecture, streaming pipeline deep-dive, Frontend reference, Contributing guide); `docs.yml` CI workflow builds and deploys on every push to `main`
+
 ### Fixed
 - Security: bump transitive `fast-xml-parser` to 5.7.0 (Dependabot #13 — XML comment/CDATA injection) and `tmp` to 0.2.4 (Dependabot #11 — symlink write vulnerability) via pnpm overrides; both packages are dev-only, never shipped in the app bundle
 - Security: `security-audit` CI job now also runs `pnpm audit` for frontend-only PRs (previously only triggered when Rust files changed, leaving npm dep changes unaudited)

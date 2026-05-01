@@ -1,0 +1,82 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build VitePress
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build VitePress
+        run: pnpm docs:build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: vitepress-dist
+          path: docs/.vitepress/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy to gh-pages
+    runs-on: ubuntu-22.04
+    needs: build
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+
+      - name: Download VitePress dist
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: vitepress-dist
+          path: /tmp/vitepress-dist
+
+      - name: Overlay VitePress output (preserve apt/)
+        run: |
+          test -f /tmp/vitepress-dist/index.html || { echo "dist is missing index.html — aborting"; exit 1; }
+          rsync -av --delete \
+            --exclude='/apt/' \
+            --exclude='.git' \
+            /tmp/vitepress-dist/ ./
+          touch .nojekyll
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "No changes to deploy." && exit 0
+          git commit -m "docs: deploy VitePress site from ${GITHUB_SHA}"
+          git push origin gh-pages

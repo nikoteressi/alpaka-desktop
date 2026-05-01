@@ -39,3 +39,7 @@ coverage-rust/
 # Legacy / removed dirs (kept for gitignore safety)
 ollama-desktop-linux-mockup
 alpaka-desktop-mockup/
+
+# VitePress build and cache output
+docs/.vitepress/dist
+docs/.vitepress/cache
