@@ -344,7 +344,9 @@ function handleTextareaKeydown(e: KeyboardEvent) {
     document.execCommand("redo");
     return;
   }
-  handleEnter(e);
+  if (e.key === "Enter") {
+    handleEnter(e);
+  }
 }
 
 function handleSubmit() {
