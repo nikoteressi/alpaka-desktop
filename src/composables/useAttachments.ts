@@ -178,12 +178,8 @@ export function useAttachments(options: AttachmentsOptions = {}) {
       const paths = parseUriList(uriList);
       if (paths.length > 0) {
         e.preventDefault();
-        for (const path of paths) {
-          const ext = extOf(path);
-          if (TEXT_EXTS.has(ext) && options.onLinkFile) {
-            await options.onLinkFile(path);
-          }
-        }
+        await handleDroppedPaths(paths);
+        return;
       }
     }
   }

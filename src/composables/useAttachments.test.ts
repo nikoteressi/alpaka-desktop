@@ -189,6 +189,28 @@ describe("useAttachments", () => {
     expect(onLinkFile).toHaveBeenCalledWith("/home/user/notes.md");
   });
 
+  it("onGlobalPaste attaches images from uri-list", async () => {
+    urlCounter = 0;
+    const { readFile } = await import("@tauri-apps/plugin-fs");
+    vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, onGlobalPaste } = useAttachments();
+
+    const evt = {
+      clipboardData: {
+        items: [],
+        getData: (type: string) =>
+          type === "text/uri-list" ? "file:///home/user/photo.png\n" : "",
+      },
+      preventDefault: vi.fn(),
+      target: document.createElement("div"),
+    } as unknown as ClipboardEvent;
+
+    await onGlobalPaste(evt);
+    expect(attachments.value).toHaveLength(1);
+    expect(attachments.value[0].data).toBeInstanceOf(Uint8Array);
+  });
+
   it("onGlobalPaste is suppressed when a textarea is focused", async () => {
     const onLinkFile = vi.fn();
     const { useAttachments } = await import("./useAttachments");
