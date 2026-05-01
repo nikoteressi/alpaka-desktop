@@ -467,7 +467,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type Component } from "vue";
+import { ref, computed, onMounted, type Component } from "vue";
+import { useRoute } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
 import ConfirmationModal from "../components/shared/ConfirmationModal.vue";
 import ToggleSwitch from "../components/shared/ToggleSwitch.vue";
@@ -529,6 +530,13 @@ function previewLineStyle(themeId: string, primary: boolean) {
 }
 
 const activeTab = ref("general");
+const route = useRoute();
+onMounted(() => {
+  const tab = route?.query?.tab;
+  if (typeof tab === "string" && tabs.some((t) => t.id === tab)) {
+    activeTab.value = tab;
+  }
+});
 
 interface Tab {
   id: string;

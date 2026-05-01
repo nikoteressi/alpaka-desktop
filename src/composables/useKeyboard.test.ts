@@ -75,9 +75,12 @@ describe("useKeyboard", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/settings");
   });
 
-  it("Ctrl+H navigates to /settings", () => {
+  it("Ctrl+H navigates to /settings connectivity tab", () => {
     fire("h", { ctrlKey: true });
-    expect(mockRouterPush).toHaveBeenCalledWith("/settings");
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      path: "/settings",
+      query: { tab: "connectivity" },
+    });
   });
 
   it("Ctrl+N navigates to /chat", () => {

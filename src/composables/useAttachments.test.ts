@@ -4,22 +4,10 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   readFile: vi.fn(),
 }));
 
-vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
-  readImage: vi.fn().mockRejectedValue(new Error("no image")),
-}));
-
 // jsdom doesn't implement createObjectURL — stub it with a counter so each call returns a unique URL
 let urlCounter = 0;
 global.URL.createObjectURL = vi.fn(() => `blob:mock-${++urlCounter}`);
 global.URL.revokeObjectURL = vi.fn();
-
-// Stub navigator.clipboard — default: no items (all async clipboard reads return null)
-Object.defineProperty(navigator, "clipboard", {
-  value: {
-    read: vi.fn().mockResolvedValue([]),
-  },
-  writable: true,
-});
 
 describe("useAttachments", () => {
   it("handleFiles adds image attachments with preview URLs", async () => {
@@ -60,47 +48,6 @@ describe("useAttachments", () => {
 
     const textFile = new File(["hello"], "note.txt", { type: "text/plain" });
     await handleFiles([textFile]);
-    expect(attachments.value).toHaveLength(0);
-  });
-
-  it("onPaste adds image files from clipboard items", async () => {
-    urlCounter = 0;
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, onPaste } = useAttachments();
-
-    const file = new File(["x".repeat(10)], "paste.png", { type: "image/png" });
-    const pasteEvt = {
-      clipboardData: {
-        items: [{ type: "image/png", getAsFile: () => file }],
-      },
-      preventDefault: vi.fn(),
-    } as unknown as ClipboardEvent;
-    await onPaste(pasteEvt);
-
-    expect(attachments.value).toHaveLength(1);
-  });
-
-  it("onPaste ignores clipboard items that are not images", async () => {
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, onPaste } = useAttachments();
-
-    const pasteEvt = {
-      clipboardData: {
-        items: [{ type: "text/plain", getAsFile: () => null }],
-      },
-      preventDefault: vi.fn(),
-    } as unknown as ClipboardEvent;
-    await onPaste(pasteEvt);
-
-    expect(attachments.value).toHaveLength(0);
-  });
-
-  it("onPaste does nothing when clipboardData is absent", async () => {
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, onPaste } = useAttachments();
-
-    const pasteEvt = { clipboardData: null } as unknown as ClipboardEvent;
-    await onPaste(pasteEvt);
     expect(attachments.value).toHaveLength(0);
   });
 
@@ -163,100 +110,5 @@ describe("useAttachments", () => {
     await handleDroppedPaths(["/a.png", "/b.md", "/c.zip"]);
     expect(attachments.value).toHaveLength(1); // only the image
     expect(onLinkFile).toHaveBeenCalledTimes(2); // .md and .zip
-  });
-
-  // onGlobalPaste tests
-
-  it("onGlobalPaste attaches image from clipboard image data (web items path)", async () => {
-    urlCounter = 0;
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, onGlobalPaste } = useAttachments();
-    const file = new File(["x".repeat(10)], "img.png", { type: "image/png" });
-    const evt = {
-      clipboardData: {
-        items: [{ type: "image/png", getAsFile: () => file }],
-        getData: () => "",
-      },
-      preventDefault: vi.fn(),
-      target: document.createElement("div"),
-    } as unknown as ClipboardEvent;
-    await onGlobalPaste(evt);
-    expect(attachments.value).toHaveLength(1);
-  });
-
-  it("onGlobalPaste attaches image via navigator.clipboard.read() when clipboardData.items is empty", async () => {
-    urlCounter = 0;
-    const blob = new Blob(["x".repeat(10)], { type: "image/png" });
-    vi.mocked(navigator.clipboard.read).mockResolvedValueOnce([
-      {
-        types: ["image/png"],
-        getType: vi.fn().mockResolvedValue(blob),
-      } as unknown as ClipboardItem,
-    ]);
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, onGlobalPaste } = useAttachments();
-    const evt = {
-      clipboardData: { items: [], getData: () => "" },
-      preventDefault: vi.fn(),
-    } as unknown as ClipboardEvent;
-    await onGlobalPaste(evt);
-    expect(attachments.value).toHaveLength(1);
-  });
-
-  it("onGlobalPaste links text files from uri-list", async () => {
-    const onLinkFile = vi.fn().mockResolvedValue(undefined);
-    const { useAttachments } = await import("./useAttachments");
-    const { onGlobalPaste } = useAttachments({ onLinkFile });
-    const evt = {
-      clipboardData: {
-        items: [],
-        getData: (type: string) =>
-          type === "text/uri-list" ? "file:///home/user/notes.md\n" : "",
-      },
-      preventDefault: vi.fn(),
-      target: document.createElement("div"),
-    } as unknown as ClipboardEvent;
-    await onGlobalPaste(evt);
-    expect(onLinkFile).toHaveBeenCalledWith("/home/user/notes.md");
-  });
-
-  it("onGlobalPaste attaches images from uri-list", async () => {
-    urlCounter = 0;
-    const { readFile } = await import("@tauri-apps/plugin-fs");
-    vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, onGlobalPaste } = useAttachments();
-
-    const evt = {
-      clipboardData: {
-        items: [],
-        getData: (type: string) =>
-          type === "text/uri-list" ? "file:///home/user/photo.png\n" : "",
-      },
-      preventDefault: vi.fn(),
-      target: document.createElement("div"),
-    } as unknown as ClipboardEvent;
-
-    await onGlobalPaste(evt);
-    expect(attachments.value).toHaveLength(1);
-    expect(attachments.value[0].data).toBeInstanceOf(Uint8Array);
-  });
-
-  it("onGlobalPaste processes files even when a textarea is focused", async () => {
-    const onLinkFile = vi.fn().mockResolvedValue(undefined);
-    const { useAttachments } = await import("./useAttachments");
-    const { onGlobalPaste } = useAttachments({ onLinkFile });
-    const ta = document.createElement("textarea");
-    const evt = {
-      clipboardData: {
-        items: [],
-        getData: (type: string) =>
-          type === "text/uri-list" ? "file:///home/user/notes.md\n" : "",
-      },
-      preventDefault: vi.fn(),
-      target: ta,
-    } as unknown as ClipboardEvent;
-    await onGlobalPaste(evt);
-    expect(onLinkFile).toHaveBeenCalledWith("/home/user/notes.md");
   });
 });

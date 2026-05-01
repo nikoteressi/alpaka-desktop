@@ -30,7 +30,6 @@ tauri-plugin-dialog               = "2.7"
 tauri-plugin-notification         = "2.3"
 tauri-plugin-global-shortcut      = "2.3"
 tauri-plugin-log                  = "2.8"
-tauri-plugin-clipboard-manager    = "2"
 
 # ── Async runtime ─────────────────────────────────────────────────────────
 tokio        = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }

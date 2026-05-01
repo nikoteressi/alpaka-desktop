@@ -14,8 +14,6 @@
     "global-shortcut:default",
     "opener:allow-open-url",
     "opener:allow-open-path",
-    "fs:allow-read-file",
-    "clipboard-manager:allow-read-image",
-    "clipboard-manager:allow-read-text"
+    "fs:allow-read-file"
   ]
 }

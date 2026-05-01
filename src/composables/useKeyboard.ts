@@ -38,6 +38,17 @@ export function useKeyboard() {
     }
 
     if (!ctrl) return;
+
+    if (key === "c" && shift) {
+      e.preventDefault();
+      const messages = chatStore.activeMessages;
+      const last = [...messages].reverse().find((m) => m.role === "assistant");
+      if (last?.content) {
+        copyToClipboard(last.content);
+      }
+      return;
+    }
+
     if (isFocusedOnInput()) return;
 
     if (key === "/" && !shift) {
@@ -63,7 +74,7 @@ export function useKeyboard() {
 
     if (key === "h" && !shift) {
       e.preventDefault();
-      router.push("/settings");
+      router.push({ path: "/settings", query: { tab: "connectivity" } });
       return;
     }
 
@@ -83,16 +94,6 @@ export function useKeyboard() {
     if (key === "m" && !shift) {
       e.preventDefault();
       appEvents.dispatchEvent(new Event(APP_EVENT.OPEN_MODEL_SWITCHER));
-      return;
-    }
-
-    if (key === "c" && shift) {
-      e.preventDefault();
-      const messages = chatStore.activeMessages;
-      const last = [...messages].reverse().find((m) => m.role === "assistant");
-      if (last?.content) {
-        copyToClipboard(last.content);
-      }
       return;
     }
 

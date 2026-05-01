@@ -283,7 +283,6 @@ const {
   attachments,
   isDragging,
   handleFiles,
-  onGlobalPaste,
   initDragDrop,
   removeAttachment,
   clearAttachments,
@@ -325,7 +324,10 @@ const { maxContext, contextTokens, isContextNearFull } = useContextWindow({
 
 // ---- Submit ----
 function handleEnter(e: KeyboardEvent) {
-  if (!e.shiftKey) handleSubmit();
+  if (!e.shiftKey) {
+    e.preventDefault();
+    handleSubmit();
+  }
 }
 
 function handleSubmit() {
@@ -424,7 +426,6 @@ onMounted(async () => {
     APP_EVENT.OPEN_MODEL_SWITCHER,
     onOpenModelSwitcher,
   );
-  window.addEventListener("paste", onGlobalPaste);
   try {
     unlistenDrag = await initDragDrop();
   } catch {
@@ -438,7 +439,6 @@ onBeforeUnmount(() => {
     onOpenModelSwitcher,
   );
   unlistenDrag?.();
-  window.removeEventListener("paste", onGlobalPaste);
 });
 </script>
 
@@ -556,9 +556,8 @@ onBeforeUnmount(() => {
       <textarea
         data-testid="chat-input"
         v-model="inputContent"
-        @keydown.enter.prevent="handleEnter"
-        @paste.stop="onGlobalPaste"
-        placeholder="Type a message or paste an image..."
+        @keydown.enter="handleEnter"
+        placeholder="Type a message…"
         class="w-full bg-transparent focus:outline-none resize-none overflow-hidden text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
         :disabled="isStreaming"
         rows="1"

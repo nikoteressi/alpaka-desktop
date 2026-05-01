@@ -1,56 +1,13 @@
 <template>
   <div class="flex flex-col min-h-0">
-    <!-- Search bar -->
-    <div v-if="isSearchOpen" class="px-2 pt-2 pb-1 flex items-center gap-1">
-      <div
-        class="flex-1 flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-lg"
-      >
-        <svg
-          class="w-3 h-3 text-[var(--text-dim)] flex-shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="M21 21l-4.35-4.35" />
-        </svg>
-        <input
-          ref="searchInput"
-          v-model="searchQuery"
-          placeholder="Search conversations…"
-          class="flex-1 bg-transparent text-[12px] text-[var(--text)] placeholder-[var(--text-dim)] outline-none"
-          @keydown.escape.prevent="closeSearch"
-        />
-      </div>
-      <button
-        @click="closeSearch"
-        class="p-1 rounded text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-active)] transition-colors cursor-pointer"
-      >
-        <svg
-          class="w-3.5 h-3.5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-        >
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- Search icon when closed -->
-    <div v-else class="flex justify-end px-2 pt-1">
-      <CustomTooltip text="Search conversations (Ctrl+K)">
-        <button
-          @click="openSearch"
-          class="p-1 rounded text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-active)] transition-colors cursor-pointer"
+    <!-- Sidebar header: title + search toggle -->
+    <div class="flex items-center gap-1 px-2 py-1.5 flex-shrink-0">
+      <template v-if="isSearchOpen">
+        <div
+          class="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-lg"
         >
           <svg
-            class="w-3.5 h-3.5"
+            class="w-3 h-3 text-[var(--text-dim)] flex-shrink-0"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -61,8 +18,56 @@
             <circle cx="11" cy="11" r="8" />
             <path d="M21 21l-4.35-4.35" />
           </svg>
+          <input
+            ref="searchInput"
+            v-model="searchQuery"
+            placeholder="Search…"
+            class="flex-1 min-w-0 bg-transparent text-[12px] text-[var(--text)] placeholder-[var(--text-dim)] outline-none"
+            @keydown.escape.prevent="closeSearch"
+          />
+        </div>
+        <button
+          @click="closeSearch"
+          class="flex-shrink-0 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-active)] transition-colors cursor-pointer"
+        >
+          <svg
+            class="w-3.5 h-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
         </button>
-      </CustomTooltip>
+      </template>
+      <template v-else>
+        <span
+          class="flex-1 min-w-0 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider px-1 select-none truncate"
+        >
+          Conversations
+        </span>
+        <CustomTooltip text="Search conversations (Ctrl+K)">
+          <button
+            @click="openSearch"
+            class="flex-shrink-0 p-1 rounded text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-active)] transition-colors cursor-pointer"
+          >
+            <svg
+              class="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+          </button>
+        </CustomTooltip>
+      </template>
     </div>
 
     <DynamicScroller
