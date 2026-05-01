@@ -81,7 +81,7 @@ tauri-plugin-opener = "2.5.3"
 
 [dev-dependencies]
 tokio   = { version = "1", features = ["full", "test-util"] }
-mockall = "0.13"
+mockall = "0.14"
 mockito = "1"
 tempfile = "3.27.0"
 tauri = { version = "2", features = ["test"] }
