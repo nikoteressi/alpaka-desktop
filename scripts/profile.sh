@@ -10,7 +10,7 @@ set -euo pipefail
 BINARY="$(cd "$(dirname "$0")/.." && pwd)/src-tauri/target/release/alpaka-desktop"
 DIST_DIR="$(cd "$(dirname "$0")/.." && pwd)/dist"
 BUDGET_MEMORY_MB=280   # PSS budget; see docs/ARCHITECTURE.md §13
-BUDGET_BINARY_MB=15
+BUDGET_BINARY_MB=20
 SAMPLE_DURATION=10   # seconds to sample CPU/memory after launch
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'

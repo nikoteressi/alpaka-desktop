@@ -893,7 +893,7 @@ Stop generation uses a `tokio::sync::broadcast` channel stored in `AppState::can
 | Message list (1000+) | Constant DOM size | — | Virtual scrolling; lazy markdown rendering |
 | SQLite queries | < 50ms | — | Indexed queries; connection reuse; WAL mode |
 | Memory (idle, PSS) | < 280 MB | **252 MB** | See breakdown below; no leaked event listeners |
-| Binary size | < 15 MB | **13.64 MB** | Tauri bundle; tree-shaken frontend |
+| Binary size | < 20 MB | **16.94 MB** | Tauri bundle; tree-shaken frontend; bundled SQLCipher |
 | CPU at idle | < 5% | **2.6%** | No polling loops on main thread |
 
 ### Memory breakdown (PSS, idle, v1.0.1)
