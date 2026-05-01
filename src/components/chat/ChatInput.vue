@@ -283,13 +283,32 @@ const {
   attachments,
   isDragging,
   handleFiles,
+  onGlobalPaste,
+  initDragDrop,
   removeAttachment,
   clearAttachments,
-  onDragEnter,
-  onDragLeave,
-  onDrop,
-  onPaste,
-} = useAttachments();
+} = useAttachments({
+  onLinkFile: async (path: string) => {
+    let targetId = activeConvId.value;
+    if (!targetId) return;
+    if (chatStore.isDraft) targetId = await persistDraft();
+    isLinking.value = true;
+    try {
+      const payload = await tauriApi.linkFolder(targetId, path);
+      chatStore.addFolderContext(targetId, {
+        id: payload.id,
+        name: path.split("/").pop() ?? path,
+        path,
+        content: payload.content,
+        tokens: payload.token_estimate,
+      });
+    } catch (err) {
+      console.error("Failed to link dropped file:", err);
+    } finally {
+      isLinking.value = false;
+    }
+  },
+});
 
 // ---- Context Window Tracking ----
 const { maxContext, contextTokens, isContextNearFull } = useContextWindow({
@@ -400,12 +419,16 @@ function onOpenModelSwitcher() {
   modelSelectorRef.value?.openModelDropdown();
 }
 
-onMounted(() => {
+let unlistenDrag: (() => void) | undefined;
+
+onMounted(async () => {
   modelStore.fetchModels();
   appEvents.addEventListener(
     APP_EVENT.OPEN_MODEL_SWITCHER,
     onOpenModelSwitcher,
   );
+  unlistenDrag = await initDragDrop();
+  window.addEventListener("paste", onGlobalPaste);
 });
 
 onBeforeUnmount(() => {
@@ -413,16 +436,14 @@ onBeforeUnmount(() => {
     APP_EVENT.OPEN_MODEL_SWITCHER,
     onOpenModelSwitcher,
   );
+  unlistenDrag?.();
+  window.removeEventListener("paste", onGlobalPaste);
 });
 </script>
 
 <template>
   <div
     class="flex flex-col w-full max-w-4xl mx-auto px-4 pb-4 pt-2 transition-all duration-300"
-    @dragenter.prevent="onDragEnter"
-    @dragover.prevent
-    @dragleave.prevent="onDragLeave"
-    @drop.prevent="onDrop"
   >
     <SystemPromptPanel
       v-model:systemPromptDraft="systemPromptDraft"
@@ -535,7 +556,6 @@ onBeforeUnmount(() => {
         data-testid="chat-input"
         v-model="inputContent"
         @keydown.enter.prevent="handleEnter"
-        @paste="onPaste"
         placeholder="Type a message or paste an image..."
         class="w-full bg-transparent focus:outline-none resize-none overflow-hidden text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
         :disabled="isStreaming"
