@@ -330,6 +330,23 @@ function handleEnter(e: KeyboardEvent) {
   }
 }
 
+function handleTextareaKeydown(e: KeyboardEvent) {
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && e.key === "z" && !e.shiftKey) {
+    // WebKitGTK on Wayland doesn't route Ctrl+Z to the native textarea undo;
+    // execCommand still works and talks directly to the browser's undo history.
+    e.preventDefault();
+    document.execCommand("undo");
+    return;
+  }
+  if (ctrl && e.key === "z" && e.shiftKey) {
+    e.preventDefault();
+    document.execCommand("redo");
+    return;
+  }
+  handleEnter(e);
+}
+
 function handleSubmit() {
   if (props.isStreaming) {
     emit("stop");
@@ -556,7 +573,7 @@ onBeforeUnmount(() => {
       <textarea
         data-testid="chat-input"
         v-model="inputContent"
-        @keydown.enter="handleEnter"
+        @keydown="handleTextareaKeydown"
         placeholder="Type a message…"
         class="w-full bg-transparent focus:outline-none resize-none overflow-hidden text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
         :disabled="isStreaming"
