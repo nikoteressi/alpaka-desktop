@@ -2,44 +2,123 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, release/*, hotfix/*]
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, release/*, hotfix/*]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # ─────────────────────────────────────────────────────────────────────── #
+  # Detect which parts of the codebase changed (PR only; push = run all)   #
+  # ─────────────────────────────────────────────────────────────────────── #
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      rust: ${{ steps.set.outputs.rust }}
+      frontend: ${{ steps.set.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - uses: dorny/paths-filter@6852f92c20ea7fd3b0c25de3b5112db3a98da050 # v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            rust:
+              - 'src-tauri/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            frontend:
+              - 'src/**'
+              - 'e2e-desktop/**'
+              - 'index.html'
+              - 'vite.config.ts'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - '.github/**'
+              - 'CHANGELOG.md'
+
+      - name: Set change flags
+        id: set
+        run: |
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "rust=true"     >> "$GITHUB_OUTPUT"
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rust=${{ steps.filter.outputs.rust }}"         >> "$GITHUB_OUTPUT"
+            echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────── #
+  # Spell check — fast, always runs                                         #
+  # ─────────────────────────────────────────────────────────────────────── #
+  typos:
+    name: Spell Check (typos)
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - uses: crate-ci/typos@c96c46fae465ab9e3607401d9ce93d75e7998023 # v1
+        with:
+          config: _typos.toml
+          files: ./src ./src-tauri/src docs
+
+  # ─────────────────────────────────────────────────────────────────────── #
+  # Security audit — cargo-audit + cargo-deny + pnpm audit                 #
+  # ─────────────────────────────────────────────────────────────────────── #
   security-audit:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+          toolchain: stable
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: ci
+
+      - name: Install audit tools
+        uses: taiki-e/install-action@1f2425cdb59f8fffb99ee16a5968edf6f57a2b93 # v2
+        with:
+          tool: cargo-audit,cargo-deny
 
       - name: Run cargo audit
-        # No --deny flags: cargo audit exits non-zero by default for real CVEs.
-        # --deny warnings would also block on unmaintained notices from Tauri's
-        # GTK3 transitive deps (atk, gdk, etc.) which we cannot update.
+        # --deny warnings would block on unmaintained GTK3 transitive deps
+        # (atk, gdk-sys, etc.) which Tauri cannot yet update.
         run: cargo audit
         working-directory: src-tauri
 
+      - name: Run cargo deny
+        run: cargo deny check
+        working-directory: src-tauri
+
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        # No 'version' key — reads from package.json "packageManager" field
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -48,49 +127,222 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run pnpm audit
-        # --prod: dev dependencies (eslint-plugin-vue → lodash) don't ship in
-        # the Tauri binary, so only production deps need to pass the audit.
         run: pnpm audit --audit-level=high --prod
 
-  build-check:
-    name: Build Check
-    runs-on: ubuntu-latest
+  # ─────────────────────────────────────────────────────────────────────── #
+  # MSRV — verify rust-version = "1.88.0" from Cargo.toml compiles         #
+  # 1.88.0 is the minimum because transitive deps use Cargo edition2024,   #
+  # which was stabilised in Rust 1.85.                                      #
+  # ─────────────────────────────────────────────────────────────────────── #
+  msrv-check:
+    name: MSRV Check (1.88.0)
+    runs-on: ubuntu-22.04
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust 1.88.0 (MSRV)
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: "1.88.0"
 
       - name: Install Linux system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libssl-dev \
             pkg-config
 
-      - name: Cache cargo build
-        uses: actions/cache@v4
+      - name: Cache Rust artifacts (MSRV)
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-build-
+          workspaces: src-tauri -> target
+          shared-key: msrv
+
+      - name: Cargo check at MSRV
+        run: cargo check --locked
+        working-directory: src-tauri
+
+  # ─────────────────────────────────────────────────────────────────────── #
+  # Build check — format, lint, typecheck                                   #
+  # ─────────────────────────────────────────────────────────────────────── #
+  build-check:
+    name: Build Check
+    runs-on: ubuntu-22.04
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.frontend == 'true'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust stable
+        if: needs.changes.outputs.rust == 'true'
+        id: rust-toolchain
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Linux system dependencies
+        if: needs.changes.outputs.rust == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Cache Rust artifacts
+        if: needs.changes.outputs.rust == 'true'
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: ci
 
       - name: Cargo check
-        run: cargo check
+        if: needs.changes.outputs.rust == 'true'
+        run: cargo check --locked
+        working-directory: src-tauri
+
+      - name: Cargo fmt
+        if: needs.changes.outputs.rust == 'true'
+        run: cargo fmt -- --check
+        working-directory: src-tauri
+
+      - name: Cargo clippy
+        if: needs.changes.outputs.rust == 'true'
+        run: cargo clippy -- -D warnings
         working-directory: src-tauri
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        # No 'version' key — reads from package.json "packageManager" field
+        if: needs.changes.outputs.frontend == 'true'
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        if: needs.changes.outputs.frontend == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install npm dependencies
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm typecheck
+
+      - name: ESLint check
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm lint:check
+
+      - name: Prettier check
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm format:check
+
+      - name: Check CHANGELOG updated
+        if: github.event_name == 'pull_request'
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${BASE_REF}" --depth=1
+          CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+
+          if echo "$CHANGED" | grep -Fxq "CHANGELOG.md"; then
+            echo "CHANGELOG.md updated."
+            exit 0
+          fi
+
+          ADVISORY=$(echo "$PR_LABELS" | jq -r '.[].name' | grep -E '^type: (ci|docs)$' | head -1 || true)
+
+          if [[ -n "$ADVISORY" ]]; then
+            echo "WARNING: CHANGELOG.md not updated, but PR is labeled '${ADVISORY}' — advisory only."
+            exit 0
+          fi
+
+          echo "ERROR: CHANGELOG.md not updated."
+          echo "Please add an entry under [Unreleased] in CHANGELOG.md."
+          echo "For CI-only or docs-only PRs, add the 'type: ci' or 'type: docs' label to suppress this check."
+          exit 1
+
+  # ─────────────────────────────────────────────────────────────────────── #
+  # Test + Coverage — runs tests ONCE with instrumentation (not twice)      #
+  # ─────────────────────────────────────────────────────────────────────── #
+  test-and-coverage:
+    name: Test and Coverage
+    runs-on: ubuntu-22.04
+    needs: [changes, build-check]
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.frontend == 'true'
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust stable
+        if: needs.changes.outputs.rust == 'true'
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
+
+      - name: Install Linux system dependencies
+        if: needs.changes.outputs.rust == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config
+
+      - name: Cache Rust artifacts
+        if: needs.changes.outputs.rust == 'true'
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: ci
+
+      - name: Install coverage + test tools
+        if: needs.changes.outputs.rust == 'true'
+        uses: taiki-e/install-action@1f2425cdb59f8fffb99ee16a5968edf6f57a2b93 # v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+
+      - name: Run Rust tests with coverage (nextest)
+        if: needs.changes.outputs.rust == 'true'
+        run: |
+          mkdir -p coverage-rust
+          cargo llvm-cov nextest --no-report --workspace --locked
+          cargo llvm-cov report --lcov --output-path coverage-rust/lcov.info
+          cargo llvm-cov report --html --output-dir coverage-rust/html
+        working-directory: src-tauri
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           cache: pnpm
@@ -98,5 +350,184 @@ jobs:
       - name: Install npm dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: TypeScript check
-        run: pnpm typecheck
+      - name: Run Vitest with coverage
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm test:coverage
+
+      - name: Run Vitest (Rust-only change — no frontend coverage needed)
+        if: needs.changes.outputs.rust == 'true' && needs.changes.outputs.frontend != 'true'
+        run: pnpm test
+
+      - name: SonarCloud scan
+        if: |
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+          (needs.changes.outputs.rust == 'true' || needs.changes.outputs.frontend == 'true')
+        uses: SonarSource/sonarcloud-github-action@383f7e52eae3ab0510c3cb0e7d9d150bbaeab838 # v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Upload TypeScript coverage report
+        if: needs.changes.outputs.frontend == 'true'
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: vitest-coverage
+          path: coverage/
+          retention-days: 30
+
+      - name: Upload Rust coverage report
+        if: needs.changes.outputs.rust == 'true'
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: cargo-coverage
+          path: src-tauri/coverage-rust/html/
+          retention-days: 30
+
+  # ─────────────────────────────────────────────────────────────────────── #
+  # E2E Smoke — binary launches and navigates (no Ollama required)          #
+  # Required PR gate.                                                        #
+  # ─────────────────────────────────────────────────────────────────────── #
+  e2e-smoke:
+    name: E2E Smoke Tests
+    runs-on: ubuntu-22.04
+    needs: [changes, build-check]
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.rust == 'true'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            webkit2gtk-driver \
+            xvfb
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: e2e
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install npm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build test binary
+        run: pnpm e2e:build
+
+      - name: Run smoke tests
+        run: xvfb-run -a pnpm e2e:smoke
+        env:
+          DISPLAY: ':99'
+
+      - name: Upload smoke test artifacts
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: smoke-artifacts
+          path: e2e-desktop/.artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────── #
+  # E2E Integration — full Ollama integration (post-merge only)             #
+  # Non-blocking — does not gate PRs.                                       #
+  # ─────────────────────────────────────────────────────────────────────── #
+  e2e-integration:
+    name: E2E Integration Tests
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && contains(fromJSON('["develop","main"]'), github.ref_name)
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        with:
+          toolchain: stable
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            pkg-config \
+            webkit2gtk-driver \
+            xvfb
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: e2e
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install npm dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start Ollama and pull test model
+        run: |
+          ollama serve &
+          sleep 5
+          ollama pull qwen2:0.5b
+
+      - name: Build test binary
+        run: pnpm e2e:build
+
+      - name: Run integration tests
+        run: xvfb-run -a pnpm e2e:integration
+        env:
+          DISPLAY: ':99'
+
+      - name: Upload integration test artifacts
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: integration-artifacts
+          path: e2e-desktop/.artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
+

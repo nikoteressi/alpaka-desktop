@@ -1,0 +1,38 @@
+version: 2
+
+updates:
+  # NPM / pnpm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      # Tauri NPM packages must stay in sync with Rust crate versions (major.minor must match).
+      # Grouping ensures both sides land in the same PR and the build never sees a mismatch.
+      tauri:
+        patterns:
+          - "@tauri-apps/*"
+
+  # Cargo / Rust dependencies
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      # Must mirror the NPM "tauri" group so both ecosystems update together.
+      tauri:
+        patterns:
+          - "tauri"
+          - "tauri-*"
+
+  # GitHub Actions — keep action versions and their SHA pins up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5

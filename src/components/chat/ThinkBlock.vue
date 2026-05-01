@@ -1,36 +1,60 @@
 <template>
-  <div style="margin-bottom: 12px;">
+  <div style="margin-bottom: 12px">
     <button
       @click="toggle"
-      style="display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 2px 0; font-family: inherit;"
+      style="
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 13px;
+        cursor: pointer;
+        padding: 2px 0;
+        font-family: inherit;
+      "
     >
       <svg
-        width="11" height="11" viewBox="0 0 12 12"
-        fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-        :style="{ transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }"
+        width="11"
+        height="11"
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        :style="{
+          transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.15s',
+        }"
       >
-        <path d="M4 2l4 4-4 4"/>
+        <path d="M4 2l4 4-4 4" />
       </svg>
       <span>{{ label }}</span>
       <span v-if="isThinking" class="think-pulse-dot" />
     </button>
 
     <!-- Grid accordion wrapper -->
-    <div class="think-accordion" :class="{ 'think-accordion--closed': !isExpanded }">
+    <div
+      class="think-accordion"
+      :class="{ 'think-accordion--closed': !isExpanded }"
+    >
       <div class="think-accordion__inner">
         <!-- Streaming: plain text (safe, no markdown parsing on partial content) -->
         <div
           v-if="isThinking"
           ref="contentEl"
           class="think-content think-content--plain"
-          style="max-height: 380px;"
-        >{{ content }}<span class="think-cursor" /></div>
+          style="max-height: 380px"
+        >
+          {{ content }}<span class="think-cursor" />
+        </div>
 
         <!-- Finished: render as markdown -->
         <div
           v-else
           class="think-content think-content--rendered"
-          style="max-height: 380px;"
+          style="max-height: 380px"
           v-html="renderedContent"
         ></div>
       </div>
@@ -39,54 +63,64 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
-import { useCollapsibleState } from '../../composables/useCollapsibleState'
-import { renderMarkdown } from '../../lib/markdown'
+import { ref, computed, watch, nextTick } from "vue";
+import { useCollapsibleState } from "../../composables/useCollapsibleState";
+import { renderMarkdown } from "../../lib/markdown";
 
 const props = defineProps<{
-  content: string
-  isThinking: boolean
-  thinkTime?: number | null
-  messageKey?: string
-}>()
+  content: string;
+  isThinking: boolean;
+  thinkTime?: number | null;
+  messageKey?: string;
+}>();
 
-const { isOpen, toggle: _toggle, setOpen } = useCollapsibleState({
+const {
+  isOpen,
+  toggle: _toggle,
+  setOpen,
+} = useCollapsibleState({
   messageKey: props.messageKey,
   initialOpen: props.isThinking,
-})
+});
 
-const isExpanded = computed(() => isOpen.value)
-const contentEl = ref<HTMLElement | null>(null)
+const isExpanded = computed(() => isOpen.value);
+const contentEl = ref<HTMLElement | null>(null);
 
 const label = computed(() => {
-  if (props.isThinking) return 'Thinking...'
-  const t = props.thinkTime
+  if (props.isThinking) return "Thinking...";
+  const t = props.thinkTime;
   if (t !== null && t !== undefined && !isNaN(t)) {
-    return `Thought for ${t.toFixed(1)} seconds`
+    return `Thought for ${t.toFixed(1)} seconds`;
   }
-  return 'Thoughts'
-})
+  return "Thoughts";
+});
 
-const renderedContent = computed(() => renderMarkdown(props.content))
+const renderedContent = computed(() => renderMarkdown(props.content));
 
 function toggle(event: MouseEvent) {
-  event.stopPropagation()
-  _toggle()
+  event.stopPropagation();
+  _toggle();
 }
 
-watch(() => props.content, async () => {
-  if (!props.isThinking || !isOpen.value) return
-  await nextTick()
-  if (contentEl.value) {
-    contentEl.value.scrollTop = contentEl.value.scrollHeight
-  }
-})
+watch(
+  () => props.content,
+  async () => {
+    if (!props.isThinking || !isOpen.value) return;
+    await nextTick();
+    if (contentEl.value) {
+      contentEl.value.scrollTop = contentEl.value.scrollHeight;
+    }
+  },
+);
 
-watch(() => props.isThinking, (isNow, wasBefore) => {
-  if (wasBefore && !isNow) setOpen(false)
-})
+watch(
+  () => props.isThinking,
+  (isNow, wasBefore) => {
+    if (wasBefore && !isNow) setOpen(false);
+  },
+);
 
-defineExpose({ isOpen })
+defineExpose({ isOpen });
 </script>
 
 <style scoped>
@@ -197,13 +231,25 @@ defineExpose({ isOpen })
 
 /* Animations */
 @keyframes think-pulse {
-  0%, 100% { opacity: 0.3; transform: scale(0.8); }
-  50%       { opacity: 1;   transform: scale(1);   }
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes think-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .think-pulse-dot {

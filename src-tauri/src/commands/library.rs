@@ -1,7 +1,7 @@
-use tauri::State;
 use crate::error::AppError;
-use crate::state::AppState;
 use crate::services::library::{LibraryModel, LibraryTag};
+use crate::state::AppState;
+use tauri::State;
 
 #[tauri::command]
 pub async fn search_ollama_library(

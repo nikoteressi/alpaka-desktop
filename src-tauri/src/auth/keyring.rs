@@ -1,21 +1,56 @@
 use crate::error::AppError;
+#[cfg(not(feature = "test-mode"))]
 use keyring::Entry;
 
+#[cfg(feature = "test-mode")]
+use std::collections::HashMap;
+#[cfg(feature = "test-mode")]
+use std::sync::Mutex;
+
+#[cfg(feature = "test-mode")]
+static TEST_KEYRING: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+
+#[cfg(feature = "test-mode")]
+fn test_store() -> std::sync::MutexGuard<'static, Option<HashMap<String, String>>> {
+    let mut guard = TEST_KEYRING.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(HashMap::new());
+    }
+    guard
+}
+
 pub const SERVICE_NAME: &str = "ollama-desktop";
+
+/// Fixed keyring account name for the Ollama Cloud API key.
+///
+/// Stored under [`SERVICE_NAME`] as the account identifier, keeping it separate
+/// from per-host OAuth bearer tokens, which use the host's UUID as the account name.
+pub const API_KEY_ACCOUNT: &str = "ollama-api-key";
 
 /// Sets a bearer token in the system's secure credential store (keyring).
 ///
 /// Under Linux, this uses the Secret Service API.
+#[cfg(not(feature = "test-mode"))]
 pub fn set_token(host_id: &str, token: &str) -> Result<(), AppError> {
     let entry = Entry::new(SERVICE_NAME, host_id)?;
     entry.set_password(token)?;
     Ok(())
 }
 
+#[cfg(feature = "test-mode")]
+pub fn set_token(host_id: &str, token: &str) -> Result<(), AppError> {
+    test_store()
+        .as_mut()
+        .unwrap()
+        .insert(host_id.to_string(), token.to_string());
+    Ok(())
+}
+
 /// Retrieves a bearer token from the system's secure credential store.
-/// 
-/// We first check our own service 'ollama-desktop'. 
+///
+/// We first check our own service 'ollama-desktop'.
 /// If not found, we check the official client's service 'ollama' (account 'cloud').
+#[cfg(not(feature = "test-mode"))]
 pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
     // 1. Try our own service/identifier first
     let entry = Entry::new(SERVICE_NAME, host_id)?;
@@ -32,7 +67,7 @@ pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
         for service in &["ollama", "ollama-desktop"] {
             for account in &["cloud", "default"] {
                 if let Ok(token) = Entry::new(service, account).and_then(|e| e.get_password()) {
-                    log::info!("Found Ollama token for {}/{}", service, account);
+                    log::debug!("Found Ollama token for {}/{}", service, account);
                     return Ok(Some(token));
                 }
             }
@@ -42,7 +77,13 @@ pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
     Ok(None)
 }
 
+#[cfg(feature = "test-mode")]
+pub fn get_token(host_id: &str) -> Result<Option<String>, AppError> {
+    Ok(test_store().as_ref().unwrap().get(host_id).cloned())
+}
+
 /// Returns true if the system keyring is accessible.
+#[cfg(not(feature = "test-mode"))]
 pub fn check_keyring_available() -> bool {
     match keyring::Entry::new("alpaka-desktop-health-check", "probe") {
         Ok(entry) => match entry.get_password() {
@@ -59,9 +100,15 @@ pub fn check_keyring_available() -> bool {
     }
 }
 
+#[cfg(feature = "test-mode")]
+pub fn check_keyring_available() -> bool {
+    true
+}
+
 /// Deletes a bearer token from the system's secure credential store.
 ///
 /// Returns `Ok(())` even if the token did not exist.
+#[cfg(not(feature = "test-mode"))]
 pub fn delete_token(host_id: &str) -> Result<(), AppError> {
     let entry = Entry::new(SERVICE_NAME, host_id)?;
     match entry.delete_credential() {
@@ -69,6 +116,12 @@ pub fn delete_token(host_id: &str) -> Result<(), AppError> {
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(AppError::from(e)),
     }
+}
+
+#[cfg(feature = "test-mode")]
+pub fn delete_token(host_id: &str) -> Result<(), AppError> {
+    test_store().as_mut().unwrap().remove(host_id);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -85,14 +138,20 @@ mod tests {
         // In headless CI/environments, keyring might not be available,
         // so we tolerate NoBackend errors gracefully in tests or assert explicitly.
         let set_res = set_token(&host_id, test_token);
-        
-        if let Err(AppError::Auth(msg)) = &set_res {
-            if msg.contains("No secret-service") || msg.contains("NoBackend") || msg.contains("locked") {
-                // CI environment without a valid keyring daemon, pass gracefully
-                return;
+
+        if let Err(ref e) = set_res {
+            let msg = format!("{e:?}");
+            if msg.contains("No secret-service")
+                || msg.contains("NoBackend")
+                || msg.contains("locked")
+                || msg.contains("Platform secure storage")
+                || msg.contains("ServiceUnknown")
+                || msg.contains("org.freedesktop")
+            {
+                return; // No Secret Service daemon in this environment
             }
         }
-        
+
         // Assert we could set it
         assert!(set_res.is_ok(), "Setting token should succeed");
 
@@ -105,32 +164,77 @@ mod tests {
         assert!(del_res.is_ok(), "Deleting token should succeed");
 
         // Assert it's gone
-        let retrieved_after = get_token(&host_id).expect("Should not fail when querying missing token");
+        let retrieved_after =
+            get_token(&host_id).expect("Should not fail when querying missing token");
         assert_eq!(retrieved_after, None);
     }
 
     #[test]
     fn test_get_nonexistent_token() {
         let host_id = Uuid::new_v4().to_string();
-        
+
         let retrieved = get_token(&host_id);
         match retrieved {
             Ok(None) => (), // Expected
-            Err(AppError::Auth(msg)) if msg.contains("No secret-service") || msg.contains("NoBackend") || msg.contains("locked") => (),
+            Err(AppError::Auth(msg))
+                if msg.contains("No secret-service")
+                    || msg.contains("NoBackend")
+                    || msg.contains("locked")
+                    || msg.contains("Platform secure storage")
+                    || msg.contains("ServiceUnknown") => {}
             Ok(Some(_)) => panic!("Token shouldn't exist"),
             Err(e) => panic!("Unexpected error: {:?}", e),
         }
     }
-    
+
     #[test]
     fn test_delete_nonexistent_token() {
         let host_id = Uuid::new_v4().to_string();
-        
+
         let del_res = delete_token(&host_id);
         match del_res {
             Ok(_) => (), // Expected, should silently succeed
-            Err(AppError::Auth(msg)) if msg.contains("No secret-service") || msg.contains("NoBackend") || msg.contains("locked") => (),
+            Err(AppError::Auth(msg))
+                if msg.contains("No secret-service")
+                    || msg.contains("NoBackend")
+                    || msg.contains("locked")
+                    || msg.contains("Platform secure storage")
+                    || msg.contains("ServiceUnknown") => {}
             Err(e) => panic!("Unexpected error: {:?}", e),
         }
+    }
+
+    #[test]
+    fn test_api_key_account_is_distinct() {
+        assert_ne!(API_KEY_ACCOUNT, "cloud");
+        assert_ne!(API_KEY_ACCOUNT, SERVICE_NAME);
+        assert_eq!(API_KEY_ACCOUNT, "ollama-api-key");
+    }
+
+    #[test]
+    fn test_set_get_delete_via_api_key_account() {
+        // Use a unique account derived from the constant to avoid clobbering live data.
+        let test_account = format!("{}-test-{}", API_KEY_ACCOUNT, Uuid::new_v4());
+        let test_key = "sk-test-ollama-key-abc123";
+
+        let set_res = set_token(&test_account, test_key);
+        if let Err(ref e) = set_res {
+            let msg = format!("{e:?}");
+            if msg.contains("No secret-service")
+                || msg.contains("NoBackend")
+                || msg.contains("locked")
+                || msg.contains("Platform secure storage")
+                || msg.contains("ServiceUnknown")
+                || msg.contains("org.freedesktop")
+            {
+                return;
+            }
+        }
+        assert!(set_res.is_ok());
+        let retrieved = get_token(&test_account).expect("should retrieve");
+        assert_eq!(retrieved, Some(test_key.to_string()));
+        assert!(delete_token(&test_account).is_ok());
+        let after = get_token(&test_account).expect("should not error on missing");
+        assert_eq!(after, None);
     }
 }

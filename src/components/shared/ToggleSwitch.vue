@@ -2,7 +2,11 @@
   <button
     class="relative w-10 h-[22px] rounded-full transition-colors cursor-pointer flex-shrink-0"
     :class="value ? 'bg-[var(--accent)]' : 'bg-[var(--bg-hover)]'"
-    :style="value ? { border: '1px solid var(--accent)' } : { border: '1px solid var(--border)' }"
+    :style="
+      value
+        ? { border: '1px solid var(--accent)' }
+        : { border: '1px solid var(--border)' }
+    "
     @click="$emit('change', !value)"
   >
     <span
@@ -15,10 +19,10 @@
 
 <script setup lang="ts">
 defineProps<{
-  value: boolean
-}>()
+  value: boolean;
+}>();
 
 defineEmits<{
-  (e: 'change', value: boolean): void
-}>()
+  (e: "change", value: boolean): void;
+}>();
 </script>

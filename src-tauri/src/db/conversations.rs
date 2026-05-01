@@ -125,9 +125,35 @@ pub fn update_title(conn: &Connection, id: &str, title: &str) -> Result<(), AppE
         params![title, now, id],
     )?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!(
-            "Conversation '{id}' not found"
-        )));
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
+    }
+    Ok(())
+}
+
+/// Update the model for a conversation and bump updated_at.
+pub fn update_model(conn: &Connection, id: &str, model: &str) -> Result<(), AppError> {
+    let changed = conn.execute(
+        "UPDATE conversations
+         SET model = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+         WHERE id = ?2",
+        rusqlite::params![model, id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
+    }
+    Ok(())
+}
+
+/// Persist generation settings for a conversation.
+pub fn update_settings(conn: &Connection, id: &str, settings_json: &str) -> Result<(), AppError> {
+    let changed = conn.execute(
+        "UPDATE conversations
+         SET settings_json = ?1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+         WHERE id = ?2",
+        rusqlite::params![settings_json, id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
     }
     Ok(())
 }
@@ -140,16 +166,17 @@ pub fn set_pinned(conn: &Connection, id: &str, pinned: bool) -> Result<(), AppEr
         params![pinned as i64, now, id],
     )?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!(
-            "Conversation '{id}' not found"
-        )));
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
     }
     Ok(())
 }
 
 /// Update (or create) the system prompt for a conversation by modifying the first 'system' message.
-pub fn update_system_prompt(conn: &Connection, id: &str, system_prompt: &str) -> Result<(), AppError> {
-
+pub fn update_system_prompt(
+    conn: &Connection,
+    id: &str,
+    system_prompt: &str,
+) -> Result<(), AppError> {
     // Check if a system message already exists for this conversation
     let existing_id: Option<String> = conn.query_row(
         "SELECT id FROM messages WHERE conversation_id = ?1 AND role = 'system' ORDER BY created_at ASC LIMIT 1",
@@ -161,25 +188,29 @@ pub fn update_system_prompt(conn: &Connection, id: &str, system_prompt: &str) ->
         // Update existing
         conn.execute(
             "UPDATE messages SET content = ?1 WHERE id = ?2",
-            params![system_prompt, msg_id]
+            params![system_prompt, msg_id],
         )?;
     } else {
         // Create new
-        crate::db::messages::create(conn, crate::db::messages::NewMessage {
-            conversation_id: id.to_string(),
-            role: crate::db::messages::MessageRole::System,
-            content: system_prompt.to_string(),
-            images_json: None,
-            files_json: None,
-            tokens_used: None,
-            generation_time_ms: None,
-            prompt_tokens: None,
-            tokens_per_sec: None,
-            total_duration_ms: None,
-            load_duration_ms: None,
-            prompt_eval_duration_ms: None,
-            eval_duration_ms: None,
-        })?;
+        crate::db::messages::create(
+            conn,
+            crate::db::messages::NewMessage {
+                conversation_id: id.to_string(),
+                role: crate::db::messages::MessageRole::System,
+                content: system_prompt.to_string(),
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )?;
     }
 
     // Touch conversation's updated_at
@@ -213,9 +244,7 @@ pub fn touch_updated_at(conn: &Connection, id: &str) -> Result<(), AppError> {
 pub fn delete(conn: &Connection, id: &str) -> Result<(), AppError> {
     let changed = conn.execute("DELETE FROM conversations WHERE id = ?1", params![id])?;
     if changed == 0 {
-        return Err(AppError::NotFound(format!(
-            "Conversation '{id}' not found"
-        )));
+        return Err(AppError::NotFound(format!("Conversation '{id}' not found")));
     }
     Ok(())
 }
@@ -243,7 +272,11 @@ pub fn search(conn: &Connection, query: &str) -> Result<Vec<Conversation>, AppEr
 }
 
 /// Export a conversation and all its messages to a JSON file.
-pub fn export_to_path(conn: &Connection, conversation_id: &str, path: &std::path::Path) -> Result<(), AppError> {
+pub fn export_to_path(
+    conn: &Connection,
+    conversation_id: &str,
+    path: &std::path::Path,
+) -> Result<(), AppError> {
     let conv = get_by_id(conn, conversation_id)?;
     let msgs = crate::db::messages::list_for_conversation(conn, conversation_id)?;
 
@@ -252,8 +285,8 @@ pub fn export_to_path(conn: &Connection, conversation_id: &str, path: &std::path
         "messages": msgs,
     });
 
-    let json_str = serde_json::to_string_pretty(&export_data).map_err(|e| AppError::Serialization(e.to_string()))?;
-    std::fs::write(path, json_str).map_err(|e| AppError::Io(e.to_string()))?;
+    let json_str = serde_json::to_string_pretty(&export_data)?;
+    std::fs::write(path, json_str)?;
     Ok(())
 }
 
@@ -331,6 +364,34 @@ mod tests {
 
         delete(&conn, &conv.id).unwrap();
         assert!(list(&conn, 10, 0).unwrap().is_empty());
+    }
+
+    #[test]
+    fn update_settings_persists_json() {
+        let conn = in_memory_conn();
+        let conv = create(
+            &conn,
+            NewConversation {
+                title: "Settings test".into(),
+                model: "llama3".into(),
+                settings_json: None,
+                tags: None,
+            },
+        )
+        .unwrap();
+
+        let json = r#"{"temperature":0.8,"top_p":0.9}"#;
+        update_settings(&conn, &conv.id, json).unwrap();
+
+        let updated = get_by_id(&conn, &conv.id).unwrap();
+        assert_eq!(updated.settings_json, json);
+    }
+
+    #[test]
+    fn update_settings_missing_id_returns_not_found() {
+        let conn = in_memory_conn();
+        let result = update_settings(&conn, "nonexistent-id", "{}");
+        assert!(matches!(result, Err(AppError::NotFound(_))));
     }
 
     #[test]

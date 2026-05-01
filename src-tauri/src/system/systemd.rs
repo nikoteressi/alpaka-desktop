@@ -110,8 +110,8 @@ struct CommandOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::ExitStatus;
     use std::os::unix::process::ExitStatusExt;
+    use std::process::ExitStatus;
 
     #[test]
     fn test_handle_result_success() {

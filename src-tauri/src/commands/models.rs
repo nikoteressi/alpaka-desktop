@@ -1,9 +1,9 @@
 use crate::error::AppError;
+use crate::ollama::client::OllamaClient;
 use crate::state::AppState;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
-use futures_util::StreamExt;
-use crate::ollama::client::OllamaClient;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModelDetails {
@@ -63,7 +63,10 @@ pub async fn core_delete_model(client: &OllamaClient, name: &str) -> Result<(), 
     if resp.status().is_success() {
         Ok(())
     } else {
-        Err(AppError::Http(format!("Failed to delete model: {}", resp.status())))
+        Err(AppError::Http(format!(
+            "Failed to delete model: {}",
+            resp.status()
+        )))
     }
 }
 
@@ -80,7 +83,7 @@ pub async fn core_pull_model<R: tauri::Runtime>(
 ) -> Result<(), AppError> {
     // Record start of pull in DB
     let payload = serde_json::json!({ "name": name, "stream": true });
-    
+
     let resp = client.post("/api/pull").json(&payload).send().await?;
     if !resp.status().is_success() {
         let err_msg = format!("Failed to pull model: {}", resp.status());
@@ -89,26 +92,36 @@ pub async fn core_pull_model<R: tauri::Runtime>(
     }
 
     let mut stream = resp.bytes_stream();
-    
+
     while let Some(chunk_res) = stream.next().await {
         match chunk_res {
             Ok(bytes) => {
                 let text = String::from_utf8_lossy(&bytes);
                 for line in text.lines() {
-                    if line.trim().is_empty() { continue; }
+                    if line.trim().is_empty() {
+                        continue;
+                    }
                     if let Ok(progress) = serde_json::from_str::<PullProgress>(line) {
-                        let percent = if let (Some(c), Some(t)) = (progress.completed, progress.total) {
-                            if t > 0 { (c as f64 / t as f64) * 100.0 } else { 0.0 }
-                        } else {
-                            0.0
-                        };
-                        let _ = app.emit("model:pull-progress", serde_json::json!({
-                            "model": name,
-                            "status": progress.status,
-                            "completed": progress.completed,
-                            "total": progress.total,
-                            "percent": percent,
-                        }));
+                        let percent =
+                            if let (Some(c), Some(t)) = (progress.completed, progress.total) {
+                                if t > 0 {
+                                    (c as f64 / t as f64) * 100.0
+                                } else {
+                                    0.0
+                                }
+                            } else {
+                                0.0
+                            };
+                        let _ = app.emit(
+                            "model:pull-progress",
+                            serde_json::json!({
+                                "model": name,
+                                "status": progress.status,
+                                "completed": progress.completed,
+                                "total": progress.total,
+                                "percent": percent,
+                            }),
+                        );
                     }
                 }
             }
@@ -119,7 +132,6 @@ pub async fn core_pull_model<R: tauri::Runtime>(
             }
         }
     }
-    
 
     let _ = app.emit("model:pull-done", serde_json::json!({ "model": name }));
     crate::system::notifications::notify_model_pulled(app, name);
@@ -135,7 +147,6 @@ pub async fn pull_model<R: tauri::Runtime>(
     let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
     core_pull_model(&client, &name, &app).await
 }
-
 
 /// Response from Ollama's /api/show endpoint
 #[derive(Debug, Serialize, Deserialize)]
@@ -190,7 +201,8 @@ pub async fn get_model_capabilities(
     name: String,
 ) -> Result<ModelCapabilities, AppError> {
     let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
-    let resp = client.post("/api/show")
+    let resp = client
+        .post("/api/show")
         .json(&serde_json::json!({ "name": name, "verbose": false }))
         .send()
         .await?;
@@ -203,20 +215,27 @@ pub async fn get_model_capabilities(
             parameters: None,
             model_info: None,
         });
-        let ctx_len = info.model_info
+        let ctx_len = info
+            .model_info
             .as_ref()
             .and_then(extract_context_length_from_info);
-        (info.capabilities, info.parameters.unwrap_or_default(), info.modelfile.unwrap_or_default(), ctx_len)
+        (
+            info.capabilities,
+            info.parameters.unwrap_or_default(),
+            info.modelfile.unwrap_or_default(),
+            ctx_len,
+        )
     } else {
         log::warn!(
             "Could not fetch capabilities for '{}': HTTP {} — returning empty",
-            name, resp.status()
+            name,
+            resp.status()
         );
         (Vec::new(), String::new(), String::new(), None)
     };
 
     let lower = name.to_lowercase();
-    
+
     // 1. Thinking / Reasoning
     // Reasoning toggle is ONLY shown if the model explicitly declares 'think' as a parameter in its metadata or modelfile.
     let native_levels_found = parameters.to_lowercase().contains("think low")
@@ -230,7 +249,7 @@ pub async fn get_model_capabilities(
         || modelfile.to_lowercase().contains("parameter think");
 
     let thinking_toggleable = native_think_found;
-    
+
     // The thinking icon/status is shown if toggleable OR if the API reports it as a thinking model.
     let thinking = thinking_toggleable || caps.iter().any(|c| c == "thinking");
 
@@ -249,11 +268,9 @@ pub async fn get_model_capabilities(
     let vision = caps.iter().any(|c| c == "vision");
     let embedding = caps.iter().any(|c| c == "embedding");
     let audio = caps.iter().any(|c| c == "audio");
-    
-    let cloud = caps.iter().any(|c| c == "cloud")
-        || lower.contains(":cloud")
-        || lower.contains("-cloud");
 
+    let cloud =
+        caps.iter().any(|c| c == "cloud") || lower.contains(":cloud") || lower.contains("-cloud");
 
     Ok(ModelCapabilities {
         name,
@@ -301,7 +318,8 @@ mod tests {
     #[tokio::test]
     async fn test_list_models_malformed_json() {
         let mut server = Server::new_async().await;
-        let mock = server.mock("GET", "/api/tags")
+        let mock = server
+            .mock("GET", "/api/tags")
             .with_status(200)
             .with_body(r#"{"models": "not a list"}"#)
             .create_async()
@@ -318,7 +336,8 @@ mod tests {
     #[tokio::test]
     async fn test_list_models_error() {
         let mut server = Server::new_async().await;
-        let mock = server.mock("GET", "/api/tags")
+        let mock = server
+            .mock("GET", "/api/tags")
             .with_status(500)
             .create_async()
             .await;
@@ -334,8 +353,11 @@ mod tests {
     #[tokio::test]
     async fn test_delete_model_success() {
         let mut server = Server::new_async().await;
-        let mock = server.mock("DELETE", "/api/delete")
-            .match_body(mockito::Matcher::Json(serde_json::json!({"name": "llama3"})))
+        let mock = server
+            .mock("DELETE", "/api/delete")
+            .match_body(mockito::Matcher::Json(
+                serde_json::json!({"name": "llama3"}),
+            ))
             .with_status(200)
             .create_async()
             .await;
@@ -351,7 +373,8 @@ mod tests {
     #[tokio::test]
     async fn test_delete_model_error() {
         let mut server = Server::new_async().await;
-        let mock = server.mock("DELETE", "/api/delete")
+        let mock = server
+            .mock("DELETE", "/api/delete")
             .with_status(404)
             .create_async()
             .await;
@@ -368,20 +391,23 @@ mod tests {
     async fn test_core_pull_model_success() {
         let mut server = Server::new_async().await;
         // Mock NDJSON stream
-        let mock = server.mock("POST", "/api/pull")
+        let mock = server
+            .mock("POST", "/api/pull")
             .with_status(200)
-            .with_body(r#"{"status":"downloading","completed":10,"total":100}
+            .with_body(
+                r#"{"status":"downloading","completed":10,"total":100}
 {"status":"downloading","completed":50,"total":100}
 {"status":"success"}
-"#)
+"#,
+            )
             .create_async()
             .await;
 
         let req_client = reqwest::Client::new();
         let client = OllamaClient::new(req_client, server.url(), None);
-        
+
         let app = tauri::test::mock_app();
-        let result = core_pull_model(&client, "llama3", &app.handle()).await;
+        let result = core_pull_model(&client, "llama3", app.handle()).await;
         mock.assert_async().await;
 
         assert!(result.is_ok());
@@ -390,20 +416,23 @@ mod tests {
     #[tokio::test]
     async fn test_core_pull_model_invalid_chunk_skips_line() {
         let mut server = Server::new_async().await;
-        let mock = server.mock("POST", "/api/pull")
+        let mock = server
+            .mock("POST", "/api/pull")
             .with_status(200)
-            .with_body(r#"{"status":"downloading","completed":10,"total":100}
+            .with_body(
+                r#"{"status":"downloading","completed":10,"total":100}
 not json at all
 {"status":"success"}
-"#)
+"#,
+            )
             .create_async()
             .await;
 
         let req_client = reqwest::Client::new();
         let client = OllamaClient::new(req_client, server.url(), None);
-        
+
         let app = tauri::test::mock_app();
-        let result = core_pull_model(&client, "llama3", &app.handle()).await;
+        let result = core_pull_model(&client, "llama3", app.handle()).await;
         mock.assert_async().await;
 
         // Function should continue and succeed even if one line is bad
@@ -413,7 +442,8 @@ not json at all
     #[tokio::test]
     async fn test_core_pull_model_http_error() {
         let mut server = Server::new_async().await;
-        let mock = server.mock("POST", "/api/pull")
+        let mock = server
+            .mock("POST", "/api/pull")
             .with_status(403)
             .create_async()
             .await;
@@ -422,7 +452,7 @@ not json at all
         let client = OllamaClient::new(req_client, server.url(), None);
 
         let app = tauri::test::mock_app();
-        let result = core_pull_model(&client, "llama3", &app.handle()).await;
+        let result = core_pull_model(&client, "llama3", app.handle()).await;
         mock.assert_async().await;
 
         assert!(result.is_err());
@@ -473,4 +503,3 @@ not json at all
         assert_eq!(extract_context_length_from_info(&model_info), None);
     }
 }
-

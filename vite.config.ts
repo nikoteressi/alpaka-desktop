@@ -13,8 +13,16 @@ export default defineConfig({
       '**/dist/**',
       '**/cypress/**',
       '**/e2e/**',
+      '**/e2e-desktop/**',
       '**/.{idea,git,cache,output,temp}/**',
       '**/.tabs/**',
+      '**/.worktrees/**',
+      '**/.claude/worktrees/**',
     ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      reportsDirectory: 'coverage',
+    },
   }
 })

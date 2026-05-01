@@ -4,7 +4,14 @@
 
 <template>
   <div
-    style="display: inline-flex; align-items: center; gap: 5px; background: #222; border-radius: 12px; padding: 10px 14px;"
+    style="
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #222;
+      border-radius: 12px;
+      padding: 10px 14px;
+    "
   >
     <span
       class="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce"

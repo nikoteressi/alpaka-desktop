@@ -1,23 +1,64 @@
-import { defineStore } from 'pinia';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import type { Model, PullProgressPayload, LibraryModel, ModelCapabilities, PullHistoryEntry, LibraryTag, LaunchApp } from '../types/models';
+import { defineStore } from "pinia";
+
+// Module-level helper — not part of store state. Used by ModelsPage and ModelSelector.
+export function modelMatchesTag(
+  modelName: string,
+  tag: string,
+  userDataMap: Record<string, { tags: string[] }>,
+  caps:
+    | {
+        vision?: boolean;
+        tools?: boolean;
+        thinking?: boolean;
+        embedding?: boolean;
+        cloud?: boolean;
+        audio?: boolean;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (userDataMap[modelName]?.tags.includes(tag)) return true;
+  if (!caps) return false;
+  if (tag === "vision") return !!caps.vision;
+  if (tag === "tools") return !!caps.tools;
+  if (tag === "thinking") return !!caps.thinking;
+  if (tag === "embed") return !!caps.embedding;
+  if (tag === "cloud") return !!caps.cloud;
+  if (tag === "audio") return !!caps.audio;
+  return false;
+}
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { extractErrorMessage } from "../lib/tauri";
+import type {
+  Model,
+  PullProgressPayload,
+  LibraryModel,
+  ModelCapabilities,
+  LibraryTag,
+  LaunchApp,
+  ModelUserData,
+  CreateState,
+  CreateProgressPayload,
+  CreateDonePayload,
+  CreateErrorPayload,
+} from "../types/models";
 
 export type { ModelCapabilities };
 
-
-export const useModelStore = defineStore('models', {
+export const useModelStore = defineStore("models", {
   state: () => ({
     models: [] as Model[],
     pulling: {} as Record<string, PullProgressPayload>,
+    creating: {} as Record<string, CreateState>,
     isLoading: false,
     error: null as string | null,
     listenersInitialized: false,
     capabilities: {} as Record<string, ModelCapabilities>,
+    modelUserData: {} as Record<string, ModelUserData>,
     // Library search state
     libraryResults: [] as LibraryModel[],
-    pullHistory: [] as PullHistoryEntry[],
-    searchQuery: '',
+    searchQuery: "",
     isSearching: false,
     _searchTimer: null as ReturnType<typeof setTimeout> | null,
     // Details view state
@@ -27,65 +68,169 @@ export const useModelStore = defineStore('models', {
   }),
   getters: {
     /** Names of all locally installed models */
-    installedModelNames: (state) => state.models.map(m => m.name),
+    installedModelNames: (state) => state.models.map((m) => m.name),
     /** Check if a model name is installed locally */
     isInstalled: (state) => (name: string) =>
-      state.models.some(m => m.name === name || m.name.startsWith(name + ':')),
+      state.models.some(
+        (m) => m.name === name || m.name.startsWith(name + ":"),
+      ),
+    /** Models sorted with favorites first, preserving relative order otherwise */
+    sortedModels: (state) => {
+      return [...state.models].sort((a, b) => {
+        const aFav = state.modelUserData[a.name]?.isFavorite ?? false;
+        const bFav = state.modelUserData[b.name]?.isFavorite ?? false;
+        if (aFav !== bFav) return aFav ? -1 : 1;
+        return 0;
+      });
+    },
+    isFavorite: (state) => (name: string) =>
+      state.modelUserData[name]?.isFavorite ?? false,
+    getUserTags: (state) => (name: string) =>
+      state.modelUserData[name]?.tags ?? [],
+    allUserTags: (state) => {
+      const tagSet = new Set<string>();
+      Object.values(state.modelUserData).forEach((d) =>
+        d.tags.forEach((t) => tagSet.add(t)),
+      );
+      return [...tagSet].sort((a, b) => a.localeCompare(b));
+    },
+    allFilterableTags: (state) => {
+      const tagSet = new Set<string>();
+      // User-defined tags
+      Object.values(state.modelUserData).forEach((d) =>
+        d.tags.forEach((t) => tagSet.add(t)),
+      );
+      // Ollama capability tags present on at least one installed model
+      Object.values(state.capabilities).forEach((caps) => {
+        if (caps.vision) tagSet.add("vision");
+        if (caps.tools) tagSet.add("tools");
+        if (caps.thinking) tagSet.add("thinking");
+        if (caps.embedding) tagSet.add("embed");
+        if (caps.cloud) tagSet.add("cloud");
+        if (caps.audio) tagSet.add("audio");
+      });
+      return [...tagSet].sort((a, b) => a.localeCompare(b));
+    },
   },
   actions: {
     async fetchModels() {
       this.isLoading = true;
       this.error = null;
       try {
-        const models = await invoke<Model[]>('list_models');
+        const models = await invoke<Model[]>("list_models");
         this.models = models;
 
+        this.fetchModelUserData();
+
         // Fetch capabilities for all models in parallel
-        Promise.all(models.map(m => this.fetchCapabilities(m.name)))
-          .catch(err => console.error('Failed to fetch capabilities for some models:', err));
+        Promise.all(models.map((m) => this.fetchCapabilities(m.name))).catch(
+          (err) =>
+            console.error("Failed to fetch capabilities for some models:", err),
+        );
       } catch (e: unknown) {
-        this.error = e instanceof Error ? e.message : String(e);
+        // Tauri AppError serializes as a tagged object e.g. {"Http":"connection refused"}.
+        // Check instanceof Error first since Error properties are non-enumerable.
+        if (e instanceof Error) {
+          this.error = e.message;
+        } else if (e && typeof e === "object" && !Array.isArray(e)) {
+          const entries = Object.entries(e as Record<string, unknown>);
+          this.error =
+            entries.length > 0
+              ? entries.map(([k, v]) => `${k}: ${v}`).join("; ")
+              : JSON.stringify(e);
+        } else {
+          this.error = String(e);
+        }
+        console.error("[models] fetchModels failed:", e);
       } finally {
         this.isLoading = false;
       }
     },
 
-    async fetchCapabilities(modelName: string) {
-      if (this.capabilities[modelName]) return this.capabilities[modelName]
+    async fetchModelUserData(): Promise<void> {
       try {
-        const caps = await invoke<ModelCapabilities>('get_model_capabilities', { name: modelName })
-        this.capabilities[modelName] = caps
-        return caps
-      } catch {
-        return null
+        const rows = await invoke<
+          Array<{ name: string; is_favorite: boolean; tags: string[] }>
+        >("list_model_user_data");
+        const map: Record<string, ModelUserData> = {};
+        for (const row of rows) {
+          map[row.name] = {
+            name: row.name,
+            isFavorite: row.is_favorite,
+            tags: row.tags,
+          };
+        }
+        this.modelUserData = map;
+      } catch (e) {
+        console.error("[models] fetchModelUserData failed:", e);
       }
     },
 
+    async toggleFavorite(name: string): Promise<void> {
+      try {
+        const newState = await invoke<boolean>("toggle_model_favorite", {
+          name,
+        });
+        if (this.modelUserData[name]) {
+          this.modelUserData[name].isFavorite = newState;
+        } else {
+          this.modelUserData[name] = { name, isFavorite: newState, tags: [] };
+        }
+      } catch (e) {
+        console.error("[models] toggleFavorite failed:", e);
+      }
+    },
+
+    async setModelTags(name: string, tags: string[]): Promise<void> {
+      try {
+        await invoke<void>("set_model_tags", { name, tags });
+        if (this.modelUserData[name]) {
+          this.modelUserData[name].tags = tags;
+        } else {
+          this.modelUserData[name] = { name, isFavorite: false, tags };
+        }
+      } catch (e) {
+        console.error("[models] setModelTags failed:", e);
+      }
+    },
+
+    async fetchCapabilities(modelName: string) {
+      if (this.capabilities[modelName]) return this.capabilities[modelName];
+      try {
+        const caps = await invoke<ModelCapabilities>("get_model_capabilities", {
+          name: modelName,
+        });
+        this.capabilities[modelName] = caps;
+        return caps;
+      } catch {
+        return null;
+      }
+    },
 
     getCapabilities(modelName: string): ModelCapabilities | null {
-      return this.capabilities[modelName] ?? null
+      return this.capabilities[modelName] ?? null;
     },
     async deleteModel(name: string): Promise<void> {
       try {
-        await invoke<void>('delete_model', { name });
-        this.models = this.models.filter(m => m.name !== name);
+        await invoke<void>("delete_model", { name });
+        this.models = this.models.filter((m) => m.name !== name);
         // Also clean up capabilities cache for the deleted model
         if (this.capabilities) {
           delete this.capabilities[name];
         }
       } catch (e: unknown) {
-        const errorMsg = e instanceof Error ? e.message : String(e);
+        const errorMsg = extractErrorMessage(e);
         this.error = errorMsg;
         throw new Error(`Failed to delete model "${name}": ${errorMsg}`);
       }
     },
     async pullModel(name: string) {
       if (this.pulling[name]) return; // Already pulling
-      this.pulling[name] = { model: name, status: 'starting...', percent: 0 };
+      this.pulling[name] = { model: name, status: "starting...", percent: 0 };
       try {
-        await invoke('pull_model', { name });
+        await invoke("pull_model", { name });
       } catch (e: unknown) {
-        this.error = e instanceof Error ? e.message : String(e);
+        this.error = extractErrorMessage(e);
         delete this.pulling[name];
       }
     },
@@ -94,8 +239,8 @@ export const useModelStore = defineStore('models', {
      */
     async fetchLibraryTags(slug: string): Promise<string[]> {
       try {
-        const tags = await invoke<LibraryTag[]>('get_library_tags', { slug });
-        return tags.map(t => t.name);
+        const tags = await invoke<LibraryTag[]>("get_library_tags", { slug });
+        return tags.map((t) => t.name);
       } catch (e) {
         console.error(`Failed to fetch tags for ${slug}`, e);
         return [];
@@ -110,22 +255,28 @@ export const useModelStore = defineStore('models', {
     async fetchLibraryModelDetails(slug: string) {
       this.isLoadingDetails = true;
       try {
-        const details = await invoke<{ readme: string, launch_apps: LaunchApp[] }>('get_library_model_readme', { slug });
+        const details = await invoke<{
+          readme: string;
+          launch_apps: LaunchApp[];
+        }>("get_library_model_readme", { slug });
         if (this.selectedModel && this.selectedModel.slug === slug) {
           this.selectedModel.readme = details.readme;
           this.selectedModel.launch_apps = details.launch_apps;
         }
       } catch (e) {
-        console.error('Failed to fetch model details:', e);
+        console.error("Failed to fetch model details:", e);
       } finally {
         this.isLoadingDetails = false;
       }
     },
     async fetchLibraryTagsDetailed(slug: string) {
       try {
-        this.selectedModelTags = await invoke<LibraryTag[]>('get_library_tags', { slug });
+        this.selectedModelTags = await invoke<LibraryTag[]>(
+          "get_library_tags",
+          { slug },
+        );
       } catch (e) {
-        console.error('Failed to fetch detailed tags:', e);
+        console.error("Failed to fetch detailed tags:", e);
         this.selectedModelTags = [];
       }
     },
@@ -142,9 +293,12 @@ export const useModelStore = defineStore('models', {
       this.isSearching = true;
       this._searchTimer = setTimeout(async () => {
         try {
-          this.libraryResults = await invoke<LibraryModel[]>('search_ollama_library', { query: q });
+          this.libraryResults = await invoke<LibraryModel[]>(
+            "search_ollama_library",
+            { query: q },
+          );
         } catch (err) {
-          console.error('Library search failed:', err);
+          console.error("Library search failed:", err);
           this.libraryResults = [];
         } finally {
           this.isSearching = false;
@@ -152,7 +306,7 @@ export const useModelStore = defineStore('models', {
       }, 300);
     },
     clearLibrarySearch() {
-      this.searchQuery = '';
+      this.searchQuery = "";
       this.libraryResults = [];
       this.isSearching = false;
       if (this._searchTimer) clearTimeout(this._searchTimer);
@@ -161,36 +315,57 @@ export const useModelStore = defineStore('models', {
       if (this.listenersInitialized) return;
       this.listenersInitialized = true;
 
-      this.fetchPullHistory();
-
-      await listen<PullProgressPayload>('model:pull-progress', (event) => {
+      await listen<PullProgressPayload>("model:pull-progress", (event) => {
         const payload = event.payload;
         this.pulling[payload.model] = payload;
-        // Optionally refresh history during pull if status changes significantly
       });
-      await listen<{ model: string }>('model:pull-done', (event) => {
+      await listen<{ model: string }>("model:pull-done", (event) => {
         const payload = event.payload;
         delete this.pulling[payload.model];
-        this.fetchModels(); // Refresh list automatically
-        this.fetchPullHistory(); // Also refresh history
-        this.fetchCapabilities(payload.model); // Re-fetch capabilities now that it's ready
+        this.fetchModels();
+        this.fetchCapabilities(payload.model);
+      });
+      await listen<CreateProgressPayload>("model:create-progress", (event) => {
+        const { model, status } = event.payload;
+        if (this.creating[model]) {
+          this.creating[model].status = status;
+          this.creating[model].logLines.push(status);
+        }
+      });
+      await listen<CreateDonePayload>("model:create-done", (event) => {
+        const { model } = event.payload;
+        if (this.creating[model]) {
+          this.creating[model].phase = "done";
+        }
+        this.fetchModels();
+      });
+      await listen<CreateErrorPayload>("model:create-error", (event) => {
+        const { model, error, cancelled } = event.payload;
+        if (this.creating[model]) {
+          if (cancelled) {
+            // No reason to keep cancelled state in memory — delete immediately.
+            // CreateModelPage captures the phase locally before this fires.
+            delete this.creating[model];
+          } else {
+            this.creating[model].phase = "error";
+            this.creating[model].error = error;
+          }
+        }
       });
     },
 
-    async fetchPullHistory() {
-      try {
-        this.pullHistory = await invoke<PullHistoryEntry[]>('get_pull_history');
-      } catch (err) {
-        console.error('Failed to fetch pull history:', err);
-      }
+    clearCreateState(name: string) {
+      delete this.creating[name];
     },
 
     formatBytes(bytes: number) {
-      if (bytes === 0) return '0 B';
+      if (bytes === 0) return "0 B";
       const k = 1024;
-      const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+      const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-  }
+      return (
+        Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+      );
+    },
+  },
 });

@@ -64,8 +64,8 @@ fn detect_amd_gpu() -> Option<(Option<String>, u64)> {
         let card_path = entry.path();
 
         // Read VRAM total (bytes)
-        let vram_bytes: Option<u64> = read_drm_card_file(&card_path, "mem_info_vram_total")
-            .and_then(|s| s.parse().ok());
+        let vram_bytes: Option<u64> =
+            read_drm_card_file(&card_path, "mem_info_vram_total").and_then(|s| s.parse().ok());
 
         if let Some(bytes) = vram_bytes {
             let vram_mb = bytes / (1024 * 1024);
@@ -111,7 +111,11 @@ async fn detect_nvidia_gpu() -> Option<(Option<String>, u64)> {
     let vram_part = first_line[comma_pos + 1..].trim();
 
     let vram_mb: u64 = vram_part.parse().ok()?;
-    let gpu_name = if name_part.is_empty() { None } else { Some(name_part) };
+    let gpu_name = if name_part.is_empty() {
+        None
+    } else {
+        Some(name_part)
+    };
 
     Some((gpu_name, vram_mb))
 }
@@ -124,14 +128,26 @@ pub async fn detect_hardware() -> Result<HardwareInfo, AppError> {
 
     // Try AMD first (pure filesystem, no subprocess)
     if let Some((gpu_name, vram_mb)) = detect_amd_gpu() {
-        return Ok(HardwareInfo { gpu_name, vram_mb: Some(vram_mb), ram_mb });
+        return Ok(HardwareInfo {
+            gpu_name,
+            vram_mb: Some(vram_mb),
+            ram_mb,
+        });
     }
 
     // Try NVIDIA (subprocess with timeout)
     if let Some((gpu_name, vram_mb)) = detect_nvidia_gpu().await {
-        return Ok(HardwareInfo { gpu_name, vram_mb: Some(vram_mb), ram_mb });
+        return Ok(HardwareInfo {
+            gpu_name,
+            vram_mb: Some(vram_mb),
+            ram_mb,
+        });
     }
 
     // No GPU detected — return partial info (no error)
-    Ok(HardwareInfo { gpu_name: None, vram_mb: None, ram_mb })
+    Ok(HardwareInfo {
+        gpu_name: None,
+        vram_mb: None,
+        ram_mb,
+    })
 }

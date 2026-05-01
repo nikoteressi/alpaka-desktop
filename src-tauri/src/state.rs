@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot};
 
 use crate::db::DbConn;
 
@@ -26,6 +27,10 @@ pub struct AppState {
     /// Set to `None` when no generation is running.
     pub cancel_tx: Mutex<Option<broadcast::Sender<()>>>,
 
+    /// Per-model cancellation senders for in-progress create_model commands.
+    /// Key is the model name; dropping the sender also cancels the stream.
+    pub model_create_cancel_tx: Mutex<HashMap<String, oneshot::Sender<()>>>,
+
     /// Send on this channel to shut down the host health loop task.
     /// Stored here so the loop can be terminated cleanly on app exit.
     pub health_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
@@ -35,9 +40,9 @@ pub struct AppState {
     pub health_loop_handle: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 
     /// Tracks if the user is currently on a chat-related page.
-    pub is_chat_view: Mutex<bool>,
+    pub is_chat_view: RwLock<bool>,
     /// Tracks the ID of the conversation currently visible to the user.
-    pub active_conversation_id: Mutex<Option<String>>,
+    pub active_conversation_id: RwLock<Option<String>>,
 }
 
 impl AppState {
@@ -52,10 +57,11 @@ impl AppState {
             db_path,
             http_client,
             cancel_tx: Mutex::new(None),
+            model_create_cancel_tx: Mutex::new(HashMap::new()),
             health_loop_shutdown: Mutex::new(None),
             health_loop_handle: std::sync::Mutex::new(None),
-            is_chat_view: Mutex::new(true),
-            active_conversation_id: Mutex::new(None),
+            is_chat_view: RwLock::new(true),
+            active_conversation_id: RwLock::new(None),
         })
     }
 }

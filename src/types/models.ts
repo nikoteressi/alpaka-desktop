@@ -1,7 +1,7 @@
 // ---- Branded Types for Nominal Typing ----
-export type Brand<T, K> = T & { __brand: K }
-export type ModelName = Brand<string, 'ModelName'>
-export type ModelSlug = Brand<string, 'ModelSlug'>
+export type Brand<T, K> = T & { __brand: K };
+export type ModelName = Brand<string, "ModelName">;
+export type ModelSlug = Brand<string, "ModelSlug">;
 
 export interface ModelDetails {
   parent_model: string;
@@ -82,4 +82,34 @@ export interface PullHistoryEntry {
   error_message?: string;
   started_at: string;
   finished_at?: string;
+}
+
+export interface ModelUserData {
+  name: string;
+  isFavorite: boolean;
+  tags: string[];
+}
+
+export interface CreateProgressPayload {
+  model: string;
+  status: string;
+}
+
+export interface CreateDonePayload {
+  model: string;
+}
+
+export interface CreateErrorPayload {
+  model: string;
+  error: string;
+  cancelled: boolean;
+}
+
+export interface CreateState {
+  name: string;
+  modelfile: string;
+  status: string;
+  phase: "running" | "done" | "error" | "cancelled";
+  error?: string;
+  logLines: string[];
 }

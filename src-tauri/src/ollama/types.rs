@@ -86,6 +86,14 @@ pub struct ChatOptions {
     pub repeat_last_n: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirostat: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirostat_tau: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirostat_eta: Option<f32>,
 }
 
 impl ChatOptions {
@@ -99,6 +107,10 @@ impl ChatOptions {
             repeat_penalty: self.repeat_penalty.or(fallback.repeat_penalty),
             repeat_last_n: self.repeat_last_n.or(fallback.repeat_last_n),
             seed: self.seed.or(fallback.seed),
+            stop: self.stop.clone().or_else(|| fallback.stop.clone()),
+            mirostat: self.mirostat.or(fallback.mirostat),
+            mirostat_tau: self.mirostat_tau.or(fallback.mirostat_tau),
+            mirostat_eta: self.mirostat_eta.or(fallback.mirostat_eta),
         }
     }
 }
@@ -121,7 +133,6 @@ pub struct StreamResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_message_serialization_with_images() {
@@ -142,10 +153,7 @@ mod tests {
         };
 
         let val = serde_json::to_value(&req).unwrap();
-        assert_eq!(
-            val["messages"][0]["images"][0],
-            "base64encodedstr"
-        );
+        assert_eq!(val["messages"][0]["images"][0], "base64encodedstr");
     }
 
     #[test]
@@ -168,7 +176,10 @@ mod tests {
 
         let val = serde_json::to_value(&req).unwrap();
         // Should omit "images" entirely rather than outputting `"images": null`
-        assert!(val["messages"][0].get("images").is_none(), "images field should be completely omitted when None");
+        assert!(
+            val["messages"][0].get("images").is_none(),
+            "images field should be completely omitted when None"
+        );
     }
 
     #[test]
@@ -182,7 +193,10 @@ mod tests {
             name: None,
         };
         let val = serde_json::to_value(&msg).unwrap();
-        assert!(val.get("thinking").is_none(), "thinking field should be omitted when None");
+        assert!(
+            val.get("thinking").is_none(),
+            "thinking field should be omitted when None"
+        );
     }
 
     #[test]
@@ -217,6 +231,47 @@ mod tests {
             Some("I should reason carefully here")
         );
         assert_eq!(resp.message.content, "");
+    }
+
+    #[test]
+    fn test_mirostat_fields_serialized_when_set() {
+        let opts = ChatOptions {
+            mirostat: Some(2),
+            mirostat_tau: Some(5.0),
+            mirostat_eta: Some(0.1),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&opts).unwrap();
+        assert_eq!(val["mirostat"], 2);
+        assert!((val["mirostat_tau"].as_f64().unwrap() - 5.0).abs() < 1e-5);
+        assert!((val["mirostat_eta"].as_f64().unwrap() - 0.1).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_mirostat_fields_omitted_when_none() {
+        let opts = ChatOptions::default();
+        let val = serde_json::to_value(&opts).unwrap();
+        assert!(val.get("mirostat").is_none());
+        assert!(val.get("mirostat_tau").is_none());
+        assert!(val.get("mirostat_eta").is_none());
+    }
+
+    #[test]
+    fn test_merge_with_fallback_mirostat() {
+        let primary = ChatOptions {
+            mirostat: Some(1),
+            ..Default::default()
+        };
+        let fallback = ChatOptions {
+            mirostat: Some(2),
+            mirostat_tau: Some(5.0),
+            mirostat_eta: Some(0.1),
+            ..Default::default()
+        };
+        let merged = primary.merge_with_fallback(&fallback);
+        assert_eq!(merged.mirostat, Some(1)); // primary wins
+        assert_eq!(merged.mirostat_tau, Some(5.0)); // fallback fills in
+        assert_eq!(merged.mirostat_eta, Some(0.1)); // fallback fills in
     }
 
     #[test]

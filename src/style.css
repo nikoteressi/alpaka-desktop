@@ -22,7 +22,7 @@
   --bg-user-msg: #2d2d2d;
   --bg-code: #111111;
   --bg-code-hdr: rgba(255, 255, 255, 0.025);
-  --bg-glass: rgba(26, 26, 26, 0.70);
+  --bg-glass: rgba(26, 26, 26, 0.7);
 
   /* Borders */
   --border: #242424;
@@ -41,18 +41,18 @@
   --accent: #4a80d0;
   --accent-hover: #5a90e0;
   --accent-muted: rgba(74, 128, 208, 0.15);
-  --accent-border: rgba(74, 128, 208, 0.30);
+  --accent-border: rgba(74, 128, 208, 0.3);
 
   /* Semantic */
   --danger: #e06060;
-  --danger-muted: rgba(224, 96, 96, 0.10);
+  --danger-muted: rgba(224, 96, 96, 0.1);
   --success: #5bc97a;
   --warning: #f59e0b;
 
   /* Model tag colours */
   --tag-vision-bg: rgba(88, 101, 242, 0.12);
   --tag-vision-text: #8c9eff;
-  --tag-tools-bg: rgba(245, 158, 11, 0.10);
+  --tag-tools-bg: rgba(245, 158, 11, 0.1);
   --tag-tools-text: #fbbf24;
   --tag-thinking-bg: rgba(168, 85, 247, 0.12);
   --tag-thinking-text: #c084fc;
@@ -66,9 +66,11 @@
   --tag-generic-text: #94a3b8;
   --tag-quant-bg: rgba(255, 255, 255, 0.04);
   --tag-quant-text: #64748b;
+  --tag-user-bg: rgba(251, 146, 60, 0.12);
+  --tag-user-text: #fb923c;
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.40);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.65);
 
@@ -101,7 +103,7 @@
   --bg-user-msg: #e4e4e4;
   --bg-code: #f6f8fa;
   --bg-code-hdr: rgba(0, 0, 0, 0.03);
-  --bg-glass: rgba(240, 240, 240, 0.80);
+  --bg-glass: rgba(240, 240, 240, 0.8);
 
   --border: #e0e0e0;
   --border-subtle: #ebebeb;
@@ -116,7 +118,7 @@
 
   --accent: #4a80d0;
   --accent-hover: #3a70c0;
-  --accent-muted: rgba(74, 128, 208, 0.10);
+  --accent-muted: rgba(74, 128, 208, 0.1);
   --accent-border: rgba(74, 128, 208, 0.25);
 
   --danger: #dc2626;
@@ -128,13 +130,15 @@
   --tag-generic-text: #64748b;
   --tag-quant-bg: rgba(0, 0, 0, 0.04);
   --tag-quant-text: #94a3b8;
+  --tag-user-bg: rgba(234, 88, 12, 0.1);
+  --tag-user-text: #ea580c;
 
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.07);
-  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.10);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.14);
 
-  --scrollbar: rgba(0, 0, 0, 0.10);
-  --scrollbar-hover: rgba(0, 0, 0, 0.20);
+  --scrollbar: rgba(0, 0, 0, 0.1);
+  --scrollbar-hover: rgba(0, 0, 0, 0.2);
 
   color-scheme: light;
 
@@ -151,9 +155,9 @@
 
 /* ── TYPOGRAPHY ─────────────────────────────────────────────── */
 :root {
-  --sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --heading: 'Outfit', system-ui, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --sans: "Inter", system-ui, -apple-system, sans-serif;
+  --heading: "Outfit", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
 
   font: 16px/1.6 var(--sans);
   letter-spacing: -0.011em;
@@ -169,7 +173,11 @@
 *,
 *::before,
 *::after {
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 svg *,
@@ -278,6 +286,11 @@ body {
   font-weight: 400;
 }
 
+.tag-user {
+  background: var(--tag-user-bg);
+  color: var(--tag-user-text);
+}
+
 /* ── CLOUD / ACTION BUTTON ──────────────────────────────────── */
 .model-cloud-btn {
   display: inline-flex;
@@ -364,7 +377,6 @@ body {
 }
 
 @keyframes pulse-opacity {
-
   0%,
   100% {
     opacity: 0.4;
@@ -384,4 +396,13 @@ body {
 
 .themed-logo {
   transition: filter 0.2s ease;
+}
+
+/* ── SCROLLBAR UTILITIES ────────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

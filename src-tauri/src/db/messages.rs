@@ -25,6 +25,7 @@ pub struct Message {
     pub load_duration_ms: Option<i64>,
     pub prompt_eval_duration_ms: Option<i64>,
     pub eval_duration_ms: Option<i64>,
+    pub seed: Option<i64>,
     pub created_at: String,
 }
 
@@ -75,13 +76,12 @@ pub struct NewMessage {
     pub load_duration_ms: Option<i64>,
     pub prompt_eval_duration_ms: Option<i64>,
     pub eval_duration_ms: Option<i64>,
+    pub seed: Option<i64>,
 }
 
 fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     let role_str: String = row.get(2)?;
-    let role = role_str
-        .parse::<MessageRole>()
-        .unwrap_or(MessageRole::User);
+    let role = role_str.parse::<MessageRole>().unwrap_or(MessageRole::User);
 
     Ok(Message {
         id: row.get(0)?,
@@ -98,7 +98,8 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         load_duration_ms: row.get(11)?,
         prompt_eval_duration_ms: row.get(12)?,
         eval_duration_ms: row.get(13)?,
-        created_at: row.get(14)?,
+        seed: row.get(14)?,
+        created_at: row.get(15)?,
     })
 }
 
@@ -111,9 +112,9 @@ pub fn list_for_conversation(
 ) -> Result<Vec<Message>, AppError> {
     let mut stmt = conn.prepare(
         "SELECT id, conversation_id, role, content, images_json, files_json,
-                tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec, 
-                total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms, 
-                created_at
+                tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
+                total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
+                seed, created_at
          FROM messages
          WHERE conversation_id = ?1
          ORDER BY created_at ASC",
@@ -134,9 +135,10 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
     conn.execute(
         "INSERT INTO messages
              (id, conversation_id, role, content, images_json, files_json,
-              tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec, 
-              total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+              tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
+              total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
+              seed, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
         params![
             id,
             new.conversation_id,
@@ -152,15 +154,16 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
             new.load_duration_ms,
             new.prompt_eval_duration_ms,
             new.eval_duration_ms,
+            new.seed,
             now,
         ],
     )?;
 
     conn.query_row(
         "SELECT id, conversation_id, role, content, images_json, files_json,
-                tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec, 
-                total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms, 
-                created_at
+                tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
+                total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
+                seed, created_at
          FROM messages WHERE id = ?1",
         params![id],
         row_to_message,
@@ -236,6 +239,7 @@ mod tests {
                 load_duration_ms: None,
                 prompt_eval_duration_ms: None,
                 eval_duration_ms: None,
+                seed: None,
             },
         )
         .unwrap();
@@ -256,6 +260,7 @@ mod tests {
                 load_duration_ms: Some(10),
                 prompt_eval_duration_ms: Some(40),
                 eval_duration_ms: Some(250),
+                seed: None,
             },
         )
         .unwrap();
@@ -287,6 +292,7 @@ mod tests {
                 load_duration_ms: None,
                 prompt_eval_duration_ms: None,
                 eval_duration_ms: None,
+                seed: None,
             },
         )
         .unwrap();

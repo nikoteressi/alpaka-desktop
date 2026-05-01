@@ -13,8 +13,7 @@ dist-ssr
 *.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea
 .DS_Store
 *.suo
@@ -23,8 +22,20 @@ dist-ssr
 *.sln
 *.sw?
 
+# Claude Code / AI tool runtime dirs
 .claude
 CLAUDE.md
-test-results
-ollama-desktop-linux-mockup
+.superpowers/
+.playwright-mcp/
 .playwright-mcp.worktrees/
+.worktrees/
+
+# Test and coverage output
+test-results
+playwright-report/
+coverage/
+coverage-rust/
+
+# Legacy / removed dirs (kept for gitignore safety)
+ollama-desktop-linux-mockup
+alpaka-desktop-mockup/

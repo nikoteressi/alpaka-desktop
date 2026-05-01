@@ -1,6 +1,6 @@
-use tauri::{command, State};
-use crate::state::AppState;
 use crate::error::AppError;
+use crate::state::AppState;
+use tauri::{command, State};
 
 #[command]
 pub async fn report_active_view(
@@ -10,11 +10,11 @@ pub async fn report_active_view(
 ) -> Result<(), AppError> {
     *state
         .is_chat_view
-        .lock()
+        .write()
         .map_err(|_| AppError::Internal("is_chat_view lock poisoned".into()))? = is_chat_view;
     *state
         .active_conversation_id
-        .lock()
+        .write()
         .map_err(|_| AppError::Internal("active_conversation_id lock poisoned".into()))? =
         conversation_id;
     Ok(())
@@ -22,7 +22,14 @@ pub async fn report_active_view(
 
 #[command]
 pub async fn open_browser(app: tauri::AppHandle, url: String) -> Result<(), AppError> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err(AppError::Internal(
+            "only http/https URLs are permitted".into(),
+        ));
+    }
     use tauri_plugin_opener::OpenerExt;
-    app.opener().open_url(url, None::<String>).map_err(|e| AppError::Internal(e.to_string()))?;
+    app.opener()
+        .open_url(url, None::<String>)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(())
 }

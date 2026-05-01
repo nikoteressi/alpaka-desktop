@@ -5,17 +5,18 @@ export interface UserProfile {
   avatar_url?: string;
 }
 
-export interface ApiKey {
-  id: string;
-  name: string;
-  key: string; // masked in UI, plaintext from backend on create
-  created_at: string;
-}
+export type ApiKeyStatus =
+  | "not_set"
+  | "set"
+  | "valid"
+  | "invalid"
+  | "checking"
+  | "unknown";
 
 export interface AuthState {
   user: UserProfile | null;
-  authenticatedHosts: Record<string, boolean>; // host_id -> is_authenticated
-  apiKeys: ApiKey[];
+  authenticatedHosts: Record<string, boolean>;
+  apiKeyStatus: ApiKeyStatus;
   isCheckingStatus: boolean;
 }
 

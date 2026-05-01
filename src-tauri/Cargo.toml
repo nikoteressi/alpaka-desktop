@@ -1,14 +1,21 @@
 [package]
 name = "alpaka-desktop"
-version = "1.1.1"
+version = "1.2.0"
 description = "Native desktop client for Ollama"
 authors = ["nikoteressi@gmail.com"]
 edition = "2021"
-rust-version = "1.77.2"   # CVE-2024-24576 minimum
+license = "MIT"
+rust-version = "1.88.0"   # darling/image/serde_with/time require 1.88; CVE-2024-24576 minimum was 1.77.2
 
 [lib]
 name = "alpaka_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+# test-mode: CI/e2e-only feature flag. Replaces Secret Service keyring calls with
+# deterministic stubs so tests run without a desktop session. NEVER ship a
+# production binary built with this feature enabled.
+[features]
+test-mode = []
 
 [build-dependencies]
 tauri-build = { version = "2.5", features = [] }

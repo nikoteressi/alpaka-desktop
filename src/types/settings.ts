@@ -1,4 +1,4 @@
-export type ColorTheme = 'light' | 'dark' | 'system';
+export type ColorTheme = "light" | "dark" | "system";
 
 export interface ChatOptions {
   temperature?: number;
@@ -9,6 +9,32 @@ export interface ChatOptions {
   repeat_last_n?: number;
   seed?: number;
   stop?: string[];
+  mirostat?: 0 | 1 | 2;
+  mirostat_tau?: number;
+  mirostat_eta?: number;
+}
+
+export type PresetOptions = Required<
+  Pick<
+    ChatOptions,
+    | "temperature"
+    | "top_p"
+    | "top_k"
+    | "num_ctx"
+    | "repeat_penalty"
+    | "repeat_last_n"
+  >
+> & {
+  mirostat?: 0 | 1 | 2;
+  mirostat_tau?: number;
+  mirostat_eta?: number;
+};
+
+export interface Preset {
+  id: string;
+  name: string;
+  isBuiltin: boolean;
+  options: PresetOptions;
 }
 
 export interface SettingsState {
@@ -16,7 +42,7 @@ export interface SettingsState {
   sidebarCollapsed: boolean;
   fontSize: number;
   compactMode: boolean;
-  chatOptions: Required<Omit<ChatOptions, 'seed' | 'stop'>> & ChatOptions;
+  chatOptions: Required<Omit<ChatOptions, "seed" | "stop">> & ChatOptions;
   cloud: boolean;
   autoUpdate: boolean;
   exposeNetwork: boolean;
@@ -29,6 +55,8 @@ export interface SettingsState {
   systemFormattingTemplate: string;
   systemSearchTemplate: string;
   systemFolderTemplate: string;
+  presets: Preset[];
+  defaultPresetId: string;
 }
 
 export interface AppSettings {

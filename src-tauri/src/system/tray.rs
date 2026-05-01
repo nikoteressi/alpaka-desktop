@@ -1,9 +1,11 @@
+#[cfg(not(feature = "test-mode"))]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     AppHandle, Manager,
 };
 
+#[cfg(not(feature = "test-mode"))]
 pub fn setup(app: &AppHandle) -> Result<tauri::tray::TrayIcon, Box<dyn std::error::Error>> {
     let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
     let hide_i = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
@@ -16,9 +18,13 @@ pub fn setup(app: &AppHandle) -> Result<tauri::tray::TrayIcon, Box<dyn std::erro
     let icon_dark: &[u8] = include_bytes!("../../icons/32x32.png");
 
     // Get theme from the first available window
-    let window_theme = app.webview_windows().values().next().and_then(|w| w.theme().ok());
-    
-    // On Linux, panels are often dark even if apps are light. 
+    let window_theme = app
+        .webview_windows()
+        .values()
+        .next()
+        .and_then(|w| w.theme().ok());
+
+    // On Linux, panels are often dark even if apps are light.
     // Default to Dark theme (White icon) for better visibility.
     let is_light = window_theme
         .map(|t| t == tauri::Theme::Light)
@@ -66,13 +72,21 @@ pub fn setup(app: &AppHandle) -> Result<tauri::tray::TrayIcon, Box<dyn std::erro
     Ok(tray)
 }
 
-pub fn update_icon(tray: &tauri::tray::TrayIcon, theme: tauri::Theme) -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(not(feature = "test-mode"))]
+pub fn update_icon(
+    tray: &tauri::tray::TrayIcon,
+    theme: tauri::Theme,
+) -> Result<(), Box<dyn std::error::Error>> {
     let icon_white: &[u8] = include_bytes!("../../icons/32x32_dark.png");
     let icon_dark: &[u8] = include_bytes!("../../icons/32x32.png");
-    
+
     // Theme::Light -> needs Dark icon
     // Theme::Dark -> needs White icon
-    let icon_bytes = if theme == tauri::Theme::Light { icon_dark } else { icon_white };
+    let icon_bytes = if theme == tauri::Theme::Light {
+        icon_dark
+    } else {
+        icon_white
+    };
     let icon = tauri::image::Image::from_bytes(icon_bytes)?;
     tray.set_icon(Some(icon))?;
     Ok(())

@@ -1,11 +1,11 @@
+pub mod auth;
+pub mod commands;
 pub mod db;
 pub mod error;
+pub mod ollama;
+pub mod services;
 pub mod state;
 mod system;
-pub mod auth;
-pub mod ollama;
-pub mod commands;
-pub mod services;
 
 use tauri::Manager;
 
@@ -24,11 +24,20 @@ pub fn run() {
             commands::models::delete_model,
             commands::models::pull_model,
             commands::models::get_model_capabilities,
+            commands::model_create::get_modelfile,
+            commands::model_create::create_model,
+            commands::model_create::cancel_model_create,
+            commands::model_path::validate_model_path,
+            commands::model_path::apply_model_path,
             commands::auth::login,
             commands::auth::logout,
             commands::auth::get_auth_status,
             commands::auth::check_ollama_signed_in,
             commands::auth::trigger_ollama_signin,
+            commands::auth::set_api_key,
+            commands::auth::get_api_key_status,
+            commands::auth::delete_api_key,
+            commands::auth::validate_api_key,
             commands::hosts::list_hosts,
             commands::hosts::add_host,
             commands::hosts::update_host,
@@ -40,6 +49,8 @@ pub fn run() {
             commands::chat::list_conversations,
             commands::chat::delete_conversation,
             commands::chat::update_conversation_title,
+            commands::chat::update_conversation_model,
+            commands::chat::update_conversation_settings,
             commands::chat::set_conversation_pinned,
             commands::chat::update_system_prompt,
             commands::chat::update_chat_draft,
@@ -57,6 +68,12 @@ pub fn run() {
             commands::settings::get_all_settings,
             commands::settings::delete_setting,
             commands::settings::delete_all_settings,
+            commands::model_settings::get_model_defaults,
+            commands::model_settings::set_model_defaults,
+            commands::model_settings::reset_model_defaults,
+            commands::model_user_data::toggle_model_favorite,
+            commands::model_user_data::set_model_tags,
+            commands::model_user_data::list_model_user_data,
             commands::folders::link_folder,
             commands::folders::unlink_folder,
             commands::folders::get_folder_contexts,
@@ -80,6 +97,7 @@ pub fn run() {
             )?;
 
             // ── Keyring health check ───────────────────────────────────────────
+            #[cfg(not(feature = "test-mode"))]
             if !crate::auth::keyring::check_keyring_available() {
                 log::warn!(
                     "System keyring is unavailable. Credentials cannot be stored securely. \
@@ -96,36 +114,47 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)?;
 
             let db_path = app_data_dir.join("alpaka-desktop.db");
-            let db_conn = db::open(&app_data_dir)
-                .expect("Failed to open SQLite database");
+            let db_conn = db::open(&app_data_dir).expect("Failed to open SQLite database");
 
             // ── Shared state ───────────────────────────────────────────────────
             let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-            let state = AppState::new(db_conn, db_path)
-                .map_err(|e| tauri::Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to build HTTP client: {e}"),
-                )))?;
-            *state.health_loop_shutdown.lock().expect("health_loop_shutdown lock") = Some(shutdown_tx);
+            let state = AppState::new(db_conn, db_path).map_err(|e| {
+                tauri::Error::Io(std::io::Error::other(format!(
+                    "Failed to build HTTP client: {e}"
+                )))
+            })?;
+            *state
+                .health_loop_shutdown
+                .lock()
+                .expect("health_loop_shutdown lock") = Some(shutdown_tx);
             app.manage(state);
 
             // ── System Tray ────────────────────────────────────────────────────
-            let tray = system::tray::setup(app.handle()).expect("Failed to setup system tray");
+            #[cfg(not(feature = "test-mode"))]
+            {
+                let tray = system::tray::setup(app.handle()).expect("Failed to setup system tray");
 
-            // Listen for theme changes on any window to update the tray icon
-            if let Some(window) = app.webview_windows().values().next() {
-                let tray_handle = tray.clone();
-                window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::ThemeChanged(theme) = event {
-                        // On Linux, the window theme is the best proxy we have for the tray
-                        let _ = system::tray::update_icon(&tray_handle, *theme);
-                    }
-                });
+                // Listen for theme changes on any window to update the tray icon
+                if let Some(window) = app.webview_windows().values().next() {
+                    let tray_handle = tray.clone();
+                    window.on_window_event(move |event| {
+                        if let tauri::WindowEvent::ThemeChanged(theme) = event {
+                            // On Linux, the window theme is the best proxy we have for the tray
+                            let _ = system::tray::update_icon(&tray_handle, *theme);
+                        }
+                    });
+                }
             }
 
             // ── Hosts Manager ──────────────────────────────────────────────────
-            let health_handle = commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
-            *app.state::<AppState>().health_loop_handle.lock().unwrap() = Some(health_handle);
+            #[cfg(feature = "test-mode")]
+            let _ = shutdown_rx;
+            #[cfg(not(feature = "test-mode"))]
+            {
+                let health_handle =
+                    commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
+                *app.state::<AppState>().health_loop_handle.lock().unwrap() = Some(health_handle);
+            }
 
             Ok(())
         })

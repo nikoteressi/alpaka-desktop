@@ -7,18 +7,60 @@ on:
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 jobs:
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-22.04
+    permissions:
+      checks: read
+    steps:
+      - name: Verify CI passed on tagged commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          REQUIRED=("Build Check" "Test and Coverage" "Security Audit")
+
+          echo "Checking CI status for commit ${SHA} in ${REPO}..."
+          RESULT=$(gh api "repos/${REPO}/commits/${SHA}/check-runs?filter=latest&per_page=100")
+
+          ALL_PASS=true
+          for CHECK in "${REQUIRED[@]}"; do
+            CONCLUSION=$(echo "$RESULT" | jq -r --arg name "$CHECK" \
+              '[.check_runs[] | select(.name == $name)] | last | .conclusion // "not found"')
+            if [[ "$CONCLUSION" == "success" ]]; then
+              echo "PASS: ${CHECK}"
+            else
+              echo "FAIL: ${CHECK} — conclusion=${CONCLUSION}"
+              ALL_PASS=false
+            fi
+          done
+
+          if [[ "$ALL_PASS" != "true" ]]; then
+            echo ""
+            echo "Release blocked: required CI checks did not all pass on ${SHA}."
+            echo "Fix the failing checks and re-tag from a green commit."
+            exit 1
+          fi
+
+          echo "All required checks passed. Proceeding with release."
+
   release-linux:
     name: Build and Release (Linux)
     runs-on: ubuntu-22.04
+    needs: ci-gate
 
     steps:
       # ------------------------------------------------------------------ #
       # 1. Checkout — full history so changelog generation works correctly  #
       # ------------------------------------------------------------------ #
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
 
@@ -31,7 +73,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: src-tauri -> target
 
@@ -43,7 +85,7 @@ jobs:
         # No 'version' key — reads from package.json "packageManager" field
 
       - name: Setup Node.js 20
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "20"
           cache: pnpm
@@ -79,7 +121,13 @@ jobs:
           CI: true
 
       # ------------------------------------------------------------------ #
-      # 7. Locate built artifacts and compute checksums                     #
+      # 7. Binary size budget check                                         #
+      # ------------------------------------------------------------------ #
+      - name: Run binary size budget check
+        run: bash scripts/profile.sh --no-launch
+
+      # ------------------------------------------------------------------ #
+      # 8. Locate built artifacts and compute checksums                     #
       # ------------------------------------------------------------------ #
       - name: Locate artifacts
         id: artifacts
@@ -103,8 +151,23 @@ jobs:
           cat "${CHECKSUM_FILE}"
           echo "checksum_file=${CHECKSUM_FILE}" >> "$GITHUB_OUTPUT"
 
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          artifact-name: alpaka-desktop-${{ github.ref_name }}.spdx.json
+          output-file: sbom.spdx.json
+          path: src-tauri/target/release/bundle
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-path: |
+            ${{ steps.artifacts.outputs.appimage }}
+            ${{ steps.artifacts.outputs.deb }}
+
       # ------------------------------------------------------------------ #
-      # 8. Create GitHub Release and upload assets                          #
+      # 9. Create GitHub Release and upload assets                          #
       # ------------------------------------------------------------------ #
       - name: Create GitHub Release
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631  # v2.2.2
@@ -117,6 +180,7 @@ jobs:
             ${{ steps.artifacts.outputs.appimage }}
             ${{ steps.artifacts.outputs.deb }}
             ${{ steps.checksums.outputs.checksum_file }}
+            sbom.spdx.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -129,8 +193,8 @@ jobs:
   # ======================================================================== #
   publish-aur:
     name: Publish to AUR
-    needs: release-linux
-    runs-on: ubuntu-latest
+    needs: [ci-gate, release-linux]
+    runs-on: ubuntu-22.04
 
     steps:
       # secrets context is not available in job-level if:, so guard here instead
@@ -145,7 +209,7 @@ jobs:
             echo "::notice::AUR_SSH_PRIVATE_KEY not configured — skipping AUR publish."
           fi
 
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         if: steps.guard.outputs.run == 'true'
 
       - name: Get version and AppImage sha256
@@ -236,8 +300,8 @@ jobs:
   # ======================================================================== #
   publish-apt-repo:
     name: Publish APT Repository
-    needs: release-linux
-    runs-on: ubuntu-latest
+    needs: [ci-gate, release-linux]
+    runs-on: ubuntu-22.04
 
     steps:
       # secrets context is not available in job-level if:, so guard here instead

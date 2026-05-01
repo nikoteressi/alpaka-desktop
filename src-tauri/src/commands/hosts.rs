@@ -1,17 +1,21 @@
+use serde_json::json;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
-use serde_json::json;
 use tokio::time::Instant;
 
-use crate::db::{self, DbConn, hosts::{Host, NewHost, PingStatus}};
+use crate::db::{
+    self,
+    hosts::{Host, NewHost, PingStatus},
+    spawn_db, DbConn,
+};
 use crate::error::AppError;
 use crate::state::AppState;
 
 /// Validate that a host URL is safe to use.
 /// Rejects non-http(s) schemes and link-local / metadata IP ranges.
 fn validate_host_url(url: &str) -> Result<(), AppError> {
-    let parsed = url::Url::parse(url)
-        .map_err(|e| AppError::Internal(format!("Invalid host URL: {}", e)))?;
+    let parsed =
+        url::Url::parse(url).map_err(|e| AppError::Internal(format!("Invalid host URL: {}", e)))?;
 
     match parsed.scheme() {
         "http" | "https" => {}
@@ -56,11 +60,7 @@ fn validate_host_url(url: &str) -> Result<(), AppError> {
 }
 
 pub async fn core_list_hosts(db: DbConn) -> Result<Vec<Host>, AppError> {
-    tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-        db::hosts::list_all(&conn)
-    })
-    .await?
+    spawn_db(db, db::hosts::list_all).await
 }
 
 #[tauri::command]
@@ -71,11 +71,7 @@ pub async fn list_hosts(state: State<'_, AppState>) -> Result<Vec<Host>, AppErro
 pub async fn core_add_host(db: DbConn, new_host: NewHost) -> Result<Host, AppError> {
     validate_host_url(&new_host.url)?;
 
-    tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-        db::hosts::create(&conn, new_host)
-    })
-    .await?
+    spawn_db(db, move |conn| db::hosts::create(conn, new_host)).await
 }
 
 #[tauri::command]
@@ -91,11 +87,7 @@ pub async fn core_update_host(
 ) -> Result<(), AppError> {
     validate_host_url(&url)?;
 
-    tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-        db::hosts::update(&conn, &id, &name, &url)
-    })
-    .await?
+    spawn_db(db, move |conn| db::hosts::update(conn, &id, &name, &url)).await
 }
 
 #[tauri::command]
@@ -109,11 +101,7 @@ pub async fn update_host(
 }
 
 pub async fn core_delete_host(db: DbConn, id: String) -> Result<(), AppError> {
-    tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-        db::hosts::delete(&conn, &id)
-    })
-    .await?
+    spawn_db(db, move |conn| db::hosts::delete(conn, &id)).await
 }
 
 #[tauri::command]
@@ -122,11 +110,7 @@ pub async fn delete_host(state: State<'_, AppState>, id: String) -> Result<(), A
 }
 
 pub async fn core_set_active_host(db: DbConn, id: String) -> Result<(), AppError> {
-    tokio::task::spawn_blocking(move || {
-        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-        db::hosts::set_active(&conn, &id)
-    })
-    .await?
+    spawn_db(db, move |conn| db::hosts::set_active(conn, &id)).await
 }
 
 #[tauri::command]
@@ -139,7 +123,12 @@ pub async fn perform_ping(client: &reqwest::Client, url: &str) -> (PingStatus, O
     let endpoint = format!("{}/api/tags", url.trim_end_matches('/'));
 
     // graceful timeout (5s) without panicking
-    match client.get(&endpoint).timeout(Duration::from_secs(5)).send().await {
+    match client
+        .get(&endpoint)
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await
+    {
         Ok(res) if res.status().is_success() => {
             (PingStatus::Online, Some(start.elapsed().as_millis()))
         }
@@ -147,28 +136,21 @@ pub async fn perform_ping(client: &reqwest::Client, url: &str) -> (PingStatus, O
     }
 }
 
-pub async fn core_ping_host(db: DbConn, http_client: reqwest::Client, id: String) -> Result<PingStatus, AppError> {
-    let host = tokio::task::spawn_blocking({
-        let db = db.clone();
-        let id = id.clone();
-        move || {
-            let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-            db::hosts::get_by_id(&conn, &id)
-        }
-    })
-    .await??;
+pub async fn core_ping_host(
+    db: DbConn,
+    http_client: reqwest::Client,
+    id: String,
+) -> Result<PingStatus, AppError> {
+    let host = spawn_db(db.clone(), move |conn| db::hosts::get_by_id(conn, &id)).await?;
 
     let (status, _latency) = perform_ping(&http_client, &host.url).await;
 
-    tokio::task::spawn_blocking({
-        let db = db.clone();
+    let id = host.id.clone();
+    spawn_db(db, {
         let status = status.clone();
-        move || {
-            let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
-            db::hosts::update_ping_status(&conn, &id, &status)
-        }
+        move |conn| db::hosts::update_ping_status(conn, &id, &status)
     })
-    .await??;
+    .await?;
 
     Ok(status)
 }
@@ -202,10 +184,14 @@ pub fn start_host_health_loop(
             let hosts = match tokio::task::spawn_blocking({
                 let db = db.clone();
                 move || {
-                    let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+                    let conn = db
+                        .lock()
+                        .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
                     db::hosts::list_all(&conn)
                 }
-            }).await {
+            })
+            .await
+            {
                 Ok(Ok(h)) => h,
                 _ => Vec::new(),
             };
@@ -218,10 +204,13 @@ pub fn start_host_health_loop(
                     let id = host.id.clone();
                     let status = status.clone();
                     move || {
-                        let conn = db.lock().map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+                        let conn = db
+                            .lock()
+                            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
                         db::hosts::update_ping_status(&conn, &id, &status)
                     }
-                }).await;
+                })
+                .await;
 
                 // Detect transition to offline
                 if host.last_ping_status == PingStatus::Online && status == PingStatus::Offline {
@@ -229,11 +218,14 @@ pub fn start_host_health_loop(
                 }
 
                 // emit event to frontend
-                let _ = app.emit("host:status-change", json!({
-                    "host_id": host.id,
-                    "status": status.as_str(),
-                    "latency_ms": latency_ms,
-                }));
+                let _ = app.emit(
+                    "host:status-change",
+                    json!({
+                        "host_id": host.id,
+                        "status": status.as_str(),
+                        "latency_ms": latency_ms,
+                    }),
+                );
             }
 
             // MED-10: select on the shutdown signal alongside the sleep interval
@@ -251,10 +243,10 @@ pub fn start_host_health_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockito::Server;
     use crate::db::migrations;
-    use std::sync::{Arc, Mutex};
+    use mockito::Server;
     use rusqlite::Connection;
+    use std::sync::{Arc, Mutex};
 
     fn setup_test_db() -> crate::db::DbConn {
         let conn = Connection::open_in_memory().unwrap();
@@ -273,7 +265,8 @@ mod tests {
     #[tokio::test]
     async fn test_perform_ping_success() {
         let mut server = Server::new_async().await;
-        let mock = server.mock("GET", "/api/tags")
+        let mock = server
+            .mock("GET", "/api/tags")
             .with_status(200)
             .create_async()
             .await;
@@ -305,10 +298,19 @@ mod tests {
         assert_eq!(hosts[0].id, host.id);
 
         // 3. Update host
-        core_update_host(db.clone(), host.id.clone(), "New Name".into(), "http://new:11434".into()).await.unwrap();
+        core_update_host(
+            db.clone(),
+            host.id.clone(),
+            "New Name".into(),
+            "http://new:11434".into(),
+        )
+        .await
+        .unwrap();
 
         // 4. Set Active
-        core_set_active_host(db.clone(), host.id.clone()).await.unwrap();
+        core_set_active_host(db.clone(), host.id.clone())
+            .await
+            .unwrap();
 
         // 5. Delete host
         core_delete_host(db.clone(), host.id).await.unwrap();
@@ -320,24 +322,32 @@ mod tests {
     #[tokio::test]
     async fn test_ping_host_integration() {
         let mut server = Server::new_async().await;
-        let _mock = server.mock("GET", "/api/tags")
+        let _mock = server
+            .mock("GET", "/api/tags")
             .with_status(200)
             .create_async()
             .await;
 
         let db = setup_test_db();
-        let conn = db.lock().unwrap();
-        let host = crate::db::hosts::create(&conn, NewHost {
-            name: "Server".into(),
-            url: server.url(),
-            is_default: None,
-        }).unwrap();
-        drop(conn);
+        let host = {
+            let conn = db.lock().unwrap();
+            crate::db::hosts::create(
+                &conn,
+                NewHost {
+                    name: "Server".into(),
+                    url: server.url(),
+                    is_default: None,
+                },
+            )
+            .unwrap()
+        };
 
         let http_client = reqwest::Client::new();
 
         // ping_host updates the DB
-        let status = core_ping_host(db.clone(), http_client, host.id.clone()).await.unwrap();
+        let status = core_ping_host(db.clone(), http_client, host.id.clone())
+            .await
+            .unwrap();
         assert_eq!(status, PingStatus::Online);
 
         // Verify DB update
@@ -349,24 +359,36 @@ mod tests {
     #[tokio::test]
     async fn test_add_host_rejects_file_scheme() {
         let db = setup_test_db();
-        let result = core_add_host(db, NewHost {
-            name: "Bad".into(),
-            url: "file:///etc/passwd".into(),
-            is_default: None,
-        }).await;
+        let result = core_add_host(
+            db,
+            NewHost {
+                name: "Bad".into(),
+                url: "file:///etc/passwd".into(),
+                is_default: None,
+            },
+        )
+        .await;
         assert!(result.is_err(), "file:// URL should be rejected");
         let err_str = result.unwrap_err().to_string();
-        assert!(err_str.contains("not allowed") || err_str.contains("Invalid host URL"), "Error should mention invalid URL: {}", err_str);
+        assert!(
+            err_str.contains("not allowed") || err_str.contains("Invalid host URL"),
+            "Error should mention invalid URL: {}",
+            err_str
+        );
     }
 
     #[tokio::test]
     async fn test_add_host_rejects_link_local_ip() {
         let db = setup_test_db();
-        let result = core_add_host(db, NewHost {
-            name: "Meta".into(),
-            url: "http://169.254.169.254/latest/meta-data".into(),
-            is_default: None,
-        }).await;
+        let result = core_add_host(
+            db,
+            NewHost {
+                name: "Meta".into(),
+                url: "http://169.254.169.254/latest/meta-data".into(),
+                is_default: None,
+            },
+        )
+        .await;
         assert!(result.is_err(), "169.254.x.x URL should be rejected");
     }
 
@@ -374,30 +396,35 @@ mod tests {
     async fn test_update_host_rejects_non_http_scheme() {
         let db = setup_test_db();
         // First add a valid host
-        let host = core_add_host(db.clone(), NewHost {
-            name: "Valid".into(),
-            url: "http://localhost:11434".into(),
-            is_default: None,
-        }).await.unwrap();
+        let host = core_add_host(
+            db.clone(),
+            NewHost {
+                name: "Valid".into(),
+                url: "http://localhost:11434".into(),
+                is_default: None,
+            },
+        )
+        .await
+        .unwrap();
 
         // Try to update with an invalid URL
-        let result = core_update_host(
-            db,
-            host.id,
-            "Valid".into(),
-            "ftp://evil.example.com".into(),
-        ).await;
+        let result =
+            core_update_host(db, host.id, "Valid".into(), "ftp://evil.example.com".into()).await;
         assert!(result.is_err(), "ftp:// URL should be rejected");
     }
 
     #[tokio::test]
     async fn test_add_host_rejects_ipv6_link_local() {
         let db = setup_test_db();
-        let result = core_add_host(db, NewHost {
-            name: "Meta V6".into(),
-            url: "http://[fe80::1]/".into(),
-            is_default: None,
-        }).await;
+        let result = core_add_host(
+            db,
+            NewHost {
+                name: "Meta V6".into(),
+                url: "http://[fe80::1]/".into(),
+                is_default: None,
+            },
+        )
+        .await;
         assert!(result.is_err(), "fe80:: IPv6 URL should be rejected");
         assert!(result.unwrap_err().to_string().contains("link-local IPv6"));
     }

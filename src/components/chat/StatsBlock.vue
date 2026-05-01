@@ -1,66 +1,124 @@
 <template>
   <div class="stats-block">
-    <button
-      @click="toggle"
-      class="stats-toggle-btn"
-    >
+    <button @click="toggle" class="stats-toggle-btn">
       <div class="stats-summary">
         <!-- Speed -->
         <CustomTooltip text="Generation speed">
           <span class="stat-badge">
             <span class="stat-dot pulse"></span>
-            {{ (tokensPerSec || 0).toFixed(1) }} <span class="stat-unit">tokens/s</span>
+            {{ (tokensPerSec || 0).toFixed(1) }}
+            <span class="stat-unit">tokens/s</span>
           </span>
         </CustomTooltip>
 
         <!-- Output -->
         <CustomTooltip v-if="outputTokens" text="Tokens generated in response">
           <span class="stat-badge">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
             {{ outputTokens }} <span class="stat-unit">output</span>
           </span>
         </CustomTooltip>
 
         <!-- Input -->
-        <CustomTooltip v-if="inputTokens" text="Tokens in the user prompt and context">
+        <CustomTooltip
+          v-if="inputTokens"
+          text="Tokens in the user prompt and context"
+        >
           <span class="stat-badge">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             {{ inputTokens }} <span class="stat-unit">input</span>
           </span>
         </CustomTooltip>
 
         <!-- Time -->
-        <CustomTooltip v-if="generationTimeMs" text="Total generation time taken">
+        <CustomTooltip
+          v-if="generationTimeMs"
+          text="Total generation time taken"
+        >
           <span class="stat-badge">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
             {{ (generationTimeMs / 1000).toFixed(2) }}s
           </span>
         </CustomTooltip>
 
+        <!-- Seed (only when a fixed seed was used) -->
+        <CustomTooltip
+          v-if="seed !== undefined"
+          text="Fixed seed — generation is reproducible"
+        >
+          <span class="stat-badge stat-badge--seed" data-testid="seed-badge">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            {{ seed }}
+          </span>
+        </CustomTooltip>
+
         <span class="more-label">
-          {{ isOpen ? 'Hide' : 'More' }}
-          <svg 
-            width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" 
-            :style="{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }"
+          {{ isOpen ? "Hide" : "More" }}
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            :style="{
+              transform: isOpen ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.2s',
+            }"
           >
-            <polyline points="6 9 12 15 18 9"/>
+            <polyline points="6 9 12 15 18 9" />
           </svg>
         </span>
       </div>
     </button>
 
-    <div class="stats-accordion" :class="{ 'stats-accordion--closed': !isOpen }">
+    <div
+      class="stats-accordion"
+      :class="{ 'stats-accordion--closed': !isOpen }"
+    >
       <div class="stats-accordion__inner">
         <div class="full-stats-container">
           <table class="full-stats-table">
@@ -83,7 +141,17 @@
               </tr>
               <tr>
                 <td>Prompt Eval Rate</td>
-                <td>{{ (inputTokens && metrics.prompt_eval_duration_ms) ? ((inputTokens / (metrics.prompt_eval_duration_ms / 1000)).toFixed(1)) : 0 }} tokens/s</td>
+                <td>
+                  {{
+                    inputTokens && metrics.prompt_eval_duration_ms
+                      ? (
+                          inputTokens /
+                          (metrics.prompt_eval_duration_ms / 1000)
+                        ).toFixed(1)
+                      : 0
+                  }}
+                  tokens/s
+                </td>
               </tr>
               <tr>
                 <td>Eval Count</td>
@@ -97,6 +165,10 @@
                 <td>Eval Rate (Generation)</td>
                 <td>{{ (tokensPerSec || 0).toFixed(1) }} tokens/s</td>
               </tr>
+              <tr v-if="seed !== undefined" data-testid="seed-row">
+                <td>Seed</td>
+                <td>{{ seed }}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -106,33 +178,34 @@
 </template>
 
 <script setup lang="ts">
-import CustomTooltip from '../shared/CustomTooltip.vue'
-import { useCollapsibleState } from '../../composables/useCollapsibleState'
+import CustomTooltip from "../shared/CustomTooltip.vue";
+import { useCollapsibleState } from "../../composables/useCollapsibleState";
 
 const props = defineProps<{
   metrics: {
-    total_duration_ms?: number
-    load_duration_ms?: number
-    prompt_eval_duration_ms?: number
-    eval_duration_ms?: number
-  }
-  tokensPerSec: number
-  outputTokens: number
-  inputTokens: number
-  generationTimeMs: number
-  messageKey?: string
-}>()
+    total_duration_ms?: number;
+    load_duration_ms?: number;
+    prompt_eval_duration_ms?: number;
+    eval_duration_ms?: number;
+  };
+  tokensPerSec: number;
+  outputTokens: number;
+  inputTokens: number;
+  generationTimeMs: number;
+  messageKey?: string;
+  seed?: number;
+}>();
 
 // suffix: 'stats' isolates this cache key from ThinkBlock (bare key) and SearchBlock ('search')
 const { isOpen, toggle: _toggle } = useCollapsibleState({
   messageKey: props.messageKey,
-  suffix: 'stats',
+  suffix: "stats",
   initialOpen: false,
-})
+});
 
 function toggle(event: MouseEvent) {
-  event.stopPropagation()
-  _toggle()
+  event.stopPropagation();
+  _toggle();
 }
 </script>
 
@@ -261,5 +334,12 @@ function toggle(event: MouseEvent) {
 
 .full-stats-table tr:not(:last-child) {
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.stat-badge--seed {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-active));
+  font-weight: 600;
 }
 </style>

@@ -205,7 +205,6 @@ alpaka-desktop/
 │       ├── models.ts
 │       └── settings.ts
 │
-├── e2e/                          # Playwright end-to-end tests
 ├── packaging/
 │   ├── aur/PKGBUILD              # alpaka-desktop-bin (pre-built binary)
 │   └── aur-git/PKGBUILD          # alpaka-desktop-git (build from source)
@@ -259,6 +258,12 @@ tauri::generate_handler![
     commands::models::delete_model,
     commands::models::pull_model,          // streams model:pull-progress events
     commands::models::get_model_capabilities,
+    commands::models::get_modelfile,       // fetches Modelfile for existing model via /api/show
+    commands::models::create_model,        // streams model:create-* events via /api/create
+    commands::models::cancel_model_create, // cancels in-progress model creation by name
+    commands::model_user_data::toggle_model_favorite,
+    commands::model_user_data::set_model_tags,
+    commands::model_user_data::list_model_user_data,
 
     // ── Hosts ─────────────────────────────────────────────────────────────
     commands::hosts::list_hosts,
@@ -434,12 +439,15 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:thinking-start` | Rust → Vue | `{ conversation_id }` | Opening `<think>` tag detected |
 | `chat:thinking-token` | Rust → Vue | `{ conversation_id, content }` | Token inside a `<think>` block |
 | `chat:thinking-end` | Rust → Vue | `{ conversation_id }` | Closing `</think>` tag detected |
-| `chat:done` | Rust → Vue | `{ conversation_id, total_tokens?, duration_ms?, tokens_per_sec? }` | Generation complete, message persisted |
+| `chat:done` | Rust → Vue | `{ conversation_id, total_tokens?, duration_ms?, tokens_per_sec?, seed? }` | Generation complete, message persisted; `seed` present only when a fixed seed was used |
 | `chat:error` | Rust → Vue | `{ conversation_id, error }` | Stream or generation error |
 | `chat:tool-call` | Rust → Vue | `{ conversation_id, tool_name, arguments }` | LLM requested a tool call (web search) |
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |
 | `model:pull-progress` | Rust → Vue | `{ model, status, completed?, total?, percent? }` | Download progress chunk |
 | `model:pull-done` | Rust → Vue | `{ model }` | Model download complete |
+| `model:create-progress` | Rust → Vue | `{ model: string, status: string }` | Model creation progress status line |
+| `model:create-done` | Rust → Vue | `{ model: string }` | Model creation complete |
+| `model:create-error` | Rust → Vue | `{ model: string, error: string, cancelled: boolean }` | Model creation failed or cancelled |
 | `host:status-change` | Rust → Vue | `{ host_id, status, latency_ms? }` | Periodic health check result |
 
 ### 4.3 Why Tauri Events over WebSockets/SSE
@@ -795,6 +803,14 @@ CREATE TABLE IF NOT EXISTS model_cache (
     quantization      TEXT    NOT NULL DEFAULT '',
     capabilities_json TEXT    NOT NULL DEFAULT '[]',
     last_synced_at    TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- model_user_data
+CREATE TABLE IF NOT EXISTS model_user_data (
+    name        TEXT    PRIMARY KEY NOT NULL,
+    is_favorite INTEGER NOT NULL DEFAULT 0,
+    tags_json   TEXT    NOT NULL DEFAULT '[]',
+    updated_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 -- folder_contexts
