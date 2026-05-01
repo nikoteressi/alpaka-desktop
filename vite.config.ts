@@ -16,6 +16,8 @@ export default defineConfig({
       '**/e2e-desktop/**',
       '**/.{idea,git,cache,output,temp}/**',
       '**/.tabs/**',
+      '**/.worktrees/**',
+      '**/.claude/worktrees/**',
     ],
     coverage: {
       provider: 'v8',

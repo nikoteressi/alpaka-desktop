@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
-import { useSettingsStore, BUILTIN_PRESETS } from "./settings";
+import { useSettingsStore } from "./settings";
 import type { Preset, PresetOptions } from "../types/settings";
 
 const mockInvoke = vi.fn();

@@ -179,11 +179,6 @@ describe("LibraryBrowser", () => {
     const wrapper = mount(LibraryBrowser, { global: globalOpts });
     await nextTick();
 
-    // Should have "All" button + 3 unique tags (embedding, tools, vision sorted)
-    const chipButtons = wrapper.findAll(
-      ".flex.flex-wrap.gap-1\\.5 button, [class*='rounded-full'] button",
-    );
-
     // Check uniqueTags section is present
     expect(wrapper.text()).toContain("All");
     // All 3 unique tags should be visible

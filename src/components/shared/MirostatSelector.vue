@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   modelValue: 0 | 1 | 2;
   compact?: boolean;
 }>();

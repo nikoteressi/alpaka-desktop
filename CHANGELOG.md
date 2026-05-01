@@ -21,6 +21,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CL-05: Ollama Cloud routing — stored API key is now injected as `Authorization: Bearer` on all requests to `api.ollama.com` hosts. Missing key surfaces a friendly error in the chat rather than a raw network failure. Saving a key for the first time auto-adds the Ollama Cloud host entry.
 - MO-07: Model tags and favorites — star models as favorites to float them to the top of the model selector, apply custom text tags to organize local models, and filter by tag in both the local models tab and chat model selector.
 
+### Fixed
+- E2E: hosts.spec.ts `before()` hook now waits for the connectivity tab transition to complete (`waitForDisplayed`) instead of using a fixed 300ms pause, eliminating a race condition with Vue's `<Transition mode="out-in">` (~500ms) that caused intermittent CI failures (#75)
+- CI: updated all GitHub Actions to Node.js 24 runtimes (checkout v5.0.1, setup-node v5.0.0, pnpm/action-setup v4.1.0, upload-artifact v5.0.0); add `if-no-files-found: ignore` to E2E artifact upload steps; fix four TypeScript unused-variable lint warnings (#76)
+
 ### Changed
 - CI: merge duplicate `test` + `coverage` jobs into single `test-and-coverage` (tests now run once with instrumentation instead of twice)
 - CI: add path-based job skipping — Rust-only PRs skip Vitest/TS checks; frontend-only PRs skip Rust compilation/testing
