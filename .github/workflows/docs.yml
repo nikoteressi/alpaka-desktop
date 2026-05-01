@@ -9,11 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-
-concurrency:
-  group: docs-deploy
-  cancel-in-progress: true
+  contents: read
 
 jobs:
   build:
@@ -49,6 +45,11 @@ jobs:
     name: Deploy to gh-pages
     runs-on: ubuntu-22.04
     needs: build
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
     steps:
       - name: Checkout gh-pages branch
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -64,10 +65,9 @@ jobs:
 
       - name: Overlay VitePress output (preserve apt/)
         run: |
-          # rsync overlays the new site into the root.
-          # --exclude=apt ensures the APT repository is never touched.
+          test -f /tmp/vitepress-dist/index.html || { echo "dist is missing index.html — aborting"; exit 1; }
           rsync -av --delete \
-            --exclude='apt' \
+            --exclude='/apt/' \
             --exclude='.git' \
             /tmp/vitepress-dist/ ./
           touch .nojekyll
