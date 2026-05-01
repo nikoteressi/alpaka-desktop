@@ -141,20 +141,20 @@ async function submitSignIn() {
   try {
     const connectUrl = await invoke<string>("trigger_ollama_signin");
 
-    if (connectUrl !== "ALREADY_SIGNED_IN") {
+    if (connectUrl === "ALREADY_SIGNED_IN") {
+      // Already signed in, just refresh status
+      await manualRefresh();
+      showSignInForm.value = false;
+    } else {
       try {
         await openUrl(connectUrl);
       } catch {
-        window.open(connectUrl, "_blank");
+        window.open(connectUrl, "_blank", "noopener,noreferrer");
       }
 
       // Transition to awaiting state and start polling
       isAwaitingConfirmation.value = true;
       startPolling();
-    } else {
-      // Already signed in, just refresh status
-      await manualRefresh();
-      showSignInForm.value = false;
     }
   } catch (err: unknown) {
     let msg = "";
@@ -216,7 +216,7 @@ async function openOllamaAccount() {
   try {
     await openUrl("https://ollama.com/settings");
   } catch {
-    window.open("https://ollama.com/settings", "_blank");
+    window.open("https://ollama.com/settings", "_blank", "noopener,noreferrer");
   }
 }
 
@@ -224,7 +224,7 @@ async function openUpgrade() {
   try {
     await openUrl("https://ollama.com/upgrade");
   } catch {
-    window.open("https://ollama.com/upgrade", "_blank");
+    window.open("https://ollama.com/upgrade", "_blank", "noopener,noreferrer");
   }
 }
 

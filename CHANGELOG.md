@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.2.0] - 2026-05-01
+
 ### Added
 - S-07: Seed control — fixed-seed input in Advanced Options and Settings for reproducible generation; active seed shown in message performance metadata (#20)
 - S-08: Mirostat v1/v2 sampling controls in Advanced Chat Options — Mirostat mode selector (Off/Mirostat 1/Mirostat 2) with tau (default 5.0) and eta (default 0.1) sliders; top-p/top-k hidden when Mirostat is active
@@ -144,6 +148,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.1...v1.2.0
+[1.1.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/nikoteressi/alpaka-desktop/releases/tag/v1.0.0

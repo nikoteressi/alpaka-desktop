@@ -315,10 +315,10 @@ const props = defineProps<{
 const hovered = ref(false);
 
 const sizeTags = computed(() =>
-  (props.tags ?? []).filter((t) => /^\d+(\.\d+)?[bBmM]$/i.test(t)),
+  (props.tags ?? []).filter((t) => /^\d+(\.\d+)?[bm]$/i.test(t)),
 );
 const capTags = computed(() =>
-  (props.tags ?? []).filter((t) => !/^\d+(\.\d+)?[bBmM]$/i.test(t)),
+  (props.tags ?? []).filter((t) => !/^\d+(\.\d+)?[bm]$/i.test(t)),
 );
 
 const TAG_LABELS: Record<string, string> = {
@@ -344,7 +344,7 @@ function tagClass(t: string): string {
   if (lc === "cloud") return "tag-cloud";
   if (lc === "embedding" || lc === "embed") return "tag-embedding";
   if (lc === "audio") return "tag-audio";
-  if (/^\d+(\.\d+)?[bBmM]$/i.test(t)) return "tag-size";
+  if (/^\d+(\.\d+)?[bm]$/i.test(t)) return "tag-size";
   return "tag-generic";
 }
 </script>

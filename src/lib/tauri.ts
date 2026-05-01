@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { BackendMessage, Conversation } from "../types/chat";
+import type {
+  BackendMessage,
+  Conversation,
+  FolderContextPayload,
+} from "../types/chat";
 import type {
   Model,
   ModelCapabilities,
@@ -7,7 +11,6 @@ import type {
   LaunchApp,
 } from "../types/models";
 import type { SettingsState, ChatOptions } from "../types/settings";
-import type { FolderContextPayload } from "../types/chat";
 
 // ── Error utilities ───────────────────────────────────────────────────────────
 

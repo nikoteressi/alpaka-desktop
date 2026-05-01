@@ -115,11 +115,11 @@ export function useDraftSync(state: DraftSyncRefs, deps: DraftSyncDeps) {
     if (!deps.activeConvId.value || isSyncingDraft.value) return;
 
     const draftAttachments = state.attachments.value
-      .filter((a) => a.data)
+      .filter((a): a is typeof a & { data: Uint8Array } => a.data !== null)
       .map((a) => ({
         name: a.file.name,
         type: a.file.type,
-        data: uint8ArrayToBase64(a.data!),
+        data: uint8ArrayToBase64(a.data),
       }));
 
     setDraft(deps.activeConvId.value, {

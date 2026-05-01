@@ -836,12 +836,14 @@ watch(activeTab, (newTab) => {
   }
 });
 
+function calcAvailGb(hw: typeof hardware.value): number {
+  if (hw?.vram_mb) return (hw.vram_mb / 1024) * 0.9;
+  if (hw?.ram_mb) return (hw.ram_mb / 1024) * 0.6;
+  return 0;
+}
+
 const recommendedModels = computed(() => {
-  const avail = hardware.value?.vram_mb
-    ? (hardware.value.vram_mb / 1024) * 0.9
-    : hardware.value?.ram_mb
-      ? (hardware.value.ram_mb / 1024) * 0.6
-      : 0;
+  const avail = calcAvailGb(hardware.value);
   if (avail === 0) return [];
 
   return Object.entries(LIBRARY_SIZES)

@@ -13,7 +13,7 @@ export const COPY_FEEDBACK_DURATION_MS = 1500;
 export const DRAFT_ID_PREFIX = "__draft__";
 
 export const LIBRARY_SIZES: Record<string, number> = {
-  "llama3.2:3b": 2.0,
+  "llama3.2:3b": 2,
   "llama3.2:1b": 1.3,
   "llama3.1:8b": 4.7,
   "mistral:7b": 4.1,

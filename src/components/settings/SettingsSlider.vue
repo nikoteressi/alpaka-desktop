@@ -70,7 +70,7 @@ const onInput = (e: Event) => {
   const val = (e.target as HTMLInputElement).value;
   emit(
     "update:modelValue",
-    props.step % 1 === 0 ? parseInt(val, 10) : parseFloat(val),
+    props.step % 1 === 0 ? Number.parseInt(val, 10) : Number.parseFloat(val),
   );
 };
 </script>

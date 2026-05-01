@@ -181,8 +181,8 @@ const isResizing = ref(false);
 function startResize() {
   if (isResizing.value) return; // prevent duplicate listener registration
   isResizing.value = true;
-  window.addEventListener("mousemove", doResize);
-  window.addEventListener("mouseup", stopResize);
+  globalThis.addEventListener("mousemove", doResize);
+  globalThis.addEventListener("mouseup", stopResize);
   document.body.style.cursor = "col-resize";
 }
 
@@ -197,14 +197,14 @@ function doResize(e: MouseEvent) {
 
 function stopResize() {
   isResizing.value = false;
-  window.removeEventListener("mousemove", doResize);
-  window.removeEventListener("mouseup", stopResize);
+  globalThis.removeEventListener("mousemove", doResize);
+  globalThis.removeEventListener("mouseup", stopResize);
   document.body.style.cursor = "";
 }
 
 onUnmounted(() => {
-  window.removeEventListener("mousemove", doResize);
-  window.removeEventListener("mouseup", stopResize);
+  globalThis.removeEventListener("mousemove", doResize);
+  globalThis.removeEventListener("mouseup", stopResize);
 });
 
 interface NavItem {

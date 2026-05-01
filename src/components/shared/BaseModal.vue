@@ -76,8 +76,8 @@ function handleEsc(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener("keydown", handleEsc));
-onUnmounted(() => window.removeEventListener("keydown", handleEsc));
+onMounted(() => globalThis.addEventListener("keydown", handleEsc));
+onUnmounted(() => globalThis.removeEventListener("keydown", handleEsc));
 </script>
 
 <style scoped>

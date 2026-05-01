@@ -15,7 +15,7 @@ export function base64ToUint8Array(base64: string) {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+    bytes[i] = binaryString.codePointAt(i) ?? 0;
   }
   return bytes;
 }
@@ -24,7 +24,7 @@ export function uint8ArrayToBase64(bytes: Uint8Array) {
   let binary = "";
   const len = bytes.byteLength;
   for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
+    binary += String.fromCodePoint(bytes[i]);
   }
   return btoa(binary);
 }
