@@ -551,7 +551,7 @@ const CTX_STEPS = [4096, 8192, 16384, 32768, 65536, 131072, 262144];
 
 const ctxStepIndex = computed(() => {
   const idx = CTX_STEPS.indexOf(settingsStore.chatOptions.num_ctx);
-  return idx >= 0 ? idx : 0;
+  return Math.max(idx, 0);
 });
 
 function onCtxSlider(e: Event) {
@@ -597,7 +597,7 @@ function confirmRestore() {
     onConfirm: async () => {
       try {
         await invoke("restore_database");
-        window.location.reload();
+        globalThis.location.reload();
       } catch (err: unknown) {
         console.error("Restore failed:", err);
       }

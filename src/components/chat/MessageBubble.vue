@@ -72,7 +72,7 @@ function parseProcessedParts(
   const parts: MessagePart[] = [];
   // Standard regex for full parsing (used for static messages and volatile tails)
   const blockRegex =
-    /```(\w+)?\n([\s\S]*?)(?:```|$)|<think[\s\S]*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">([\s\S]*?)<\/tool_call>/gi;
+    /```(\w+)?\n(.*?)(?:```|$)|<think.*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">(.*?)<\/tool_call>/gis;
   let lastIndex = 0;
   let match;
 
@@ -93,7 +93,7 @@ function parseProcessedParts(
       const startTagMatch = matchText.match(/^<think([^>]*)>/i);
       const startTag = startTagMatch ? startTagMatch[1] : "";
       const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
-      const contentMatch = matchText.match(/^<think[^>]*>([\s\S]*)<\/think>$/i);
+      const contentMatch = matchText.match(/^<think[^>]*>(.*)<\/think>$/is);
 
       parts.push({
         type: "think",
@@ -136,73 +136,75 @@ function parseProcessedParts(
 let frameCount = 0;
 const RENDER_EVERY_N_FRAMES = 4; // Approx 15fps during streaming for maximum smoothness/CPU balance
 
+function parseBlockMatch(match: RegExpExecArray): MessagePart | null {
+  const matchText = match[0];
+  if (matchText.toLowerCase().startsWith("<think")) {
+    const startTagMatch = matchText.match(/^<think([^>]*)>/i);
+    const startTag = startTagMatch ? startTagMatch[1] : "";
+    const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
+    const contentMatch = matchText.match(/^<think[^>]*>(.*)<\/think>$/is);
+    return {
+      type: "think",
+      content: contentMatch ? contentMatch[1].trim() : "",
+      language: timeMatch ? timeMatch[1] : undefined,
+    };
+  }
+  if (matchText.toLowerCase().startsWith("<tool_call")) {
+    return {
+      type: "tool",
+      toolName: match[3],
+      toolQuery: match[4],
+      content: match[5] || "",
+    };
+  }
+  if (matchText.startsWith("```")) {
+    return {
+      type: "code",
+      language: match[1] || "text",
+      content: match[2] || "",
+    };
+  }
+  return null;
+}
+
 // Architectural Throttling for streaming only
 const { pause, resume, isActive } = useRafFn(
   () => {
     if (!props.isStreaming) return;
     frameCount++;
-    if (frameCount % RENDER_EVERY_N_FRAMES === 0) {
-      const content = props.message.content;
-      if (!content) return;
+    if (frameCount % RENDER_EVERY_N_FRAMES !== 0) return;
 
-      // Incremental Update Logic
-      // We only look for *fully closed* blocks to stabilize them
-      const stableBlockRegex =
-        /```(\w+)?\n([\s\S]*?)```|<think[\s\S]*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">([\s\S]*?)<\/tool_call>/gi;
-      stableBlockRegex.lastIndex = lastStableIndex;
-      let match;
+    const content = props.message.content;
+    if (!content) return;
 
-      while ((match = stableBlockRegex.exec(content)) !== null) {
-        // Add the markdown before the block if it exists
-        if (match.index > lastStableIndex) {
-          const text = content.slice(lastStableIndex, match.index);
-          if (text.trim()) {
-            stableParts.value.push({
-              type: "markdown",
-              content: text,
-              rendered: renderMarkdown(text),
-            });
-          }
-        }
+    // Incremental Update Logic — only look for *fully closed* blocks to stabilize them
+    const stableBlockRegex =
+      /```(\w+)?\n(.*?)```|<think.*?<\/think>|<tool_call\s+name="([^"]+)"\s+query="([^"]+)">(.*?)<\/tool_call>/gis;
+    stableBlockRegex.lastIndex = lastStableIndex;
+    let match;
 
-        const matchText = match[0];
-        if (matchText.toLowerCase().startsWith("<think")) {
-          const startTagMatch = matchText.match(/^<think([^>]*)>/i);
-          const startTag = startTagMatch ? startTagMatch[1] : "";
-          const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
-          const contentMatch = matchText.match(
-            /^<think[^>]*>([\s\S]*)<\/think>$/i,
-          );
-
+    while ((match = stableBlockRegex.exec(content)) !== null) {
+      if (match.index > lastStableIndex) {
+        const text = content.slice(lastStableIndex, match.index);
+        if (text.trim()) {
           stableParts.value.push({
-            type: "think",
-            content: contentMatch ? contentMatch[1].trim() : "",
-            language: timeMatch ? timeMatch[1] : undefined,
-          });
-        } else if (matchText.toLowerCase().startsWith("<tool_call")) {
-          stableParts.value.push({
-            type: "tool",
-            toolName: match[3],
-            toolQuery: match[4],
-            content: match[5] || "",
-          });
-        } else if (matchText.startsWith("```")) {
-          stableParts.value.push({
-            type: "code",
-            language: match[1] || "text",
-            content: match[2] || "",
+            type: "markdown",
+            content: text,
+            rendered: renderMarkdown(text),
           });
         }
-
-        lastStableIndex = stableBlockRegex.lastIndex;
       }
-
-      // Now parse the volatile tail (from lastStableIndex to end)
-      const volatileContent = content.slice(lastStableIndex);
-      const volatileParts = parseProcessedParts(volatileContent, false);
-
-      streamingParts.value = [...stableParts.value, ...volatileParts];
+      const part = parseBlockMatch(match);
+      if (part) stableParts.value.push(part);
+      lastStableIndex = stableBlockRegex.lastIndex;
     }
+
+    // Parse the volatile tail (from lastStableIndex to end)
+    const volatileContent = content.slice(lastStableIndex);
+    streamingParts.value = [
+      ...stableParts.value,
+      ...parseProcessedParts(volatileContent, false),
+    ];
   },
   { immediate: false },
 );

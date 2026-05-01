@@ -22,6 +22,7 @@ defineEmits<{
     >
       <img
         :src="file.previewUrl"
+        alt=""
         class="h-14 w-14 object-cover rounded-lg border border-[var(--border-strong)] shadow-sm"
       />
       <button

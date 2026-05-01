@@ -37,7 +37,7 @@ export function useCollapsibleState(options: UseCollapsibleStateOptions = {}) {
 
   const key = buildCacheKey();
   const isOpen = ref<boolean>(
-    key !== null ? (_collapseCache.get(key) ?? initialOpen) : initialOpen,
+    key === null ? initialOpen : (_collapseCache.get(key) ?? initialOpen),
   );
 
   function toggle() {
