@@ -39,12 +39,6 @@ function mimeFromExt(ext: string): string {
   return MIME_MAP[ext] ?? "application/octet-stream";
 }
 
-function isFocusedOnEditable(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName.toLowerCase();
-  return tag === "input" || tag === "textarea" || target.isContentEditable;
-}
-
 function parseUriList(raw: string): string[] {
   return raw
     .split(/\r?\n/)
@@ -52,6 +46,48 @@ function parseUriList(raw: string): string[] {
     .filter((line) => line.length > 0 && !line.startsWith("#"))
     .filter((line) => line.startsWith("file://"))
     .map((line) => decodeURIComponent(line.slice("file://".length)));
+}
+
+async function rgbaToFile(
+  rgba: Uint8Array,
+  width: number,
+  height: number,
+): Promise<File | null> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return resolve(null);
+    ctx.putImageData(
+      new ImageData(new Uint8ClampedArray(rgba), width, height),
+      0,
+      0,
+    );
+    canvas.toBlob(
+      (blob) =>
+        resolve(
+          blob
+            ? new File([blob], "pasted-image.png", { type: "image/png" })
+            : null,
+        ),
+      "image/png",
+    );
+  });
+}
+
+async function readClipboardImage(): Promise<File | null> {
+  try {
+    const { readImage } = await import("@tauri-apps/plugin-clipboard-manager");
+    const img = await readImage();
+    const [rgba, { width, height }] = await Promise.all([
+      img.rgba(),
+      img.size(),
+    ]);
+    return rgbaToFile(rgba, width, height);
+  } catch {
+    return null;
+  }
 }
 
 export function useAttachments(options: AttachmentsOptions = {}) {
@@ -123,25 +159,35 @@ export function useAttachments(options: AttachmentsOptions = {}) {
   }
 
   async function onGlobalPaste(e: ClipboardEvent) {
-    const clipboardData = e.clipboardData;
-    if (!clipboardData) return;
-
-    const imageFiles: File[] = [];
-    for (let i = 0; i < clipboardData.items.length; i++) {
-      const item = clipboardData.items[i];
-      if (item.type.startsWith("image/")) {
-        const file = item.getAsFile();
-        if (file) imageFiles.push(file);
+    // 1. Try image items from web clipboard API (may be empty on WebKitGTK)
+    const items = e.clipboardData?.items;
+    const webImageFiles: File[] = [];
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          const f = items[i].getAsFile();
+          if (f) webImageFiles.push(f);
+        }
       }
     }
 
-    if (imageFiles.length > 0) {
+    if (webImageFiles.length > 0) {
       e.preventDefault();
-      await handleFiles(imageFiles);
+      await handleFiles(webImageFiles);
       return;
     }
 
-    const uriList = clipboardData.getData("text/uri-list");
+    // 2. Fallback: read image directly from OS clipboard via Tauri plugin
+    //    (handles WebKitGTK where clipboardData.items may be empty for images)
+    const tauriImage = await readClipboardImage();
+    if (tauriImage) {
+      e.preventDefault();
+      await handleFiles([tauriImage]);
+      return;
+    }
+
+    // 3. Files copied from file manager (text/uri-list format)
+    const uriList = e.clipboardData?.getData("text/uri-list") ?? "";
     if (uriList) {
       const paths = parseUriList(uriList);
       if (paths.length > 0) {
@@ -150,6 +196,8 @@ export function useAttachments(options: AttachmentsOptions = {}) {
         return;
       }
     }
+
+    // 4. Plain text — let the browser handle it naturally (no preventDefault)
   }
 
   async function initDragDrop(): Promise<() => void> {

@@ -4,6 +4,10 @@ vi.mock("@tauri-apps/plugin-fs", () => ({
   readFile: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
+  readImage: vi.fn().mockRejectedValue(new Error("no image")),
+}));
+
 // jsdom doesn't implement createObjectURL — stub it with a counter so each call returns a unique URL
 let urlCounter = 0;
 global.URL.createObjectURL = vi.fn(() => `blob:mock-${++urlCounter}`);
