@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { tauriApi } from "../../lib/tauri";
 import { useChatStore } from "../../stores/chat";
@@ -11,6 +11,7 @@ import { useContextWindow } from "../../composables/useContextWindow";
 import { useAttachments } from "../../composables/useAttachments";
 import { useModelDefaults } from "../../composables/useModelDefaults";
 import { useDraftSync } from "../../composables/useDraftSync";
+import { appEvents, APP_EVENT } from "../../lib/appEvents";
 import type { ChatOptions } from "../../types/settings";
 
 // Components
@@ -393,8 +394,25 @@ const { clearDraft } = useDraftSync(
   },
 );
 
+const modelSelectorRef = ref<InstanceType<typeof ModelSelector> | null>(null);
+
+function onOpenModelSwitcher() {
+  modelSelectorRef.value?.openModelDropdown();
+}
+
 onMounted(() => {
   modelStore.fetchModels();
+  appEvents.addEventListener(
+    APP_EVENT.OPEN_MODEL_SWITCHER,
+    onOpenModelSwitcher,
+  );
+});
+
+onUnmounted(() => {
+  appEvents.removeEventListener(
+    APP_EVENT.OPEN_MODEL_SWITCHER,
+    onOpenModelSwitcher,
+  );
 });
 </script>
 
@@ -727,6 +745,7 @@ onMounted(() => {
           </CustomTooltip>
 
           <ModelSelector
+            ref="modelSelectorRef"
             :activeModelName="activeModelName"
             :isActiveModelPulling="isActiveModelPulling"
             @select="selectModel"

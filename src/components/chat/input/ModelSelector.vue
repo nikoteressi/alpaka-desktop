@@ -101,6 +101,8 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener("mousedown", handleClickOutside);
 });
+
+defineExpose({ openModelDropdown });
 </script>
 
 <template>
