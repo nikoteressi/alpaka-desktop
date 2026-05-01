@@ -323,9 +323,6 @@ const { maxContext, contextTokens, isContextNearFull } = useContextWindow({
   isStreaming: isCurrentChatStreaming,
 });
 
-// ---- Drag and drop & Paste ----
-// Provided by useAttachments composable
-
 // ---- Submit ----
 function handleEnter(e: KeyboardEvent) {
   if (!e.shiftKey) handleSubmit();
@@ -427,8 +424,12 @@ onMounted(async () => {
     APP_EVENT.OPEN_MODEL_SWITCHER,
     onOpenModelSwitcher,
   );
-  unlistenDrag = await initDragDrop();
   window.addEventListener("paste", onGlobalPaste);
+  try {
+    unlistenDrag = await initDragDrop();
+  } catch {
+    // drag-drop unavailable in non-Tauri context
+  }
 });
 
 onBeforeUnmount(() => {
