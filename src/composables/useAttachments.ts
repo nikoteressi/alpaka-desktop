@@ -76,7 +76,25 @@ async function rgbaToFile(
   });
 }
 
-async function readClipboardImage(): Promise<File | null> {
+async function readClipboardImageViaNavigator(): Promise<File | null> {
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const imageType = item.types.find((t) => t.startsWith("image/"));
+      if (imageType) {
+        const blob = await item.getType(imageType);
+        return new File([blob], "pasted-image.png", {
+          type: blob.type || "image/png",
+        });
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function readClipboardImageViaTauri(): Promise<File | null> {
   try {
     const { readImage } = await import("@tauri-apps/plugin-clipboard-manager");
     const img = await readImage();
@@ -88,6 +106,13 @@ async function readClipboardImage(): Promise<File | null> {
   } catch {
     return null;
   }
+}
+
+async function readClipboardImage(): Promise<File | null> {
+  return (
+    (await readClipboardImageViaNavigator()) ??
+    (await readClipboardImageViaTauri())
+  );
 }
 
 export function useAttachments(options: AttachmentsOptions = {}) {
@@ -159,7 +184,10 @@ export function useAttachments(options: AttachmentsOptions = {}) {
   }
 
   async function onGlobalPaste(e: ClipboardEvent) {
-    // 1. Try image items from web clipboard API (may be empty on WebKitGTK)
+    // Collect ALL clipboard data synchronously before any await —
+    // WebKitGTK invalidates clipboardData after the synchronous portion returns.
+
+    // 1. Image items from web clipboard API (may be empty on WebKitGTK for images)
     const items = e.clipboardData?.items;
     const webImageFiles: File[] = [];
     if (items) {
@@ -171,30 +199,32 @@ export function useAttachments(options: AttachmentsOptions = {}) {
       }
     }
 
+    // 2. File URIs from file manager — must read synchronously before any await
+    const uriList = e.clipboardData?.getData("text/uri-list") ?? "";
+    const uriPaths = parseUriList(uriList);
+
+    // Handle image files from web clipboard API
     if (webImageFiles.length > 0) {
       e.preventDefault();
       await handleFiles(webImageFiles);
       return;
     }
 
-    // 2. Fallback: read image directly from OS clipboard via Tauri plugin
-    //    (handles WebKitGTK where clipboardData.items may be empty for images)
+    // Handle file URIs — preventDefault must be synchronous or browser pastes the text
+    if (uriPaths.length > 0) {
+      e.preventDefault();
+      await handleDroppedPaths(uriPaths);
+      return;
+    }
+
+    // 3. Fallback: read image from OS clipboard via navigator API then Tauri plugin.
+    //    For clipboard images in a textarea the browser default does nothing, so
+    //    the late e.preventDefault() call is still effective.
     const tauriImage = await readClipboardImage();
     if (tauriImage) {
       e.preventDefault();
       await handleFiles([tauriImage]);
       return;
-    }
-
-    // 3. Files copied from file manager (text/uri-list format)
-    const uriList = e.clipboardData?.getData("text/uri-list") ?? "";
-    if (uriList) {
-      const paths = parseUriList(uriList);
-      if (paths.length > 0) {
-        e.preventDefault();
-        await handleDroppedPaths(paths);
-        return;
-      }
     }
 
     // 4. Plain text — let the browser handle it naturally (no preventDefault)

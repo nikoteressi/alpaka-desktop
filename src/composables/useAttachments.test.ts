@@ -13,6 +13,14 @@ let urlCounter = 0;
 global.URL.createObjectURL = vi.fn(() => `blob:mock-${++urlCounter}`);
 global.URL.revokeObjectURL = vi.fn();
 
+// Stub navigator.clipboard — default: no items (all async clipboard reads return null)
+Object.defineProperty(navigator, "clipboard", {
+  value: {
+    read: vi.fn().mockResolvedValue([]),
+  },
+  writable: true,
+});
+
 describe("useAttachments", () => {
   it("handleFiles adds image attachments with preview URLs", async () => {
     urlCounter = 0;
@@ -159,7 +167,7 @@ describe("useAttachments", () => {
 
   // onGlobalPaste tests
 
-  it("onGlobalPaste attaches image from clipboard image data", async () => {
+  it("onGlobalPaste attaches image from clipboard image data (web items path)", async () => {
     urlCounter = 0;
     const { useAttachments } = await import("./useAttachments");
     const { attachments, onGlobalPaste } = useAttachments();
@@ -171,6 +179,25 @@ describe("useAttachments", () => {
       },
       preventDefault: vi.fn(),
       target: document.createElement("div"),
+    } as unknown as ClipboardEvent;
+    await onGlobalPaste(evt);
+    expect(attachments.value).toHaveLength(1);
+  });
+
+  it("onGlobalPaste attaches image via navigator.clipboard.read() when clipboardData.items is empty", async () => {
+    urlCounter = 0;
+    const blob = new Blob(["x".repeat(10)], { type: "image/png" });
+    vi.mocked(navigator.clipboard.read).mockResolvedValueOnce([
+      {
+        types: ["image/png"],
+        getType: vi.fn().mockResolvedValue(blob),
+      } as unknown as ClipboardItem,
+    ]);
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, onGlobalPaste } = useAttachments();
+    const evt = {
+      clipboardData: { items: [], getData: () => "" },
+      preventDefault: vi.fn(),
     } as unknown as ClipboardEvent;
     await onGlobalPaste(evt);
     expect(attachments.value).toHaveLength(1);
