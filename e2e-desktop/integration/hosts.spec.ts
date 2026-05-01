@@ -8,14 +8,12 @@ describe('Hosts — connectivity management', () => {
     await settings.clickNavIcon('settings')
     await $('[data-testid="settings-tab-connectivity"]').waitForDisplayed({ timeout: 5000 })
     await $('[data-testid="settings-tab-connectivity"]').click()
-    await browser.pause(300)
+    // Wait for the tab transition to complete before interacting (transition is ~500ms out-in)
+    const expandBtn = $('[data-testid="hosts-expand-btn"]')
+    await expandBtn.waitForDisplayed({ timeout: 5000 })
     // Expand the Ollama Hosts panel if not already expanded
-    const hostStatus = await $('[data-testid="host-status"]')
-    if (!(await hostStatus.isExisting())) {
-      const expandBtn = await $('[data-testid="hosts-expand-btn"]')
-      if (await expandBtn.isExisting()) {
-        await expandBtn.click()
-      }
+    if (!(await $('[data-testid="host-status"]').isExisting())) {
+      await expandBtn.click()
     }
     // Wait until the host list is visible
     await $('[data-testid="host-status"]').waitForExist({ timeout: 5000 })
