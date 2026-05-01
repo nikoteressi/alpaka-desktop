@@ -154,7 +154,6 @@ export function useAttachments(options: AttachmentsOptions = {}) {
     const clipboardData = e.clipboardData;
     if (!clipboardData) return;
 
-    // Check for image items first
     const imageFiles: File[] = [];
     for (let i = 0; i < clipboardData.items.length; i++) {
       const item = clipboardData.items[i];
@@ -170,7 +169,6 @@ export function useAttachments(options: AttachmentsOptions = {}) {
       return;
     }
 
-    // Check for file URIs from file manager copy
     const uriList = clipboardData.getData("text/uri-list");
     if (uriList) {
       const paths = parseUriList(uriList);
