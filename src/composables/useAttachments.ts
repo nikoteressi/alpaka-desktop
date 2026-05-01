@@ -64,10 +64,9 @@ function mimeFromExt(ext: string): string {
 }
 
 function isFocusedOnEditable(target: EventTarget | null): boolean {
-  if (!target) return false;
-  const el = target as HTMLElement;
-  const tag = el.tagName?.toLowerCase();
-  return tag === "input" || tag === "textarea" || el.isContentEditable;
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || target.isContentEditable;
 }
 
 function parseUriList(raw: string): string[] {
@@ -127,7 +126,6 @@ export function useAttachments(options: AttachmentsOptions = {}) {
             await options.onLinkFile(path);
           }
         }
-        // unknown extensions are silently skipped
       }),
     );
   }
@@ -138,7 +136,7 @@ export function useAttachments(options: AttachmentsOptions = {}) {
 
     const imageFiles: File[] = [];
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
+      if (items[i].type.startsWith("image/")) {
         const file = items[i].getAsFile();
         if (file) imageFiles.push(file);
       }
