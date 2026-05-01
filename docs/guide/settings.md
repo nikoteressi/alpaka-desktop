@@ -26,7 +26,7 @@ Alpaka Desktop has three layers of settings that apply to every conversation. Th
 Global default: `0.8` | llama3.2 model default: `0.4` | This chat: not changed → Ollama receives **0.4**
 
 **Example — Stop Sequences:**
-Global default: `["###"]` | Model default: not set | This chat: `["<END>", "---"]` → Ollama receives **["<END>", "---"]**
+Global default: `["###"]` | Model default: not set | This chat: `["&lt;END&gt;", "---"]` → Ollama receives **["&lt;END&gt;", "---"]**
 
 ---
 
@@ -92,7 +92,7 @@ Setting `num_ctx` higher than the model's trained context length does not improv
 Custom tokens that signal the model to stop generating. Useful for structured outputs or prompt-chaining.
 
 - Configure up to 4 stop tokens in **Settings → Advanced → Stop Sequences** (global) or in **Advanced Options** (per-chat).
-- Common examples: `###`, `<END>`, `\n\n`, `Human:`.
+- Common examples: `###`, `&lt;END&gt;`, `\n\n`, `Human:`.
 - An empty list omits the `stop` field entirely — the model generates until its natural end token.
 
 ### Seed

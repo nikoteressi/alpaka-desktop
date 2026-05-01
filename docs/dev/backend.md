@@ -45,11 +45,11 @@ Vue reactive rendering (MessageBubble.vue → markdown pipeline)
 
 ### Think Tag Detection
 
-The `<think>` tag can be split across NDJSON chunk boundaries (e.g. `<thi` in one chunk, `nk>` in the next). `streaming.rs` maintains a small string buffer to handle cross-chunk boundaries. Do not use a single-pass regex for this — it will miss split tags under load.
+The `&lt;think&gt;` tag can be split across NDJSON chunk boundaries (e.g. `&lt;thi` in one chunk, `nk&gt;` in the next). `streaming.rs` maintains a small string buffer to handle cross-chunk boundaries. Do not use a single-pass regex for this — it will miss split tags under load.
 
 ### Tool Call Parsing
 
-Tool calls arrive as `<tool_call name="..." arguments="{...}">` in the token stream. Parsing extracts the `name` attribute and the JSON `arguments` attribute using secondary regex calls (not a single complex regex — SonarCloud enforces regex complexity < 20).
+Tool calls arrive as `&lt;tool_call name="..." arguments="{...}"&gt;` in the token stream. Parsing extracts the `name` attribute and the JSON `arguments` attribute using secondary regex calls (not a single complex regex — SonarCloud enforces regex complexity < 20).
 
 ## Command Registry
 

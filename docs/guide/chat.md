@@ -10,7 +10,7 @@ Tokens render as they arrive. Markdown, code blocks, tables, and math (LaTeX via
 
 ## Thinking Blocks
 
-Models that expose chain-of-thought reasoning (e.g. DeepSeek-R1) wrap their internal reasoning in `<think>` tags. Alpaka Desktop detects these automatically and renders them in a collapsible panel with a pulsing border while the model is still thinking.
+Models that expose chain-of-thought reasoning (e.g. DeepSeek-R1) wrap their internal reasoning in `&lt;think&gt;` tags. Alpaka Desktop detects these automatically and renders them in a collapsible panel with a pulsing border while the model is still thinking.
 
 - Click the panel header to collapse or expand at any time — including while the model is still thinking.
 - The final response appears below the thinking block.
