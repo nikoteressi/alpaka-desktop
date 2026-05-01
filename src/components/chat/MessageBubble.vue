@@ -105,12 +105,16 @@ function parseProcessedParts(
     } else if (matchText.toLowerCase().startsWith("<tool_call")) {
       const nameM = matchText.match(/\bname="([^"]*)"/i);
       const queryM = matchText.match(/\bquery="([^"]*)"/i);
-      const innerM = matchText.match(/>(.*?)<\/tool_call>$/is);
+      const openEnd = matchText.indexOf(">");
+      const closeStart = matchText.lastIndexOf("</tool_call>");
       parts.push({
         type: "tool",
         toolName: nameM?.[1],
         toolQuery: queryM?.[1],
-        content: innerM?.[1] || "",
+        content:
+          openEnd >= 0 && closeStart > openEnd
+            ? matchText.slice(openEnd + 1, closeStart)
+            : "",
       });
     } else if (matchText.startsWith("```")) {
       parts.push({
@@ -155,12 +159,16 @@ function parseBlockMatch(match: RegExpExecArray): MessagePart | null {
   if (matchText.toLowerCase().startsWith("<tool_call")) {
     const nameM = matchText.match(/\bname="([^"]*)"/i);
     const queryM = matchText.match(/\bquery="([^"]*)"/i);
-    const innerM = matchText.match(/>(.*?)<\/tool_call>$/is);
+    const openEnd = matchText.indexOf(">");
+    const closeStart = matchText.lastIndexOf("</tool_call>");
     return {
       type: "tool",
       toolName: nameM?.[1],
       toolQuery: queryM?.[1],
-      content: innerM?.[1] || "",
+      content:
+        openEnd >= 0 && closeStart > openEnd
+          ? matchText.slice(openEnd + 1, closeStart)
+          : "",
     };
   }
   if (matchText.startsWith("```")) {
