@@ -22,6 +22,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - MO-07: Model tags and favorites — star models as favorites to float them to the top of the model selector, apply custom text tags to organize local models, and filter by tag in both the local models tab and chat model selector.
 
 ### Fixed
+- CI: add `src/composables/useStreamingEvents.test.ts` — 30 Vitest tests covering all 8 Tauri event handlers; add `sonar.coverage.exclusions` for framework boilerplate (`main.ts`, `router/`, `App.vue`) to bring SonarCloud new-code coverage above the 80% quality gate threshold (#77)
 - E2E: hosts.spec.ts `before()` hook now waits for the connectivity tab transition to complete (`waitForDisplayed`) instead of using a fixed 300ms pause, eliminating a race condition with Vue's `<Transition mode="out-in">` (~500ms) that caused intermittent CI failures (#75)
 - CI: updated all GitHub Actions to Node.js 24 runtimes (checkout v5.0.1, setup-node v5.0.0, pnpm/action-setup v4.1.0, upload-artifact v5.0.0); add `if-no-files-found: ignore` to E2E artifact upload steps; fix four TypeScript unused-variable lint warnings (#76)
 
