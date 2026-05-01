@@ -269,7 +269,7 @@ describe("useChatStore", () => {
 
   it("compactConversation calls invoke('compact_conversation') and returns the new conversation ID", async () => {
     const store = useChatStore();
-    mockInvoke.mockImplementation(async (cmd, args) => {
+    mockInvoke.mockImplementation(async (cmd, _args) => {
       if (cmd === "compact_conversation") return "new-conv-id";
       if (cmd === "list_conversations") return [];
       if (cmd === "get_folder_contexts") return [];
