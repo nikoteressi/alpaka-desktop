@@ -11,10 +11,14 @@ describe('Streaming — real token delivery', () => {
 
   it('streaming indicator appears in DOM while model is generating', async () => {
     const input = await chat.messageInput
-    await input.setValue('Count to 5, one number per line.')
+    // Use a multi-sentence prompt to ensure streaming takes >500ms (the default poll interval);
+    // isStreaming is set synchronously on click but a short response can complete before the
+    // first waitForExist poll fires, causing a spurious miss.
+    await input.setValue('Write a short paragraph about the solar system.')
     await chat.sendButton.click()
-    // streaming-indicator exists in DOM (v-if) but has display:none — use waitForExist
-    await $('[data-testid="streaming-indicator"]').waitForExist({ timeout: 10000 })
+    // streaming-indicator exists in DOM (v-if) but has display:none — use waitForExist.
+    // interval:100 polls every 100ms so even a sub-second stream is caught.
+    await $('[data-testid="streaming-indicator"]').waitForExist({ timeout: 10000, interval: 100 })
   })
 
   it('streaming indicator is removed from DOM when generation is complete', async () => {
