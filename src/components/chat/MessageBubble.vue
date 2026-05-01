@@ -90,18 +90,16 @@ function parseProcessedParts(
 
     const matchText = match[0];
     if (matchText.toLowerCase().startsWith("<think")) {
-      const startTagMatch = matchText.match(/^<think([\s\S]*?)>/i);
+      const startTagMatch = matchText.match(/^<think([^>]*)>/i);
       const startTag = startTagMatch ? startTagMatch[1] : "";
       const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
-      const contentMatch = matchText.match(
-        /^<think[\s\S]*?>([\s\S]*?)<\/think>$/i,
-      );
+      const contentMatch = matchText.match(/^<think[^>]*>([\s\S]*)<\/think>$/i);
 
       parts.push({
         type: "think",
         content: contentMatch
           ? contentMatch[1].trim()
-          : matchText.replace(/^<think[\s\S]*?>/i, "").trim(),
+          : matchText.replace(/^<think[^>]*>/i, "").trim(),
         language: timeMatch ? timeMatch[1] : undefined,
       });
     } else if (matchText.toLowerCase().startsWith("<tool_call")) {
@@ -169,11 +167,11 @@ const { pause, resume, isActive } = useRafFn(
 
         const matchText = match[0];
         if (matchText.toLowerCase().startsWith("<think")) {
-          const startTagMatch = matchText.match(/^<think([\s\S]*?)>/i);
+          const startTagMatch = matchText.match(/^<think([^>]*)>/i);
           const startTag = startTagMatch ? startTagMatch[1] : "";
           const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
           const contentMatch = matchText.match(
-            /^<think[\s\S]*?>([\s\S]*?)<\/think>$/i,
+            /^<think[^>]*>([\s\S]*)<\/think>$/i,
           );
 
           stableParts.value.push({
