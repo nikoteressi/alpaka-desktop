@@ -22,7 +22,7 @@ tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
 # ── Tauri core ─────────────────────────────────────────────────────────────
-tauri = { version = "2.10", features = ["tray-icon", "image-png"] }
+tauri = { version = "2.11", features = ["tray-icon", "image-png"] }
 
 # ── Tauri official plugins ──────────────────────────────────────────────────
 tauri-plugin-fs           = "2.5"
