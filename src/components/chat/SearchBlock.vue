@@ -86,6 +86,7 @@
                 <img
                   :src="getFaviconUrl(item.url)"
                   class="w-3 h-3 grayscale group-hover:grayscale-0 transition-all opacity-70 group-hover:opacity-100"
+                  alt=""
                   @error="handleIconError"
                 />
               </div>
@@ -203,12 +204,14 @@ const parsedResults = computed<SearchResult[]>(() => {
   if (!props.result) return [];
   try {
     const parsed = JSON.parse(props.result);
-    const rawResults =
-      parsed.results && Array.isArray(parsed.results)
-        ? parsed.results
-        : Array.isArray(parsed)
-          ? parsed
-          : [];
+    let rawResults: SearchResult[];
+    if (parsed.results && Array.isArray(parsed.results)) {
+      rawResults = parsed.results;
+    } else if (Array.isArray(parsed)) {
+      rawResults = parsed;
+    } else {
+      rawResults = [];
+    }
 
     return rawResults
       .map((r: SearchResult) => ({

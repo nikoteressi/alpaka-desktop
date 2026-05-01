@@ -467,7 +467,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type Component } from "vue";
+import { ref, computed, type Component } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import ConfirmationModal from "../components/shared/ConfirmationModal.vue";
 import ToggleSwitch from "../components/shared/ToggleSwitch.vue";
@@ -519,15 +519,13 @@ function previewSidebarStyle(themeId: string) {
 }
 function previewLineStyle(themeId: string, primary: boolean) {
   const dark = themeId === "dark" || themeId === "system";
-  return {
-    background: dark
-      ? primary
-        ? "#e8e8e8"
-        : "#383838"
-      : primary
-        ? "#111111"
-        : "#d0d0d0",
-  };
+  let background: string;
+  if (dark) {
+    background = primary ? "#e8e8e8" : "#383838";
+  } else {
+    background = primary ? "#111111" : "#d0d0d0";
+  }
+  return { background };
 }
 
 const activeTab = ref("general");
@@ -557,7 +555,7 @@ const ctxStepIndex = computed(() => {
 });
 
 function onCtxSlider(e: Event) {
-  const idx = parseInt((e.target as HTMLInputElement).value, 10);
+  const idx = Number.parseInt((e.target as HTMLInputElement).value, 10);
   const value = CTX_STEPS[idx];
   if (value !== undefined) {
     settingsStore.updateChatOptions({ num_ctx: value });

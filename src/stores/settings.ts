@@ -20,7 +20,7 @@ export const BUILTIN_PRESETS: Preset[] = [
       top_p: 0.95,
       top_k: 40,
       num_ctx: 4096,
-      repeat_penalty: 1.0,
+      repeat_penalty: 1,
       repeat_last_n: 64,
     },
   },
@@ -59,7 +59,7 @@ export const BUILTIN_PRESETS: Preset[] = [
       top_p: 0.95,
       top_k: 40,
       num_ctx: 8192,
-      repeat_penalty: 1.0,
+      repeat_penalty: 1,
       repeat_last_n: 64,
     },
   },
@@ -248,7 +248,7 @@ export const useSettingsStore = defineStore("settings", {
       };
 
       if (theme === "system") {
-        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const mq = globalThis.matchMedia("(prefers-color-scheme: dark)");
         setDataTheme(mq.matches);
         if (_systemThemeListener) {
           mq.removeEventListener("change", _systemThemeListener);

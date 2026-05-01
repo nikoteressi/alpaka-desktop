@@ -105,10 +105,13 @@
           </h3>
           <form @submit.prevent="addNewHost" class="space-y-4">
             <div>
-              <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1"
+              <label
+                for="new-host-name"
+                class="block text-sm text-gray-600 dark:text-gray-400 mb-1"
                 >Display Name</label
               >
               <input
+                id="new-host-name"
                 v-model="newHost.name"
                 type="text"
                 required
@@ -117,10 +120,13 @@
               />
             </div>
             <div>
-              <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1"
+              <label
+                for="new-host-url"
+                class="block text-sm text-gray-600 dark:text-gray-400 mb-1"
                 >Endpoint URL</label
               >
               <input
+                id="new-host-url"
                 v-model="newHost.url"
                 type="url"
                 required

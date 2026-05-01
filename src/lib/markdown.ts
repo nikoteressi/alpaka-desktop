@@ -53,7 +53,7 @@ function normalizeLang(lang: string): string {
 }
 
 function escapeHtml(str: string): string {
-  return str.replace(
+  return str.replaceAll(
     /[&<>"']/g,
     (m) =>
       ({
@@ -69,10 +69,7 @@ function escapeHtml(str: string): string {
 export async function highlight(str: string, lang: string): Promise<string> {
   await initMarkdown();
   const normalizedLang = normalizeLang(lang);
-  if (
-    highlighter &&
-    highlighter.getLoadedLanguages().includes(normalizedLang)
-  ) {
+  if (highlighter?.getLoadedLanguages().includes(normalizedLang)) {
     try {
       return highlighter.codeToHtml(str, {
         lang: normalizedLang,

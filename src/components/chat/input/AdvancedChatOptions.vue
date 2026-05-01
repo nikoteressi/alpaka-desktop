@@ -436,5 +436,3 @@ async function handleSaveAsModelDefault() {
   }
 }
 </script>
-
-<style scoped></style>

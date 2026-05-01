@@ -141,20 +141,20 @@ async function submitSignIn() {
   try {
     const connectUrl = await invoke<string>("trigger_ollama_signin");
 
-    if (connectUrl !== "ALREADY_SIGNED_IN") {
+    if (connectUrl === "ALREADY_SIGNED_IN") {
+      // Already signed in, just refresh status
+      await manualRefresh();
+      showSignInForm.value = false;
+    } else {
       try {
         await openUrl(connectUrl);
       } catch {
-        window.open(connectUrl, "_blank");
+        window.open(connectUrl, "_blank", "noopener,noreferrer");
       }
 
       // Transition to awaiting state and start polling
       isAwaitingConfirmation.value = true;
       startPolling();
-    } else {
-      // Already signed in, just refresh status
-      await manualRefresh();
-      showSignInForm.value = false;
     }
   } catch (err: unknown) {
     let msg = "";
