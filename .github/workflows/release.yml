@@ -116,7 +116,7 @@ jobs:
       # 3. pnpm + Node.js 20                                                #
       # ------------------------------------------------------------------ #
       - name: Setup pnpm
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda  # v4.1.0
+        uses: pnpm/action-setup@26f6d4f2c533a43e6b5da0b4a5dd983f98f7b49a  # v6.0.4
         # No 'version' key — reads from package.json "packageManager" field
 
       - name: Setup Node.js 20
