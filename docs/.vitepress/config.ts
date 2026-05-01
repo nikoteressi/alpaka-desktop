@@ -1,16 +1,22 @@
 import { defineConfig } from 'vitepress'
+import { createRequire } from 'module'
+
+const require = createRequire(import.meta.url)
+const pkg = require('../../package.json') as { version: string }
+
+const base = '/alpaka-desktop/'
 
 export default defineConfig({
   title: 'Alpaka Desktop',
   description: 'Native desktop client for Ollama — built with Tauri v2 and Vue 3',
-  base: '/alpaka-desktop/',
+  base,
   appearance: 'dark',
   cleanUrls: true,
 
   srcExclude: ['ARCHITECTURE.md', 'PRODUCT_SPEC.md'],
 
   head: [
-    ['link', { rel: 'icon', type: 'image/png', href: '/alpaka-desktop/logo.png' }],
+    ['link', { rel: 'icon', type: 'image/png', href: `${base}logo.png` }],
   ],
 
   themeConfig: {
@@ -21,7 +27,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/', activeMatch: '/guide/' },
       { text: 'Developer', link: '/dev/', activeMatch: '/dev/' },
       {
-        text: 'v1.2.0',
+        text: `v${pkg.version}`,
         items: [
           {
             text: 'Changelog',
