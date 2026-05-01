@@ -54,7 +54,7 @@
     "@tauri-apps/cli": "^2.0.0",
     "@types/lodash.throttle": "^4.1.9",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/parser": "^8.59.1",
     "@vitejs/plugin-vue": "^5.1.0",
     "@vitest/coverage-v8": "^2.1.9",
     "@vitest/ui": "^2.1.0",
