@@ -368,12 +368,13 @@ function handleEnter(e: KeyboardEvent) {
 
 function handleTextareaKeydown(e: KeyboardEvent) {
   const ctrl = e.ctrlKey || e.metaKey;
-  if (ctrl && e.key === "z" && !e.shiftKey) {
+  const key = e.key.toLowerCase();
+  if (ctrl && key === "z" && !e.shiftKey) {
     e.preventDefault();
     doUndo();
     return;
   }
-  if (ctrl && e.key === "z" && e.shiftKey) {
+  if (ctrl && key === "z" && e.shiftKey) {
     e.preventDefault();
     doRedo();
     return;
