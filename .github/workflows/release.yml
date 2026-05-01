@@ -95,7 +95,7 @@ jobs:
       # 1. Checkout — full history so changelog generation works correctly  #
       # ------------------------------------------------------------------ #
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
@@ -116,7 +116,7 @@ jobs:
       # 3. pnpm + Node.js 20                                                #
       # ------------------------------------------------------------------ #
       - name: Setup pnpm
-        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda  # v4.1.0
+        uses: pnpm/action-setup@26f6d4f2c533a43e6b5da0b4a5dd983f98f7b49a # v6.0.4
         # No 'version' key — reads from package.json "packageManager" field
 
       - name: Setup Node.js 20
@@ -205,7 +205,7 @@ jobs:
       # 9. Create GitHub Release and upload assets                          #
       # ------------------------------------------------------------------ #
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631  # v2.2.2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           tag_name: ${{ github.ref_name }}
           name: "Alpaka Desktop ${{ github.ref_name }}"
@@ -244,7 +244,7 @@ jobs:
             echo "::notice::AUR_SSH_PRIVATE_KEY not configured — skipping AUR publish."
           fi
 
-      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: steps.guard.outputs.run == 'true'
 
       - name: Get version and AppImage sha256
