@@ -6,10 +6,82 @@ export interface Attachment {
   data: Uint8Array | null;
 }
 
-export function useAttachments() {
+export interface AttachmentsOptions {
+  onLinkFile?: (path: string) => Promise<void>;
+}
+
+const IMAGE_EXTS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".bmp",
+  ".tiff",
+]);
+const TEXT_EXTS = new Set([
+  ".txt",
+  ".md",
+  ".py",
+  ".rs",
+  ".js",
+  ".ts",
+  ".jsx",
+  ".tsx",
+  ".json",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".html",
+  ".css",
+  ".sh",
+  ".csv",
+  ".xml",
+  ".go",
+  ".java",
+  ".c",
+  ".cpp",
+  ".h",
+]);
+
+const MIME_MAP: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".tiff": "image/tiff",
+};
+
+function extOf(path: string): string {
+  const dot = path.lastIndexOf(".");
+  return dot >= 0 ? path.slice(dot).toLowerCase() : "";
+}
+
+function mimeFromExt(ext: string): string {
+  return MIME_MAP[ext] ?? "application/octet-stream";
+}
+
+function isFocusedOnEditable(target: EventTarget | null): boolean {
+  if (!target) return false;
+  const el = target as HTMLElement;
+  const tag = el.tagName?.toLowerCase();
+  return tag === "input" || tag === "textarea" || el.isContentEditable;
+}
+
+function parseUriList(raw: string): string[] {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"))
+    .filter((line) => line.startsWith("file://"))
+    .map((line) => decodeURIComponent(line.slice("file://".length)));
+}
+
+export function useAttachments(options: AttachmentsOptions = {}) {
   const attachments = ref<Attachment[]>([]);
   const isDragging = ref(false);
-  let dragCounter = 0;
 
   async function handleFiles(files: FileList | File[]) {
     for (let i = 0; i < files.length; i++) {
@@ -38,22 +110,26 @@ export function useAttachments() {
     attachments.value = [];
   }
 
-  function onDragEnter(e: DragEvent) {
-    if (e.dataTransfer?.types.includes("Files")) {
-      dragCounter++;
-      isDragging.value = true;
-    }
-  }
-
-  function onDragLeave() {
-    dragCounter--;
-    if (dragCounter === 0) isDragging.value = false;
-  }
-
-  async function onDrop(e: DragEvent) {
-    dragCounter = 0;
+  async function handleDroppedPaths(paths: string[]) {
     isDragging.value = false;
-    if (e.dataTransfer?.files) await handleFiles(e.dataTransfer.files);
+    await Promise.all(
+      paths.map(async (path) => {
+        const ext = extOf(path);
+        if (IMAGE_EXTS.has(ext)) {
+          const { readFile } = await import("@tauri-apps/plugin-fs");
+          const bytes = await readFile(path);
+          const name = path.split("/").pop() ?? "image";
+          const file = new File([bytes], name, { type: mimeFromExt(ext) });
+          const previewUrl = URL.createObjectURL(file);
+          attachments.value.push({ file, previewUrl, data: bytes });
+        } else if (TEXT_EXTS.has(ext)) {
+          if (options.onLinkFile) {
+            await options.onLinkFile(path);
+          }
+        }
+        // unknown extensions are silently skipped
+      }),
+    );
   }
 
   async function onPaste(e: ClipboardEvent) {
@@ -74,15 +150,67 @@ export function useAttachments() {
     }
   }
 
+  async function onGlobalPaste(e: ClipboardEvent) {
+    if (isFocusedOnEditable(e.target)) return;
+
+    const clipboardData = e.clipboardData;
+    if (!clipboardData) return;
+
+    // Check for image items first
+    const imageFiles: File[] = [];
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      await handleFiles(imageFiles);
+      return;
+    }
+
+    // Check for file URIs from file manager copy
+    const uriList = clipboardData.getData("text/uri-list");
+    if (uriList) {
+      const paths = parseUriList(uriList);
+      if (paths.length > 0) {
+        e.preventDefault();
+        for (const path of paths) {
+          const ext = extOf(path);
+          if (TEXT_EXTS.has(ext) && options.onLinkFile) {
+            await options.onLinkFile(path);
+          }
+        }
+      }
+    }
+  }
+
+  async function initDragDrop(): Promise<() => void> {
+    const { getCurrentWebviewWindow } =
+      await import("@tauri-apps/api/webviewWindow");
+    return getCurrentWebviewWindow().onDragDropEvent((event) => {
+      if (event.payload.type === "enter" || event.payload.type === "over") {
+        isDragging.value = true;
+      } else if (event.payload.type === "leave") {
+        isDragging.value = false;
+      } else if (event.payload.type === "drop") {
+        void handleDroppedPaths(event.payload.paths);
+      }
+    });
+  }
+
   return {
     attachments,
     isDragging,
     handleFiles,
     removeAttachment,
     clearAttachments,
-    onDragEnter,
-    onDragLeave,
-    onDrop,
+    handleDroppedPaths,
     onPaste,
+    onGlobalPaste,
+    initDragDrop,
   };
 }

@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 
+vi.mock("@tauri-apps/plugin-fs", () => ({
+  readFile: vi.fn(),
+}));
+
 // jsdom doesn't implement createObjectURL — stub it with a counter so each call returns a unique URL
 let urlCounter = 0;
 global.URL.createObjectURL = vi.fn(() => `blob:mock-${++urlCounter}`);
@@ -44,80 +48,6 @@ describe("useAttachments", () => {
 
     const textFile = new File(["hello"], "note.txt", { type: "text/plain" });
     await handleFiles([textFile]);
-    expect(attachments.value).toHaveLength(0);
-  });
-
-  it("onDragEnter with Files type sets isDragging and increments counter", async () => {
-    const { useAttachments } = await import("./useAttachments");
-    const { isDragging, onDragEnter } = useAttachments();
-
-    const evt = { dataTransfer: { types: ["Files"] } } as unknown as DragEvent;
-    onDragEnter(evt);
-    expect(isDragging.value).toBe(true);
-  });
-
-  it("onDragEnter without Files type does not set isDragging", async () => {
-    const { useAttachments } = await import("./useAttachments");
-    const { isDragging, onDragEnter } = useAttachments();
-
-    const evt = {
-      dataTransfer: { types: ["text/plain"] },
-    } as unknown as DragEvent;
-    onDragEnter(evt);
-    expect(isDragging.value).toBe(false);
-  });
-
-  it("onDragLeave clears isDragging when all drag sources leave", async () => {
-    const { useAttachments } = await import("./useAttachments");
-    const { isDragging, onDragEnter, onDragLeave } = useAttachments();
-
-    const evt = { dataTransfer: { types: ["Files"] } } as unknown as DragEvent;
-    onDragEnter(evt);
-    expect(isDragging.value).toBe(true);
-
-    onDragLeave();
-    expect(isDragging.value).toBe(false);
-  });
-
-  it("onDragLeave keeps isDragging true while more drag sources remain", async () => {
-    const { useAttachments } = await import("./useAttachments");
-    const { isDragging, onDragEnter, onDragLeave } = useAttachments();
-
-    const evt = { dataTransfer: { types: ["Files"] } } as unknown as DragEvent;
-    onDragEnter(evt);
-    onDragEnter(evt);
-
-    onDragLeave();
-    expect(isDragging.value).toBe(true);
-  });
-
-  it("onDrop resets drag state and processes dropped files", async () => {
-    urlCounter = 0;
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, isDragging, onDragEnter, onDrop } = useAttachments();
-
-    const enterEvt = {
-      dataTransfer: { types: ["Files"] },
-    } as unknown as DragEvent;
-    onDragEnter(enterEvt);
-    expect(isDragging.value).toBe(true);
-
-    const file = new File(["x".repeat(10)], "drop.png", { type: "image/png" });
-    const dropEvt = {
-      dataTransfer: { files: [file] },
-    } as unknown as DragEvent;
-    await onDrop(dropEvt);
-
-    expect(isDragging.value).toBe(false);
-    expect(attachments.value).toHaveLength(1);
-  });
-
-  it("onDrop handles event with no files gracefully", async () => {
-    const { useAttachments } = await import("./useAttachments");
-    const { attachments, onDrop } = useAttachments();
-
-    const dropEvt = { dataTransfer: null } as unknown as DragEvent;
-    await onDrop(dropEvt);
     expect(attachments.value).toHaveLength(0);
   });
 
@@ -179,5 +109,100 @@ describe("useAttachments", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-1");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-2");
     expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+  });
+
+  // handleDroppedPaths tests
+
+  it("handleDroppedPaths attaches image paths as binary attachments", async () => {
+    urlCounter = 0;
+    const { readFile } = await import("@tauri-apps/plugin-fs");
+    vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, handleDroppedPaths } = useAttachments();
+    await handleDroppedPaths(["/home/user/photo.png"]);
+    expect(attachments.value).toHaveLength(1);
+    expect(attachments.value[0].data).toBeInstanceOf(Uint8Array);
+    expect(readFile).toHaveBeenCalledWith("/home/user/photo.png");
+  });
+
+  it("handleDroppedPaths calls onLinkFile for text file paths", async () => {
+    const onLinkFile = vi.fn().mockResolvedValue(undefined);
+    const { useAttachments } = await import("./useAttachments");
+    const { handleDroppedPaths } = useAttachments({ onLinkFile });
+    await handleDroppedPaths(["/home/user/notes.md"]);
+    expect(onLinkFile).toHaveBeenCalledWith("/home/user/notes.md");
+  });
+
+  it("handleDroppedPaths skips unknown extensions silently", async () => {
+    const onLinkFile = vi.fn();
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, handleDroppedPaths } = useAttachments({ onLinkFile });
+    await handleDroppedPaths(["/home/user/archive.zip"]);
+    expect(attachments.value).toHaveLength(0);
+    expect(onLinkFile).not.toHaveBeenCalled();
+  });
+
+  it("handleDroppedPaths handles multiple files in one call", async () => {
+    const { readFile } = await import("@tauri-apps/plugin-fs");
+    vi.mocked(readFile).mockResolvedValue(new Uint8Array([1]));
+    const onLinkFile = vi.fn().mockResolvedValue(undefined);
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, handleDroppedPaths } = useAttachments({ onLinkFile });
+    await handleDroppedPaths(["/a.png", "/b.md", "/c.txt"]);
+    expect(attachments.value).toHaveLength(1); // only the image
+    expect(onLinkFile).toHaveBeenCalledTimes(2); // .md and .txt
+  });
+
+  // onGlobalPaste tests
+
+  it("onGlobalPaste attaches image from clipboard image data", async () => {
+    urlCounter = 0;
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, onGlobalPaste } = useAttachments();
+    const file = new File(["x".repeat(10)], "img.png", { type: "image/png" });
+    const evt = {
+      clipboardData: {
+        items: [{ type: "image/png", getAsFile: () => file }],
+        getData: () => "",
+      },
+      preventDefault: vi.fn(),
+      target: document.createElement("div"),
+    } as unknown as ClipboardEvent;
+    await onGlobalPaste(evt);
+    expect(attachments.value).toHaveLength(1);
+  });
+
+  it("onGlobalPaste links text files from uri-list", async () => {
+    const onLinkFile = vi.fn().mockResolvedValue(undefined);
+    const { useAttachments } = await import("./useAttachments");
+    const { onGlobalPaste } = useAttachments({ onLinkFile });
+    const evt = {
+      clipboardData: {
+        items: [],
+        getData: (type: string) =>
+          type === "text/uri-list" ? "file:///home/user/notes.md\n" : "",
+      },
+      preventDefault: vi.fn(),
+      target: document.createElement("div"),
+    } as unknown as ClipboardEvent;
+    await onGlobalPaste(evt);
+    expect(onLinkFile).toHaveBeenCalledWith("/home/user/notes.md");
+  });
+
+  it("onGlobalPaste is suppressed when a textarea is focused", async () => {
+    const onLinkFile = vi.fn();
+    const { useAttachments } = await import("./useAttachments");
+    const { onGlobalPaste } = useAttachments({ onLinkFile });
+    const ta = document.createElement("textarea");
+    const evt = {
+      clipboardData: {
+        items: [],
+        getData: () => "file:///home/user/notes.md",
+      },
+      preventDefault: vi.fn(),
+      target: ta,
+    } as unknown as ClipboardEvent;
+    await onGlobalPaste(evt);
+    expect(onLinkFile).not.toHaveBeenCalled();
   });
 });
