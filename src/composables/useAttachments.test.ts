@@ -211,20 +211,21 @@ describe("useAttachments", () => {
     expect(attachments.value[0].data).toBeInstanceOf(Uint8Array);
   });
 
-  it("onGlobalPaste is suppressed when a textarea is focused", async () => {
-    const onLinkFile = vi.fn();
+  it("onGlobalPaste processes files even when a textarea is focused", async () => {
+    const onLinkFile = vi.fn().mockResolvedValue(undefined);
     const { useAttachments } = await import("./useAttachments");
     const { onGlobalPaste } = useAttachments({ onLinkFile });
     const ta = document.createElement("textarea");
     const evt = {
       clipboardData: {
         items: [],
-        getData: () => "file:///home/user/notes.md",
+        getData: (type: string) =>
+          type === "text/uri-list" ? "file:///home/user/notes.md\n" : "",
       },
       preventDefault: vi.fn(),
       target: ta,
     } as unknown as ClipboardEvent;
     await onGlobalPaste(evt);
-    expect(onLinkFile).not.toHaveBeenCalled();
+    expect(onLinkFile).toHaveBeenCalledWith("/home/user/notes.md");
   });
 });

@@ -149,8 +149,6 @@ export function useAttachments(options: AttachmentsOptions = {}) {
   }
 
   async function onGlobalPaste(e: ClipboardEvent) {
-    if (isFocusedOnEditable(e.target)) return;
-
     const clipboardData = e.clipboardData;
     if (!clipboardData) return;
 

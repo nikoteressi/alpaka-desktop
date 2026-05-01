@@ -13,6 +13,7 @@
     "notification:default",
     "global-shortcut:default",
     "opener:allow-open-url",
-    "opener:allow-open-path"
+    "opener:allow-open-path",
+    "fs:allow-read-file"
   ]
 }
