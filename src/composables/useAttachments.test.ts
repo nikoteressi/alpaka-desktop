@@ -47,6 +47,121 @@ describe("useAttachments", () => {
     expect(attachments.value).toHaveLength(0);
   });
 
+  it("onDragEnter with Files type sets isDragging and increments counter", async () => {
+    const { useAttachments } = await import("./useAttachments");
+    const { isDragging, onDragEnter } = useAttachments();
+
+    const evt = { dataTransfer: { types: ["Files"] } } as unknown as DragEvent;
+    onDragEnter(evt);
+    expect(isDragging.value).toBe(true);
+  });
+
+  it("onDragEnter without Files type does not set isDragging", async () => {
+    const { useAttachments } = await import("./useAttachments");
+    const { isDragging, onDragEnter } = useAttachments();
+
+    const evt = {
+      dataTransfer: { types: ["text/plain"] },
+    } as unknown as DragEvent;
+    onDragEnter(evt);
+    expect(isDragging.value).toBe(false);
+  });
+
+  it("onDragLeave clears isDragging when all drag sources leave", async () => {
+    const { useAttachments } = await import("./useAttachments");
+    const { isDragging, onDragEnter, onDragLeave } = useAttachments();
+
+    const evt = { dataTransfer: { types: ["Files"] } } as unknown as DragEvent;
+    onDragEnter(evt);
+    expect(isDragging.value).toBe(true);
+
+    onDragLeave();
+    expect(isDragging.value).toBe(false);
+  });
+
+  it("onDragLeave keeps isDragging true while more drag sources remain", async () => {
+    const { useAttachments } = await import("./useAttachments");
+    const { isDragging, onDragEnter, onDragLeave } = useAttachments();
+
+    const evt = { dataTransfer: { types: ["Files"] } } as unknown as DragEvent;
+    onDragEnter(evt);
+    onDragEnter(evt);
+
+    onDragLeave();
+    expect(isDragging.value).toBe(true);
+  });
+
+  it("onDrop resets drag state and processes dropped files", async () => {
+    urlCounter = 0;
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, isDragging, onDragEnter, onDrop } = useAttachments();
+
+    const enterEvt = {
+      dataTransfer: { types: ["Files"] },
+    } as unknown as DragEvent;
+    onDragEnter(enterEvt);
+    expect(isDragging.value).toBe(true);
+
+    const file = new File(["x".repeat(10)], "drop.png", { type: "image/png" });
+    const dropEvt = {
+      dataTransfer: { files: [file] },
+    } as unknown as DragEvent;
+    await onDrop(dropEvt);
+
+    expect(isDragging.value).toBe(false);
+    expect(attachments.value).toHaveLength(1);
+  });
+
+  it("onDrop handles event with no files gracefully", async () => {
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, onDrop } = useAttachments();
+
+    const dropEvt = { dataTransfer: null } as unknown as DragEvent;
+    await onDrop(dropEvt);
+    expect(attachments.value).toHaveLength(0);
+  });
+
+  it("onPaste adds image files from clipboard items", async () => {
+    urlCounter = 0;
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, onPaste } = useAttachments();
+
+    const file = new File(["x".repeat(10)], "paste.png", { type: "image/png" });
+    const pasteEvt = {
+      clipboardData: {
+        items: [{ type: "image/png", getAsFile: () => file }],
+      },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent;
+    await onPaste(pasteEvt);
+
+    expect(attachments.value).toHaveLength(1);
+  });
+
+  it("onPaste ignores clipboard items that are not images", async () => {
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, onPaste } = useAttachments();
+
+    const pasteEvt = {
+      clipboardData: {
+        items: [{ type: "text/plain", getAsFile: () => null }],
+      },
+      preventDefault: vi.fn(),
+    } as unknown as ClipboardEvent;
+    await onPaste(pasteEvt);
+
+    expect(attachments.value).toHaveLength(0);
+  });
+
+  it("onPaste does nothing when clipboardData is absent", async () => {
+    const { useAttachments } = await import("./useAttachments");
+    const { attachments, onPaste } = useAttachments();
+
+    const pasteEvt = { clipboardData: null } as unknown as ClipboardEvent;
+    await onPaste(pasteEvt);
+    expect(attachments.value).toHaveLength(0);
+  });
+
   it("clearAttachments removes all items and revokes all URLs", async () => {
     urlCounter = 0;
     vi.mocked(URL.revokeObjectURL).mockClear();
