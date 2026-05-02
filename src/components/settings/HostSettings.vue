@@ -132,12 +132,12 @@
           <input
             v-model="newHostName"
             placeholder="Display name"
-            class="bg-[var(--bg-base)] border border-[var(--border)] focus:border-[var(--border-strong)] rounded-lg px-3 py-1.5 text-[12.5px] text-[var(--text)] outline-none placeholder-[var(--text-dim)] transition-colors"
+            class="custom-input w-full"
           />
           <input
             v-model="newHostUrl"
             placeholder="http://192.168.1.100:11434"
-            class="bg-[var(--bg-base)] border border-[var(--border)] focus:border-[var(--border-strong)] rounded-lg px-3 py-1.5 text-[12.5px] text-[var(--text)] outline-none placeholder-[var(--text-dim)] font-mono transition-colors"
+            class="custom-input w-full font-mono"
           />
           <button
             @click="addHost"
