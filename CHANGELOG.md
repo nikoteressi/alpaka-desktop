@@ -1,8 +1,18 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+All notable changes to Alpaka Desktop are documented here.
 
-### [1.2.1](https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.0...v1.2.1) (2026-05-02)
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [Unreleased]
+
+### Changed
+- Removed unused dependencies: `@types/lodash.throttle`, `ts-node` (frontend), `tracing-subscriber` (backend)
+
+---
 
 ## [1.2.0] - 2026-05-02
 

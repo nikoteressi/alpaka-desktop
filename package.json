@@ -1,6 +1,6 @@
 {
   "name": "alpaka-desktop",
-  "version": "1.2.1",
+  "version": "1.2.0",
   "description": "Native Linux desktop client for Ollama",
   "private": true,
   "type": "module",
