@@ -32,24 +32,7 @@ See the [landing page](/) for all installation options (AppImage, APT, AUR, sour
 
 ## Interface Overview
 
-```
-┌──────────────────────────────────────────────────────┐
-│ [≡] Alpaka Desktop  [llama3.2 ▾] [● localhost]  [⚙] │  ← top bar
-├────────────┬─────────────────────────────────────────┤
-│            │                                         │
-│  Sidebar   │           Chat area                     │
-│            │                                         │
-│  ▸ New     │   User message                          │
-│  ─────     │   ─────────────────────────────────     │
-│  Today     │   Assistant response (streaming)        │
-│    Conv 1  │                                         │
-│    Conv 2  │                                         │
-│  Yesterday │                                         │
-│    Conv 3  │                                         │
-│            ├─────────────────────────────────────────┤
-│            │  [📎] Type a message...        [Send ▶] │  ← input
-└────────────┴─────────────────────────────────────────┘
-```
+<InterfaceMockup />
 
 - **Sidebar** — conversation history, organized by date. Click a conversation to open it. Use `Ctrl+/` to toggle.
 - **Top bar** — model selector, host indicator, and settings button.

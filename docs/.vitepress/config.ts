@@ -1,17 +1,26 @@
 import { defineConfig } from 'vitepress'
 import { createRequire } from 'module'
+import tailwindcss from '@tailwindcss/vite'
+import { withMermaid } from 'vitepress-plugin-mermaid'
 
 const require = createRequire(import.meta.url)
 const pkg = require('../../package.json') as { version: string }
 
 const base = '/alpaka-desktop/'
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: 'Alpaka Desktop',
   description: 'Native desktop client for Ollama — built with Tauri v2 and Vue 3',
   base,
   appearance: 'dark',
   cleanUrls: true,
+
+  vite: {
+    plugins: [tailwindcss()],
+    optimizeDeps: {
+      include: ['mermaid', 'dayjs'],
+    },
+  },
 
   srcExclude: ['ARCHITECTURE.md', 'PRODUCT_SPEC.md'],
 
@@ -84,4 +93,4 @@ export default defineConfig({
       copyright: 'Copyright © 2026 Alpaka Desktop Contributors',
     },
   },
-})
+}))

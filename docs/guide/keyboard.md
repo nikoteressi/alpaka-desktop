@@ -44,8 +44,4 @@ Paste works anywhere on the chat page — focus does not need to be in the input
 
 | Clipboard content | Result |
 |---|---|
-| Image data (e.g. screenshot) | Attached to message |
-| Files copied from file manager | Images attached; text files linked as context |
 | Plain text | Inserted into input field normally |
-
-Multiple files pasted at once are all processed.

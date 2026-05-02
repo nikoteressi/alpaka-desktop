@@ -10,7 +10,7 @@ Tokens render as they arrive. Markdown, code blocks, tables, and math (LaTeX via
 
 ## Thinking Blocks
 
-Models that expose chain-of-thought reasoning (e.g. DeepSeek-R1) wrap their internal reasoning in `&lt;think&gt;` tags. Alpaka Desktop detects these automatically and renders them in a collapsible panel with a pulsing border while the model is still thinking.
+Models that expose chain-of-thought reasoning (e.g. DeepSeek-R1) wrap their internal reasoning in `<think>` tags. Alpaka Desktop detects these automatically and renders them in a collapsible panel with a pulsing border while the model is still thinking.
 
 - Click the panel header to collapse or expand at any time — including while the model is still thinking.
 - The final response appears below the thinking block.
@@ -21,7 +21,7 @@ Attach files to your message using the paperclip button or by dragging and dropp
 
 | Type | How to attach | Notes |
 |---|---|---|
-| Images | Drag-drop, paste (`Ctrl+V`), or file picker | Vision models only (e.g. LLaVA, Gemma 3) |
+| Images | Drag-drop or file picker | Vision models only (e.g. LLaVA, Gemma 3) |
 | Text files | Drag-drop or file picker | Content is included in the prompt |
 | PDFs | Drag-drop or file picker | Text is extracted and included |
 
@@ -41,7 +41,6 @@ All conversations are saved automatically to a local SQLite database.
 | Rename | Right-click a conversation in the sidebar |
 | Pin | Right-click → Pin to keep at the top |
 | Delete | Right-click → Delete |
-| Export | Three-dot menu → Export as Markdown / JSON |
 
 ## Compact / TWM Mode
 

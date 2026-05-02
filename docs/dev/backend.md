@@ -8,48 +8,33 @@ This is the most complex part of the backend. Understanding it is essential befo
 
 ### Flow
 
-```
-Ollama HTTP response (NDJSON stream)
-    │
-    ▼
-src-tauri/src/ollama/streaming.rs
-    │  Parses each NDJSON line
-    │  Detects <think> / </think> tag boundaries (including splits across chunk boundaries)
-    │  Detects <tool_call> blocks and parses name + arguments
-    │
-    ├─── emits chat:token              { conversation_id, content }
-    ├─── emits chat:thinking-start     { conversation_id }
-    ├─── emits chat:thinking-token     { conversation_id, content }
-    ├─── emits chat:thinking-end       { conversation_id }
-    ├─── emits chat:tool-call          { conversation_id, tool_name, arguments }
-    ├─── emits chat:tool-result        { conversation_id, tool_name, result }
-    ├─── emits chat:done               { conversation_id, tokens_per_sec? }
-    └─── emits chat:error              { conversation_id, error }
-    │
-    ▼
-src/composables/useStreamingEvents.ts
-    │  Registers Tauri event listeners for all chat:* events
-    │  Dispatches to useStreaming.ts
-    │
-    ▼
-src/composables/useStreaming.ts
-    │  Accumulates tokens into reactive state
-    │  Manages thinking block open/close state
-    │
-    ▼
-Pinia chat store (src/stores/chat.ts)
-    │
-    ▼
-Vue reactive rendering (MessageBubble.vue → markdown pipeline)
+```mermaid
+flowchart TD
+    Ollama["Ollama HTTP response<br/>(NDJSON stream)"] --> Rust
+
+    Rust["ollama/streaming.rs"]
+    
+    Rust -->|Emits Tauri Events| Events
+    
+    Events["useStreamingEvents.ts"] --> Composables
+    Composables["useStreaming.ts"] --> Store
+    Store["Pinia chat store"] --> UI
+    UI["Vue reactive rendering"]
+
+    classDef default fill:#111111,stroke:#333333,color:#EEEEEE
+    classDef rust fill:#2a1a4a,stroke:#8251EE,color:#EEEEEE
+    classDef vue fill:#162b22,stroke:#42b883,color:#EEEEEE
+    class Rust rust
+    class Events,Composables,Store,UI vue
 ```
 
 ### Think Tag Detection
 
-The `&lt;think&gt;` tag can be split across NDJSON chunk boundaries (e.g. `&lt;thi` in one chunk, `nk&gt;` in the next). `streaming.rs` maintains a small string buffer to handle cross-chunk boundaries. Do not use a single-pass regex for this — it will miss split tags under load.
+The `<think>` tag can be split across NDJSON chunk boundaries (e.g. `<thi` in one chunk, `nk>` in the next). `streaming.rs` maintains a small string buffer to handle cross-chunk boundaries. Do not use a single-pass regex for this — it will miss split tags under load.
 
 ### Tool Call Parsing
 
-Tool calls arrive as `&lt;tool_call name="..." arguments="{...}"&gt;` in the token stream. Parsing extracts the `name` attribute and the JSON `arguments` attribute using secondary regex calls (not a single complex regex — SonarCloud enforces regex complexity < 20).
+Tool calls arrive as `<tool_call name="..." arguments="{...}">` in the token stream. Parsing extracts the `name` attribute and the JSON `arguments` attribute using secondary regex calls (not a single complex regex — SonarCloud enforces regex complexity < 20).
 
 ## Command Registry
 
