@@ -48,6 +48,7 @@ features:
 
 ## See It In Action
 
+<!-- markdownlint-disable MD033 -->
 <div class="demo-grid">
 
 ![Streaming chat](./demo/streaming.gif)
@@ -60,19 +61,7 @@ features:
 *Collapsible chain-of-thought reasoning panels*
 
 </div>
-
-::: tip Recording demo assets
-Commit GIFs and screenshots to `docs/demo/` before publishing the site:
-- `docs/demo/streaming.gif` — record a streaming chat response (~10s)
-- `docs/demo/models.png` — screenshot of the Models → Local tab
-- `docs/demo/thinking.gif` — record a thinking block expanding/collapsing (~8s)
-
-Tools: [Peek](https://github.com/phw/peek) or [Byzanz](https://github.com/GNOME/byzanz) for GIF recording. Keep each GIF under 5 MB.
-:::
-
-## Install
-
-::: code-group
+<!-- markdownlint-enable MD033 -->
 
 ```bash [AppImage]
 # Download from GitHub Releases, then:
