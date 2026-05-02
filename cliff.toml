@@ -1,0 +1,66 @@
+# git-cliff configuration — https://git-cliff.org
+# Run: git cliff --output CHANGELOG.md
+# Or for a specific range: git cliff v1.2.0..HEAD --output CHANGELOG.md
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to Alpaka Desktop are documented here.
+
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}\
+- {{ commit.message | upper_first | trim }}\
+{% if commit.breaking %} (**breaking**){% endif %}
+{% endfor %}\
+{% endfor %}
+---
+"""
+footer = """
+{% for release in releases -%}
+[{{ release.version | trim_start_matches(pat="v") }}]: \
+  {% if release.previous.version %}\
+    https://github.com/nikoteressi/alpaka-desktop/compare/{{ release.previous.version }}...{{ release.version }}\
+  {% else %}\
+    https://github.com/nikoteressi/alpaka-desktop/releases/tag/{{ release.version }}\
+  {% endif %}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+# Map conventional commit types to human-readable section headers
+commit_parsers = [
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^remove|^revert", group = "Removed" },
+  { message = "^refactor", group = "Changed" },
+  { message = "^perf", group = "Performance" },
+  { message = "^docs", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^style", skip = true },
+  { message = "^test", skip = true },
+  { message = "^build", skip = true },
+]
+filter_commits = true
+tag_pattern = "v[0-9]*"
+skip_tags = ""
+ignore_tags = ""
+topo_order = false
+sort_commits = "newest"

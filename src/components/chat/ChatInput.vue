@@ -11,6 +11,7 @@ import { useContextWindow } from "../../composables/useContextWindow";
 import { useAttachments } from "../../composables/useAttachments";
 import { useModelDefaults } from "../../composables/useModelDefaults";
 import { useDraftSync } from "../../composables/useDraftSync";
+import { useUndoHistory } from "../../composables/useUndoHistory";
 import { appEvents, APP_EVENT } from "../../lib/appEvents";
 import type { ChatOptions } from "../../types/settings";
 
@@ -326,37 +327,11 @@ const { maxContext, contextTokens, isContextNearFull } = useContextWindow({
 // WebKitGTK on Wayland doesn't route Ctrl+Z to the textarea's native undo stack,
 // and execCommand("undo") conflicts with Vue's v-model (Vue resets the value on
 // the next re-render). We maintain our own history keyed to inputContent.
-const undoHistory: string[] = [""];
-const redoHistory: string[] = [];
-let snapshotTimer: ReturnType<typeof setTimeout> | null = null;
-
-function saveSnapshot() {
-  const v = inputContent.value;
-  if (v !== undoHistory[undoHistory.length - 1]) {
-    undoHistory.push(v);
-    redoHistory.length = 0;
-    if (undoHistory.length > 100) undoHistory.shift();
-  }
-}
-
-function scheduleSnapshot() {
-  if (snapshotTimer) clearTimeout(snapshotTimer);
-  snapshotTimer = setTimeout(saveSnapshot, 300);
-}
-
-function doUndo() {
-  saveSnapshot();
-  if (undoHistory.length <= 1) return;
-  redoHistory.push(undoHistory.pop()!);
-  inputContent.value = undoHistory[undoHistory.length - 1];
-}
-
-function doRedo() {
-  if (redoHistory.length === 0) return;
-  const next = redoHistory.pop()!;
-  undoHistory.push(next);
-  inputContent.value = next;
-}
+const {
+  scheduleSnapshot,
+  undo: doUndo,
+  redo: doRedo,
+} = useUndoHistory(inputContent);
 
 // ---- Submit ----
 function handleEnter(e: KeyboardEvent) {
