@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Removed unused dependencies: `@types/lodash.throttle`, `ts-node` (frontend), `tracing-subscriber` (backend)
+
 ---
 
 ## [1.2.0] - 2026-05-02

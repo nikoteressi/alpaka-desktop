@@ -480,8 +480,6 @@ import PresetEditor from "../components/settings/PresetEditor.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
 import StopSequencesInput from "../components/settings/StopSequencesInput.vue";
 import { useSettingsStore } from "../stores/settings";
-import { useModelStore } from "../stores/models";
-import { useHostStore } from "../stores/hosts";
 import { useConfirmationModal } from "../composables/useConfirmationModal";
 import {
   IconGeneral,
@@ -494,8 +492,6 @@ import {
 } from "../components/shared/icons";
 
 const settingsStore = useSettingsStore();
-const modelsStore = useModelStore();
-const hostStore = useHostStore();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
 
 const themeOptions = [

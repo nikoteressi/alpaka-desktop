@@ -110,7 +110,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import CustomTooltip from "../../shared/CustomTooltip.vue";
 
-const props = defineProps<{
+defineProps<{
   disabled?: boolean;
   isLinking?: boolean;
 }>();
