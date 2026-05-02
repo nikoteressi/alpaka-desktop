@@ -20,12 +20,12 @@ graph TD
         subgraph "Backend Layer"
             Cmd[commands/ API]
             Svc[services/ Logic]
-            Oll[ollama/ Client]
+            OllamaClient[ollama/ Client]
             DB[(db/ SQLite)]
             Auth[auth/ Keyring]
             
             Cmd --> Svc
-            Svc --> Oll
+            Svc --> OllamaClient
             Svc --> DB
             Svc --> Auth
         end
@@ -33,7 +33,7 @@ graph TD
         P -.-> Cmd
     end
     
-    Oll <-->|HTTP| Host[Ollama Hosts<br/>Local / LAN / Cloud]
+    OllamaClient <-->|HTTP| Host[Ollama Hosts<br/>Local / LAN / Cloud]
     
     classDef default fill:#111111,stroke:#333333,color:#EEEEEE
     classDef highlight fill:#2a1a4a,stroke:#8251EE,color:#EEEEEE
