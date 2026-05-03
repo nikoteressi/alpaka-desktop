@@ -52,6 +52,23 @@ const activeConvId = computed(() => chatStore.activeConversationId);
 
 // ---- Linked Context ----
 const isLinking = ref(false);
+const linkError = ref<string | null>(null);
+let linkErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showLinkError(msg: string) {
+  linkError.value = msg;
+  if (linkErrorTimer) clearTimeout(linkErrorTimer);
+  linkErrorTimer = setTimeout(() => {
+    linkError.value = null;
+    linkErrorTimer = null;
+  }, 4000);
+}
+
+function extractErrorMessage(err: unknown): string {
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  return "Failed to link file — binary or unreadable files cannot be used as context.";
+}
 
 async function pickContext(isFolder: boolean) {
   if (!activeConvId.value) return;
@@ -81,6 +98,7 @@ async function pickContext(isFolder: boolean) {
     });
   } catch (err) {
     console.error("Failed to link context:", err);
+    showLinkError(extractErrorMessage(err));
   } finally {
     isLinking.value = false;
   }
@@ -304,6 +322,7 @@ const {
       });
     } catch (err) {
       console.error("Failed to link dropped file:", err);
+      showLinkError(extractErrorMessage(err));
     } finally {
       isLinking.value = false;
     }
@@ -463,11 +482,13 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (linkErrorTimer) clearTimeout(linkErrorTimer);
   appEvents.removeEventListener(
     APP_EVENT.OPEN_MODEL_SWITCHER,
     onOpenModelSwitcher,
   );
   unlistenDrag?.();
+  clearAttachments();
 });
 </script>
 
@@ -518,6 +539,11 @@ onBeforeUnmount(() => {
         class="absolute inset-0 z-30 bg-[var(--accent-muted)] backdrop-blur-[2px] border-2 border-dashed border-[var(--accent)] flex items-center justify-center pointer-events-none rounded-[20px]"
       >
         <span class="text-[var(--accent)] font-medium">Drop images here</span>
+      </div>
+
+      <!-- File link error -->
+      <div v-if="linkError" class="text-[11px] text-red-400 mb-1 px-1">
+        {{ linkError }}
       </div>
 
       <!-- Linked Context List -->

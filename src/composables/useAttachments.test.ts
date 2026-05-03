@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("@tauri-apps/plugin-fs", () => ({
-  readFile: vi.fn(),
+const mockInvoke = vi.fn();
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: mockInvoke,
 }));
 
 // jsdom doesn't implement createObjectURL — stub it with a counter so each call returns a unique URL
@@ -74,14 +75,15 @@ describe("useAttachments", () => {
 
   it("handleDroppedPaths attaches image paths as binary attachments", async () => {
     urlCounter = 0;
-    const { readFile } = await import("@tauri-apps/plugin-fs");
-    vi.mocked(readFile).mockResolvedValue(new Uint8Array([1, 2, 3]));
+    mockInvoke.mockResolvedValue([1, 2, 3]);
     const { useAttachments } = await import("./useAttachments");
     const { attachments, handleDroppedPaths } = useAttachments();
     await handleDroppedPaths(["/home/user/photo.png"]);
     expect(attachments.value).toHaveLength(1);
     expect(attachments.value[0].data).toBeInstanceOf(Uint8Array);
-    expect(readFile).toHaveBeenCalledWith("/home/user/photo.png");
+    expect(mockInvoke).toHaveBeenCalledWith("read_image_file", {
+      path: "/home/user/photo.png",
+    });
   });
 
   it("handleDroppedPaths calls onLinkFile for text file paths", async () => {
@@ -102,8 +104,7 @@ describe("useAttachments", () => {
   });
 
   it("handleDroppedPaths handles multiple files in one call", async () => {
-    const { readFile } = await import("@tauri-apps/plugin-fs");
-    vi.mocked(readFile).mockResolvedValue(new Uint8Array([1]));
+    mockInvoke.mockResolvedValue([1]);
     const onLinkFile = vi.fn().mockResolvedValue(undefined);
     const { useAttachments } = await import("./useAttachments");
     const { attachments, handleDroppedPaths } = useAttachments({ onLinkFile });

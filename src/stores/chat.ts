@@ -263,6 +263,8 @@ export const useChatStore = defineStore("chat", {
           }),
         ]);
 
+        if (this.activeConversationId !== id) return;
+
         this.messages[id] = (rawMessages || []).map((m) => {
           let images: Uint8Array[] = [];
           try {
@@ -311,6 +313,9 @@ export const useChatStore = defineStore("chat", {
             };
           }),
         );
+
+        if (this.activeConversationId !== id) return;
+
         this.folderContexts[id] = populatedContexts;
       } catch (err) {
         console.warn("Could not load conversation data", err);

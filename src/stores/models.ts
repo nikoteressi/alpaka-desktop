@@ -54,6 +54,7 @@ export const useModelStore = defineStore("models", {
     isLoading: false,
     error: null as string | null,
     listenersInitialized: false,
+    _unlisten: [] as Array<() => void>,
     capabilities: {} as Record<string, ModelCapabilities>,
     modelUserData: {} as Record<string, ModelUserData>,
     // Library search state
@@ -61,6 +62,7 @@ export const useModelStore = defineStore("models", {
     searchQuery: "",
     isSearching: false,
     _searchTimer: null as ReturnType<typeof setTimeout> | null,
+    _searchVersion: 0,
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],
@@ -291,17 +293,26 @@ export const useModelStore = defineStore("models", {
         return;
       }
       this.isSearching = true;
+      this._searchVersion++;
+      const version = this._searchVersion;
       this._searchTimer = setTimeout(async () => {
         try {
-          this.libraryResults = await invoke<LibraryModel[]>(
+          const results = await invoke<LibraryModel[]>(
             "search_ollama_library",
             { query: q },
           );
+          if (version === this._searchVersion) {
+            this.libraryResults = results;
+          }
         } catch (err) {
-          console.error("Library search failed:", err);
-          this.libraryResults = [];
+          if (version === this._searchVersion) {
+            console.error("Library search failed:", err);
+            this.libraryResults = [];
+          }
         } finally {
-          this.isSearching = false;
+          if (version === this._searchVersion) {
+            this.isSearching = false;
+          }
         }
       }, 300);
     },
@@ -313,45 +324,56 @@ export const useModelStore = defineStore("models", {
     },
     async initListeners() {
       if (this.listenersInitialized) return;
-      this.listenersInitialized = true;
-
-      await listen<PullProgressPayload>("model:pull-progress", (event) => {
-        const payload = event.payload;
-        this.pulling[payload.model] = payload;
-      });
-      await listen<{ model: string }>("model:pull-done", (event) => {
-        const payload = event.payload;
-        delete this.pulling[payload.model];
-        this.fetchModels();
-        this.fetchCapabilities(payload.model);
-      });
-      await listen<CreateProgressPayload>("model:create-progress", (event) => {
-        const { model, status } = event.payload;
-        if (this.creating[model]) {
-          this.creating[model].status = status;
-          this.creating[model].logLines.push(status);
-        }
-      });
-      await listen<CreateDonePayload>("model:create-done", (event) => {
-        const { model } = event.payload;
-        if (this.creating[model]) {
-          this.creating[model].phase = "done";
-        }
-        this.fetchModels();
-      });
-      await listen<CreateErrorPayload>("model:create-error", (event) => {
-        const { model, error, cancelled } = event.payload;
-        if (this.creating[model]) {
-          if (cancelled) {
-            // No reason to keep cancelled state in memory — delete immediately.
-            // CreateModelPage captures the phase locally before this fires.
-            delete this.creating[model];
-          } else {
-            this.creating[model].phase = "error";
-            this.creating[model].error = error;
-          }
-        }
-      });
+      const unlistens: Array<() => void> = [];
+      try {
+        unlistens.push(
+          ...(await Promise.all([
+            listen<PullProgressPayload>("model:pull-progress", (event) => {
+              const payload = event.payload;
+              this.pulling[payload.model] = payload;
+            }),
+            listen<{ model: string }>("model:pull-done", (event) => {
+              const payload = event.payload;
+              delete this.pulling[payload.model];
+              this.fetchModels();
+              this.fetchCapabilities(payload.model);
+            }),
+            listen<CreateProgressPayload>("model:create-progress", (event) => {
+              const { model, status } = event.payload;
+              if (this.creating[model]) {
+                this.creating[model].status = status;
+                this.creating[model].logLines.push(status);
+              }
+            }),
+            listen<CreateDonePayload>("model:create-done", (event) => {
+              const { model } = event.payload;
+              if (this.creating[model]) {
+                this.creating[model].phase = "done";
+              }
+              this.fetchModels();
+            }),
+            listen<CreateErrorPayload>("model:create-error", (event) => {
+              const { model, error, cancelled } = event.payload;
+              if (this.creating[model]) {
+                if (cancelled) {
+                  // No reason to keep cancelled state in memory — delete immediately.
+                  // CreateModelPage captures the phase locally before this fires.
+                  delete this.creating[model];
+                } else {
+                  this.creating[model].phase = "error";
+                  this.creating[model].error = error;
+                }
+              }
+            }),
+          ])),
+        );
+        this._unlisten = unlistens;
+        this.listenersInitialized = true;
+      } catch (e) {
+        unlistens.forEach((fn) => fn());
+        // listenersInitialized stays false — retry is possible
+        throw e;
+      }
     },
 
     clearCreateState(name: string) {

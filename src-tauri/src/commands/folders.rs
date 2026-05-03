@@ -91,16 +91,17 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
             ));
         }
 
-        if let Ok(file_content) = std::fs::read_to_string(folder_path) {
-            if file_content.len() > MAX_FOLDER_CONTEXT_SIZE {
-                return Err(AppError::Internal("File exceeds 50MB limit".into()));
-            }
-            let filename = folder_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("file");
-            content.push_str(&format!("\n--- File: {} ---\n{}\n", filename, file_content));
+        let bytes = std::fs::read(folder_path)
+            .map_err(|e| AppError::Io(format!("Failed to read file: {}", e)))?;
+        if bytes.len() > MAX_FOLDER_CONTEXT_SIZE {
+            return Err(AppError::Internal("File exceeds 50MB limit".into()));
         }
+        let file_content = String::from_utf8_lossy(&bytes);
+        let filename = folder_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("file");
+        content.push_str(&format!("\n--- File: {} ---\n{}\n", filename, file_content));
 
         let token_estimate = content.chars().count() / 4;
         return Ok(FolderContextPayload {

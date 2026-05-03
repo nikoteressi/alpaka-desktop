@@ -13,6 +13,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Cancelling generation (Stop button or Esc) no longer emits `chat:done`, persists a partial message to the database, or triggers a completion notification; partial content is preserved in-session via the new `chat:cancelled` event
 - Esc key now correctly clears the streaming indicator (previously `isStreaming` stayed true after pressing Esc)
 - Network chunk errors mid-stream no longer emit a duplicate `chat:done` or persist the partial response as a completed message
+- Draft message input is now correctly saved to the database; IPC parameter casing mismatch (`conversation_id`/`draft_json` → `conversationId`/`draftJson`) prevented persistence silently
+- Clearing a draft on an unsaved conversation no longer logs "Conversation not found" warnings
+- Linked file context (text files attached via "Link File Context") is now correctly passed to the model; non-UTF-8 and permission-denied files previously returned empty content silently
+- File link errors in the chat input now show the actual backend error message instead of a generic fallback
+
+### Security
+- Tauri capability narrowed from broad `fs:allow-read-file` to a scoped `read_image_file` command with an extension allowlist (`jpg`, `jpeg`, `png`, `gif`, `webp`, `bmp`) and 20 MB size guard; unused `opener:allow-open-path` capability removed
 
 ### Security
 - API key is now restricted to `https://api.ollama.com` only: `is_cloud_host` requires HTTPS scheme, preventing the key from being attached to plaintext HTTP connections; `validate_api_key` rejects any host that is not the cloud endpoint before reading the key from the keyring
