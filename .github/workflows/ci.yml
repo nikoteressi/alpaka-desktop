@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main, develop, release/*, hotfix/*]
+    tags: ['v*']
   pull_request:
     branches: [main, develop, release/*, hotfix/*]
 
@@ -229,7 +230,7 @@ jobs:
 
       - name: Cargo clippy
         if: needs.changes.outputs.rust == 'true'
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
         working-directory: src-tauri
 
       - name: Setup pnpm
@@ -297,7 +298,7 @@ jobs:
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -531,7 +532,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Ollama
-        run: curl -fsSL https://ollama.com/install.sh | sh
+        env:
+          OLLAMA_VERSION: "0.6.5"
+        run: |
+          curl -fsSL "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64" \
+            -o /usr/local/bin/ollama
+          chmod +x /usr/local/bin/ollama
 
       - name: Start Ollama and pull test model
         run: |
