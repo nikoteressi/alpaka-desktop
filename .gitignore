@@ -29,6 +29,8 @@ CLAUDE.md
 .playwright-mcp/
 .playwright-mcp.worktrees/
 .worktrees/
+.agents/
+.codex/
 
 # Test and coverage output
 test-results
