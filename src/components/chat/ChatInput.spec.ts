@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import ChatInput from "./ChatInput.vue";
@@ -600,6 +600,172 @@ describe("ChatInput — Model defaults on selection", () => {
 
     await expect(vm.selectModel("llama3")).resolves.not.toThrow();
     expect(vm.chatOptions).toEqual({});
+  });
+});
+
+describe("ChatInput — Link error display", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    mockInvoke.mockImplementation(() => Promise.resolve([]));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("showLinkError sets linkError and auto-clears after 4 s", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      showLinkError: (msg: string) => void;
+      linkError: string | null;
+    };
+
+    vm.showLinkError("Something went wrong");
+    await wrapper.vm.$nextTick();
+
+    expect(vm.linkError).toBe("Something went wrong");
+
+    vi.advanceTimersByTime(4000);
+    await wrapper.vm.$nextTick();
+
+    expect(vm.linkError).toBeNull();
+  });
+
+  it("showLinkError cancels a previous pending timer on repeated calls", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      showLinkError: (msg: string) => void;
+      linkError: string | null;
+    };
+
+    vm.showLinkError("first error");
+    await wrapper.vm.$nextTick();
+    vi.advanceTimersByTime(2000);
+
+    vm.showLinkError("second error");
+    await wrapper.vm.$nextTick();
+    vi.advanceTimersByTime(2000);
+
+    // first timer would have cleared it at t=4000; second timer resets the clock
+    expect(vm.linkError).toBe("second error");
+
+    vi.advanceTimersByTime(2000);
+    await wrapper.vm.$nextTick();
+
+    expect(vm.linkError).toBeNull();
+  });
+
+  it("renders the linkError message in the template", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      showLinkError: (msg: string) => void;
+    };
+
+    vm.showLinkError("File is binary");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain("File is binary");
+  });
+
+  it("pickContext shows a Tauri plain-string error when link_folder rejects", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    vi.mocked(open).mockResolvedValueOnce("/home/user/notes.txt");
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "link_folder")
+        return Promise.reject("File is binary or unreadable");
+      return Promise.resolve([]);
+    });
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      pickContext: (isFolder: boolean) => Promise<void>;
+      linkError: string | null;
+    };
+
+    await vm.pickContext(false);
+    await wrapper.vm.$nextTick();
+
+    expect(vm.linkError).toBe("File is binary or unreadable");
+  });
+
+  it("pickContext shows a fallback message when a non-string non-Error is thrown", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    vi.mocked(open).mockResolvedValueOnce("/home/user/doc.txt");
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "link_folder") return Promise.reject({ code: 42 });
+      return Promise.resolve([]);
+    });
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      pickContext: (isFolder: boolean) => Promise<void>;
+      linkError: string | null;
+    };
+
+    await vm.pickContext(false);
+    await wrapper.vm.$nextTick();
+
+    expect(vm.linkError).toBe(
+      "Failed to link file — binary or unreadable files cannot be used as context.",
+    );
+  });
+});
+
+describe("ChatInput — onBeforeUnmount cleanup", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+    mockInvoke.mockImplementation(() => Promise.resolve([]));
+    global.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    global.URL.revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("clears linkErrorTimer on unmount so it does not fire after teardown", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      showLinkError: (msg: string) => void;
+      linkError: string | null;
+    };
+
+    vm.showLinkError("pending error");
+    await wrapper.vm.$nextTick();
+    expect(vm.linkError).toBe("pending error");
+
+    wrapper.unmount();
+
+    // Advancing past the timer should not throw (cleared) and linkError stays put
+    expect(() => vi.advanceTimersByTime(5000)).not.toThrow();
+  });
+
+  it("clears attachments on unmount", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      handleFiles: (files: File[]) => Promise<void>;
+      attachments: { file: File; previewUrl: string }[];
+    };
+
+    const file = new File(["x"], "img.png", { type: "image/png" });
+    await vm.handleFiles([file]);
+    expect(vm.attachments).toHaveLength(1);
+
+    wrapper.unmount();
+
+    expect(URL.revokeObjectURL).toHaveBeenCalled();
   });
 });
 
