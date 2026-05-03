@@ -121,6 +121,67 @@ describe("useStreaming", () => {
     unlistenFns.forEach((fn) => expect(fn).toHaveBeenCalled());
   });
 
+  it("onCancelled callback is called when chat:cancelled fires for the active conversation", async () => {
+    const convId = ref<string | null>("active-conv-id");
+    const onCancelled = vi.fn();
+    const { listenersReady } = useStreaming(convId, { onCancelled });
+
+    await listenersReady;
+
+    const handler = mockListen.mock.calls.find(
+      ([e]) => e === "chat:cancelled",
+    )?.[1];
+    expect(handler).toBeDefined();
+    handler({ payload: { conversation_id: "active-conv-id" } });
+
+    expect(onCancelled).toHaveBeenCalledWith("active-conv-id");
+  });
+
+  it("onCancelled callback is NOT called when chat:cancelled fires for a different conversation", async () => {
+    const convId = ref<string | null>("active-conv-id");
+    const onCancelled = vi.fn();
+    const { listenersReady } = useStreaming(convId, { onCancelled });
+
+    await listenersReady;
+
+    const handler = mockListen.mock.calls.find(
+      ([e]) => e === "chat:cancelled",
+    )?.[1];
+    handler({ payload: { conversation_id: "OTHER-conv" } });
+
+    expect(onCancelled).not.toHaveBeenCalled();
+  });
+
+  it("reset() clears buffers and sets isStreaming to true", async () => {
+    const convId = ref<string | null>(null);
+    const {
+      listenersReady,
+      reset,
+      buffer,
+      thinkingBuffer,
+      isThinking,
+      isStreaming,
+      tokensPerSec,
+    } = useStreaming(convId);
+
+    await listenersReady;
+
+    // Mutate state to non-default values
+    buffer.value = "some content";
+    thinkingBuffer.value = "thinking...";
+    isThinking.value = true;
+    isStreaming.value = false;
+    tokensPerSec.value = 42;
+
+    reset();
+
+    expect(buffer.value).toBe("");
+    expect(thinkingBuffer.value).toBe("");
+    expect(isThinking.value).toBe(false);
+    expect(isStreaming.value).toBe(true);
+    expect(tokensPerSec.value).toBeNull();
+  });
+
   it("composable does not call onUnmounted — cleanup is explicit only", async () => {
     // This test documents that useStreaming does NOT rely on Vue component
     // lifecycle hooks. The composable is safe to call from a Pinia store.
