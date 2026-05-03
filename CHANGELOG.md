@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### CI/CD
+- `cargo clippy` now runs with `--all-targets --all-features` to catch cfg-gated lint failures that were silently skipped
+- CI triggers on `v*` tag pushes so the release ci-gate finds check-runs on the tagged commit instead of polling until timeout
+- `docs.yml` now builds VitePress on pull requests targeting docs; deploy is guarded to push-to-main only
+- `release-linux` job verifies version consistency across `package.json`, `Cargo.toml`, `tauri.conf.json`, and `CHANGELOG.md` before building
+- Ollama install in the integration job replaced with a pinned binary download (v0.6.5) instead of an unpinned `curl | sh` script
+- `test-and-coverage` job upgraded from `pull-requests: read` to `pull-requests: write` so SonarCloud can post inline PR annotations
+
 ### Fixed
 - Cancelling generation (Stop button or Esc) no longer emits `chat:done`, persists a partial message to the database, or triggers a completion notification; partial content is preserved in-session via the new `chat:cancelled` event
 - Esc key now correctly clears the streaming indicator (previously `isStreaming` stayed true after pressing Esc)
