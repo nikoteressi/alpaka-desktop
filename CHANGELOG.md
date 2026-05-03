@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- API key is now restricted to `https://api.ollama.com` only: `is_cloud_host` requires HTTPS scheme, preventing the key from being attached to plaintext HTTP connections; `validate_api_key` rejects any host that is not the cloud endpoint before reading the key from the keyring
+
 ### Changed
 - Removed unused dependencies: `@types/lodash.throttle`, `ts-node` (frontend), `tracing-subscriber` (backend)
 
