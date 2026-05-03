@@ -116,6 +116,12 @@ pub async fn perform_validate_api_key(
 ) -> Result<bool, AppError> {
     let host_url = fetch_host_url(db, host_id.clone()).await?;
 
+    if !crate::ollama::client::is_cloud_host(&host_url) {
+        return Err(AppError::Auth(
+            "API key validation is only supported for the Ollama Cloud host (https://api.ollama.com).".into(),
+        ));
+    }
+
     let key = tokio::task::spawn_blocking(|| keyring::get_token(API_KEY_ACCOUNT)).await??;
     let key = match key {
         Some(k) => k,
@@ -261,18 +267,44 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_perform_validate_api_key_no_key_stored() {
-        // Verifies that perform_validate_api_key completes without panicking and
-        // returns a valid result. The keyring (API_KEY_ACCOUNT) is shared with
-        // other concurrently-running tests, so we cannot assert a specific Ok(true/false)
-        // value — we only assert the function does not return an unexpected error type.
+    async fn test_perform_validate_api_key_rejects_non_cloud_host() {
         let (client, db) = create_test_state();
         let host_id = {
             let conn = db.lock().unwrap();
             let hosts = crate::db::hosts::list_all(&conn).unwrap();
             hosts[0].id.clone()
         };
+        // The seeded default host is localhost — must be rejected before any network call.
+        let result = perform_validate_api_key(&client, db.clone(), host_id).await;
+        match result {
+            Err(AppError::Auth(msg)) if msg.contains("Ollama Cloud host") => (),
+            other => panic!("Expected Auth error for non-cloud host, got: {:?}", other),
+        }
+    }
 
+    #[tokio::test]
+    async fn test_perform_validate_api_key_no_key_stored() {
+        // Uses a cloud host entry so the host-restriction guard passes and we can
+        // exercise the "no key stored → Ok(false)" path. The keyring slot is shared
+        // with other tests, so we only assert on error type, not exact value.
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        migrations::run(&conn).expect("migrations");
+        let db: DbConn = Arc::new(std::sync::Mutex::new(conn));
+        let host_id = {
+            let conn = db.lock().unwrap();
+            crate::db::hosts::create(
+                &conn,
+                crate::db::hosts::NewHost {
+                    name: "Ollama Cloud".into(),
+                    url: "https://api.ollama.com".into(),
+                    is_default: Some(true),
+                },
+            )
+            .expect("test setup: failed to create cloud host")
+            .id
+        };
+
+        let client = reqwest::Client::new();
         let result = perform_validate_api_key(&client, db.clone(), host_id).await;
         match result {
             Ok(_) => (),                      // Ok(true) or Ok(false) are both valid
@@ -283,7 +315,7 @@ mod tests {
                     || msg.contains("locked")
                     || msg.contains("Platform secure storage")
                     || msg.contains("ServiceUnknown") => {}
-            Err(AppError::NotFound(_)) => (), // Host not found in in-memory DB edge case
+            Err(AppError::NotFound(_)) => (), // Host not found edge case
             Err(e) => panic!("Unexpected error from perform_validate_api_key: {:?}", e),
         }
     }

@@ -7,6 +7,7 @@ use reqwest::{Client, RequestBuilder};
 pub fn is_cloud_host(url: &str) -> bool {
     url::Url::parse(url)
         .ok()
+        .filter(|u| u.scheme() == "https")
         .and_then(|u| u.host_str().map(|h| h.to_lowercase()))
         .map(|h| h == "api.ollama.com")
         .unwrap_or(false)
@@ -101,7 +102,6 @@ mod tests {
     fn test_is_cloud_host_detects_api_ollama_com() {
         assert!(is_cloud_host("https://api.ollama.com"));
         assert!(is_cloud_host("https://api.ollama.com/"));
-        assert!(is_cloud_host("http://api.ollama.com"));
     }
 
     #[test]
@@ -110,6 +110,8 @@ mod tests {
         assert!(!is_cloud_host("http://127.0.0.1:11434"));
         assert!(!is_cloud_host("http://192.168.1.10:11434"));
         assert!(!is_cloud_host("https://my.custom-ollama.example.com"));
+        // Plaintext HTTP to cloud host must not be classified as cloud — key would leak.
+        assert!(!is_cloud_host("http://api.ollama.com"));
         // Subdomain-prefix attack: hostname contains "api.ollama.com" as a substring
         // but is a different domain. Must not be classified as cloud.
         assert!(!is_cloud_host("https://api.ollama.com.attacker.tld"));
