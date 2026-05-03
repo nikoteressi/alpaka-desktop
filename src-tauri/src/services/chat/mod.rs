@@ -236,7 +236,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         }
 
         // 5. Orchestrate (agent loop, event emission)
-        let result = tokio::time::timeout(
+        let orchestrate_result = tokio::time::timeout(
             Duration::from_secs(300),
             self.orchestrate_stream_with_context(
                 conversation_id.clone(),
@@ -259,7 +259,13 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 }),
             );
             AppError::Internal("Agent loop timed out after 300s".into())
-        })??;
+        })?;
+
+        let result = match orchestrate_result {
+            Ok(r) => r,
+            Err(AppError::Cancelled) => return Ok(()),
+            Err(e) => return Err(e),
+        };
 
         // 6. Persist assistant message (match existing behavior: always persist when content non-empty)
         if !result.content.is_empty() {

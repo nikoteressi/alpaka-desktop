@@ -106,6 +106,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     .await
                 {
                     Ok(r) => r,
+                    Err(crate::error::AppError::Cancelled) => {
+                        return Err(crate::error::AppError::Cancelled);
+                    }
                     Err(e) => {
                         let err_msg = e.to_string();
                         crate::system::notifications::notify_generation_failed(

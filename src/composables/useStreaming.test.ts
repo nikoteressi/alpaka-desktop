@@ -32,7 +32,7 @@ describe("useStreaming", () => {
 
     await listenersReady;
 
-    expect(mockListen).toHaveBeenCalledTimes(8);
+    expect(mockListen).toHaveBeenCalledTimes(9);
     const events = mockListen.mock.calls.map(([event]) => event);
     expect(events).toContain("chat:token");
     expect(events).toContain("chat:thinking-start");
@@ -42,6 +42,7 @@ describe("useStreaming", () => {
     expect(events).toContain("chat:tool-call");
     expect(events).toContain("chat:tool-result");
     expect(events).toContain("chat:error");
+    expect(events).toContain("chat:cancelled");
   });
 
   it("onToken callback is NOT called for tokens belonging to a different conversation", async () => {

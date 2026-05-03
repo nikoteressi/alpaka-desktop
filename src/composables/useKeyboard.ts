@@ -32,7 +32,11 @@ export function useKeyboard() {
     if (e.key === "Escape") {
       if (chatStore.isStreamingForActiveConv) {
         e.preventDefault();
-        invoke("stop_generation").catch(() => {});
+        invoke("stop_generation")
+          .catch(() => {})
+          .finally(() => {
+            chatStore.streaming.isStreaming = false;
+          });
       }
       return;
     }
