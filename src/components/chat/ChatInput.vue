@@ -64,6 +64,12 @@ function showLinkError(msg: string) {
   }, 4000);
 }
 
+function extractErrorMessage(err: unknown): string {
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  return "Failed to link file — binary or unreadable files cannot be used as context.";
+}
+
 async function pickContext(isFolder: boolean) {
   if (!activeConvId.value) return;
 
@@ -92,13 +98,7 @@ async function pickContext(isFolder: boolean) {
     });
   } catch (err) {
     console.error("Failed to link context:", err);
-    showLinkError(
-      typeof err === "string"
-        ? err
-        : err instanceof Error
-          ? err.message
-          : "Failed to link file — binary or unreadable files cannot be used as context.",
-    );
+    showLinkError(extractErrorMessage(err));
   } finally {
     isLinking.value = false;
   }
@@ -322,13 +322,7 @@ const {
       });
     } catch (err) {
       console.error("Failed to link dropped file:", err);
-      showLinkError(
-        typeof err === "string"
-          ? err
-          : err instanceof Error
-            ? err.message
-            : "Failed to link file — binary or unreadable files cannot be used as context.",
-      );
+      showLinkError(extractErrorMessage(err));
     } finally {
       isLinking.value = false;
     }

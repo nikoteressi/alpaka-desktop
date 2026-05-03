@@ -327,54 +327,45 @@ export const useModelStore = defineStore("models", {
       const unlistens: Array<() => void> = [];
       try {
         unlistens.push(
-          await listen<PullProgressPayload>("model:pull-progress", (event) => {
-            const payload = event.payload;
-            this.pulling[payload.model] = payload;
-          }),
-        );
-        unlistens.push(
-          await listen<{ model: string }>("model:pull-done", (event) => {
-            const payload = event.payload;
-            delete this.pulling[payload.model];
-            this.fetchModels();
-            this.fetchCapabilities(payload.model);
-          }),
-        );
-        unlistens.push(
-          await listen<CreateProgressPayload>(
-            "model:create-progress",
-            (event) => {
+          ...(await Promise.all([
+            listen<PullProgressPayload>("model:pull-progress", (event) => {
+              const payload = event.payload;
+              this.pulling[payload.model] = payload;
+            }),
+            listen<{ model: string }>("model:pull-done", (event) => {
+              const payload = event.payload;
+              delete this.pulling[payload.model];
+              this.fetchModels();
+              this.fetchCapabilities(payload.model);
+            }),
+            listen<CreateProgressPayload>("model:create-progress", (event) => {
               const { model, status } = event.payload;
               if (this.creating[model]) {
                 this.creating[model].status = status;
                 this.creating[model].logLines.push(status);
               }
-            },
-          ),
-        );
-        unlistens.push(
-          await listen<CreateDonePayload>("model:create-done", (event) => {
-            const { model } = event.payload;
-            if (this.creating[model]) {
-              this.creating[model].phase = "done";
-            }
-            this.fetchModels();
-          }),
-        );
-        unlistens.push(
-          await listen<CreateErrorPayload>("model:create-error", (event) => {
-            const { model, error, cancelled } = event.payload;
-            if (this.creating[model]) {
-              if (cancelled) {
-                // No reason to keep cancelled state in memory — delete immediately.
-                // CreateModelPage captures the phase locally before this fires.
-                delete this.creating[model];
-              } else {
-                this.creating[model].phase = "error";
-                this.creating[model].error = error;
+            }),
+            listen<CreateDonePayload>("model:create-done", (event) => {
+              const { model } = event.payload;
+              if (this.creating[model]) {
+                this.creating[model].phase = "done";
               }
-            }
-          }),
+              this.fetchModels();
+            }),
+            listen<CreateErrorPayload>("model:create-error", (event) => {
+              const { model, error, cancelled } = event.payload;
+              if (this.creating[model]) {
+                if (cancelled) {
+                  // No reason to keep cancelled state in memory — delete immediately.
+                  // CreateModelPage captures the phase locally before this fires.
+                  delete this.creating[model];
+                } else {
+                  this.creating[model].phase = "error";
+                  this.creating[model].error = error;
+                }
+              }
+            }),
+          ])),
         );
         this._unlisten = unlistens;
         this.listenersInitialized = true;
