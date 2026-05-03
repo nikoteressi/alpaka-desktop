@@ -89,6 +89,10 @@ export function useStreamingEvents() {
         chatStore.streaming.isStreaming = false;
         chatStore.streaming.tokensPerSec = payload.tokens_per_sec;
       },
+      onCancelled: (convId) => {
+        chatStore.finalizeStreamedMessage(convId);
+        chatStore.streaming.isStreaming = false;
+      },
       onError: (_convId, error) => {
         console.error("Chat stream error:", error);
         if (!chatStore.streaming.buffer.trim()) {

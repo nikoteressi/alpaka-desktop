@@ -15,6 +15,7 @@ export interface StreamingCallbacks {
   onThinkingToken?: (payload: ThinkingTokenPayload) => void;
   onThinkingEnd?: (conversationId: string, durationMs?: number) => void;
   onDone?: (payload: DonePayload) => void;
+  onCancelled?: (conversationId: string) => void;
   onError?: (conversationId: string, error: string) => void;
   onToolCall?: (payload: ToolCallPayload) => void;
   onToolResult?: (payload: ToolResultPayload) => void;
@@ -136,6 +137,18 @@ export function useStreaming(
       callbacks.onError?.(event.payload.conversation_id, event.payload.error);
     });
 
+    const unlistenCancelled = await listen<{ conversation_id: string }>(
+      "chat:cancelled",
+      (event) => {
+        if (
+          conversationId.value &&
+          event.payload.conversation_id !== conversationId.value
+        )
+          return;
+        callbacks.onCancelled?.(event.payload.conversation_id);
+      },
+    );
+
     unlisteners.push(
       unlistenToken,
       unlistenThinkingStart,
@@ -145,6 +158,7 @@ export function useStreaming(
       unlistenToolCall,
       unlistenToolResult,
       unlistenError,
+      unlistenCancelled,
     );
   }
 

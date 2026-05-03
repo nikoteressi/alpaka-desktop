@@ -86,7 +86,10 @@ async fn stream_once<R: Runtime>(
     loop {
         tokio::select! {
             _ = cancel_rx.recv() => {
-                break;
+                let _ = app.emit("chat:cancelled", serde_json::json!({
+                    "conversation_id": conversation_id,
+                }));
+                return Err(AppError::Cancelled);
             }
             chunk_res = stream.next() => {
                 match chunk_res {
@@ -279,25 +282,13 @@ async fn stream_once<R: Runtime>(
                             assembled.len(),
                             e
                         );
-                        // If any content was already streamed to the frontend, emit
-                        // chat:done first so the frontend can persist the partial
-                        // response. Without this, the UI stays in "streaming" state
-                        // indefinitely even though the user already saw the tokens.
-                        if !assembled.is_empty() {
-                            let _ = app.emit("chat:done", json!({
-                                "conversation_id": conversation_id,
-                                "total_tokens": 0,
-                                "duration_ms": 0,
-                                "tokens_per_sec": 0.0
-                            }));
-                        }
                         if let Err(emit_err) = app.emit("chat:error", json!({
                             "conversation_id": conversation_id,
                             "error": e.to_string()
                         })) {
                             log::warn!("Failed to emit chat:error: {} — continuing stream", emit_err);
                         }
-                        break;
+                        return Err(AppError::Http(e.to_string()));
                     }
                     None => {
                         if assembled.is_empty() {
@@ -309,22 +300,4 @@ async fn stream_once<R: Runtime>(
             }
         }
     }
-
-    Ok(StreamResult {
-        content: assembled,
-        thinking: if thinking_assembled.is_empty() {
-            None
-        } else {
-            Some(thinking_assembled)
-        },
-        tokens_used: None,
-        generation_time_ms: None,
-        prompt_tokens: None,
-        tokens_per_sec: None,
-        total_duration_ms: None,
-        load_duration_ms: None,
-        prompt_eval_duration_ms: None,
-        eval_duration_ms: None,
-        tool_calls: None,
-    })
 }
