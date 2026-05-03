@@ -86,6 +86,7 @@ pub fn run() {
             commands::system_info::detect_hardware,
             commands::system::report_active_view,
             commands::system::open_browser,
+            commands::attachments::read_image_file,
         ])
         .setup(|app| {
             // ── Logging (MED-08: enabled in all builds) ────────────────────────
@@ -148,7 +149,7 @@ pub fn run() {
 
             // ── Hosts Manager ──────────────────────────────────────────────────
             #[cfg(feature = "test-mode")]
-            let _ = shutdown_rx;
+            drop(shutdown_rx);
             #[cfg(not(feature = "test-mode"))]
             {
                 let health_handle =

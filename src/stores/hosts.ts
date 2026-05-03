@@ -9,6 +9,7 @@ export const useHostStore = defineStore("hosts", {
     activeHostId: null as string | null,
     isHostManagerOpen: false,
     listenersInitialized: false,
+    _unlisten: null as (() => void) | null,
   }),
   getters: {
     activeHost: (state) =>
@@ -65,20 +66,25 @@ export const useHostStore = defineStore("hosts", {
     },
     async initListeners() {
       if (this.listenersInitialized) return;
+      const unlisten = await listen<HostStatusChangePayload>(
+        "host:status-change",
+        (event) => {
+          const payload = event.payload;
+          const hostIndex = this.hosts.findIndex(
+            (h) => h.id === payload.host_id,
+          );
+          const host = this.hosts[hostIndex];
+          if (host) {
+            this.hosts[hostIndex] = {
+              ...host,
+              last_ping_status: payload.status,
+              last_ping_at: new Date().toISOString(),
+            };
+          }
+        },
+      );
+      this._unlisten = unlisten;
       this.listenersInitialized = true;
-
-      listen<HostStatusChangePayload>("host:status-change", (event) => {
-        const payload = event.payload;
-        const hostIndex = this.hosts.findIndex((h) => h.id === payload.host_id);
-        const host = this.hosts[hostIndex];
-        if (host) {
-          this.hosts[hostIndex] = {
-            ...host,
-            last_ping_status: payload.status,
-            last_ping_at: new Date().toISOString(),
-          };
-        }
-      });
     },
   },
 });

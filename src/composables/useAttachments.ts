@@ -76,9 +76,16 @@ export function useAttachments(options: AttachmentsOptions = {}) {
       paths.map(async (path) => {
         const ext = extOf(path);
         if (IMAGE_EXTS.has(ext)) {
-          const { readFile } = await import("@tauri-apps/plugin-fs");
-          const bytes = await readFile(path);
+          const { invoke } = await import("@tauri-apps/api/core");
           const name = path.split("/").pop() ?? "image";
+          let rawBytes: number[];
+          try {
+            rawBytes = await invoke<number[]>("read_image_file", { path });
+          } catch (e) {
+            console.warn(`Dropped image ${name} could not be read: ${e}`);
+            return;
+          }
+          const bytes = new Uint8Array(rawBytes);
           const file = new File([bytes], name, { type: mimeFromExt(ext) });
           const previewUrl = URL.createObjectURL(file);
           attachments.value.push({ file, previewUrl, data: bytes });

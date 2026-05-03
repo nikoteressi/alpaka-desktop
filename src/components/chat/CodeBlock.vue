@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, onBeforeUnmount, computed } from "vue";
 import { highlight } from "../../lib/markdown";
 import { useCopyToClipboard } from "../../composables/useCopyToClipboard";
 
@@ -118,6 +118,12 @@ watch([() => props.code, () => props.language], updateHighlight, {
   immediate: false,
 });
 onMounted(() => updateHighlight());
+onBeforeUnmount(() => {
+  if (highlightTimeout) {
+    clearTimeout(highlightTimeout);
+    highlightTimeout = null;
+  }
+});
 </script>
 
 <style scoped>

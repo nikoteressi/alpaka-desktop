@@ -9,7 +9,6 @@ export function useStreamingEvents() {
 
   async function init() {
     if (chatStore._listenersInitialized) return;
-    chatStore._listenersInitialized = true;
 
     // Tear down any previous listener set before registering a new one.
     if (_streamingCleanup) {
@@ -128,8 +127,15 @@ export function useStreamingEvents() {
       },
     });
 
-    await listenersReady;
-    _streamingCleanup = cleanup;
+    try {
+      await listenersReady;
+      _streamingCleanup = cleanup;
+      chatStore._listenersInitialized = true;
+    } catch (e) {
+      _streamingCleanup = null;
+      cleanup();
+      throw e;
+    }
   }
 
   return { init };

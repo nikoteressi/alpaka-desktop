@@ -77,8 +77,8 @@ export function useDraftManager() {
     if (conversationId.startsWith(DRAFT_ID_PREFIX)) return;
     try {
       await invoke("update_chat_draft", {
-        conversation_id: conversationId,
-        draft_json: JSON.stringify(draft),
+        conversationId,
+        draftJson: JSON.stringify(draft),
       });
       const conv = store.conversations.find((c) => c.id === conversationId);
       if (conv) conv.draft_json = JSON.stringify(draft);
@@ -89,12 +89,13 @@ export function useDraftManager() {
 
   async function clearDraft(conversationId: string) {
     delete store.drafts[conversationId];
+    if (conversationId.startsWith(DRAFT_ID_PREFIX)) return;
     const conv = store.conversations.find((c) => c.id === conversationId);
     if (conv) conv.draft_json = null;
     try {
       await invoke("update_chat_draft", {
-        conversation_id: conversationId,
-        draft_json: null,
+        conversationId,
+        draftJson: null,
       });
     } catch (err) {
       console.warn("Failed to clear draft from DB", err);
