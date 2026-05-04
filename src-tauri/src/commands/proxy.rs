@@ -138,8 +138,29 @@ pub async fn test_proxy(
         });
     }
 
-    let client = crate::state::build_http_client(&proxy_url, &username, &password)
-        .map_err(|e| AppError::Http(format!("Invalid proxy URL: {e}")))?;
+    // Determine the password: use provided value or fall back to stored keyring entry
+    let effective_password = if !password.is_empty() {
+        password
+    } else {
+        tokio::task::spawn_blocking(|| {
+            keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT)
+                .ok()
+                .flatten()
+                .unwrap_or_default()
+        })
+        .await
+        .unwrap_or_default()
+    };
+
+    let client = match crate::state::build_http_client(&proxy_url, &username, &effective_password) {
+        Ok(c) => c,
+        Err(e) => {
+            return Ok(ProxyTestResult {
+                success: false,
+                message: format!("Invalid proxy URL: {e}"),
+            })
+        }
+    };
 
     let db = state.db.clone();
     let host_url_result = tokio::task::spawn_blocking(move || {

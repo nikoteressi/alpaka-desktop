@@ -109,8 +109,10 @@ impl AppState {
         let http_client = build_http_client(&proxy_url, &proxy_username, &proxy_password)
             .unwrap_or_else(|e| {
                 log::warn!(
-                    "Proxy configuration invalid at startup ({e}), connecting without proxy"
+                    "Proxy configuration invalid at startup; connecting without proxy. \
+                     Check Settings → Connection."
                 );
+                let _ = e;
                 reqwest::Client::builder()
                     .use_rustls_tls()
                     .user_agent("ollama/0.3.11 (linux amd64) Go/1.22.4")
