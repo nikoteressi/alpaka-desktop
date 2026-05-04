@@ -267,7 +267,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          git fetch origin "${BASE_REF}" --depth=1
+          git fetch origin "${BASE_REF}"
           CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD")
 
           if echo "$CHANGED" | grep -Fxq "CHANGELOG.md"; then
