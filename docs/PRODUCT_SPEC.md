@@ -1,8 +1,11 @@
 # Alpaka Desktop — Linux Native Client
 
-> **Product Specification v1.0.0** — 2026-04-27
+> **Product Specification v1.2.0** — 2026-05-04
 > Target: Linux (primary: Arch Linux · KDE Plasma 6 · Wayland)
 > Companion to [ARCHITECTURE.md](ARCHITECTURE.md)
+
+> **Status legend:** ✅ Implemented & wired in UI · ⚠️ Partial / works with caveats ·
+> 🟡 Backend implemented but not exposed in UI · 🔲 Backlog · ❌ Not implemented
 
 ---
 
@@ -49,106 +52,144 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
 | C-01 | **Multi-turn chat** | P0 | ✅ | Persistent conversation threads with full history |
-| C-02 | **Streaming text rendering** | P0 | ✅ | Token-by-token display with typing cursor animation |
-| C-03 | **Reasoning/thinking blocks** | P0 | ✅ | Collapsible `<think>` panels with console-style rendering and pulsing border |
-| C-04 | **Markdown rendering** | P0 | ✅ | Full GFM: tables, code fences, math (KaTeX) |
-| C-05 | **Code blocks with copy button** | P0 | ✅ | Language detection, syntax highlighting (Shiki), one-click copy |
-| C-06 | **Chat history persistence** | P0 | ✅ | SQLite-backed; search, rename, pin, delete conversations |
-| C-07 | **Multi-chat tabs/panels** | P1 | Backlog | Side-by-side or tabbed conversations |
-| C-08 | **Chat export** | P1 | ✅ | Export to Markdown / JSON |
-| C-09 | **Chat branching** | P2 | Backlog | Fork conversation at any message |
-| C-10 | **Chat backup & restore** | P1 | ✅ | Full JSON export/import; raw SQLite backup/restore |
-| C-11 | **Compact / TWM mode** | P1 | ✅ | Hides sidebar, reduces padding; for tiling WM users |
+| C-02 | **Streaming text rendering** | P0 | ✅ | Token-by-token display via `chat:token` Tauri events with typing cursor |
+| C-03 | **Reasoning/thinking blocks** | P0 | ✅ | Collapsible `<think>` panels with console-style rendering and pulsing border (`ThinkBlock.vue`) |
+| C-04 | **Markdown rendering** | P0 | ✅ | Full GFM via `markdown-it` + KaTeX (`lib/markdown.ts`) |
+| C-05 | **Code blocks with copy button** | P0 | ✅ | Language detection, Shiki syntax highlighting, one-click copy (`CodeBlock.vue`) |
+| C-06 | **Chat history persistence** | P0 | ✅ | SQLite-backed; pin, rename, delete, and search by title (`Ctrl+K` inside `ConversationList.vue`) |
+| C-07 | **Multi-chat tabs/panels** | P1 | 🔲 Backlog | Side-by-side or tabbed conversations |
+| C-08 | **Chat export to JSON** | P1 | 🟡 | `export_conversation` Tauri command implemented and exposed in `lib/tauri.ts`, but no UI button calls it |
+| C-08b | **Chat export to Markdown** | P1 | 🔲 Backlog | Not implemented in backend or UI |
+| C-09 | **Chat branching** | P2 | 🔲 Backlog | Fork conversation at any message |
+| C-10 | **Chat backup & restore** | P1 | ⚠️ | Raw SQLite backup/restore wired in `Settings → Maintenance`; no per-conversation JSON import/export UI |
+| C-11 | **Compact / TWM mode** | P1 | ⚠️ | `Ctrl+Shift+M` collapses the 48 px icon strip (`App.vue:14`). Padding, font sizes and the top-bar layout described in §3.6 are **not** implemented |
+| C-12 | **Conversation summarisation (Compact)** | P1 | ✅ | Button at ≥70 % context usage; summarises history with `temperature=0.3`, creates a new conversation with the summary as a system prompt + last 4 turns (`services/chat/compact.rs`) |
+| C-13 | **Sliding-window context truncation** | P0 | ✅ | Automatic on every send; trims oldest user/assistant messages to fit `0.85 × num_ctx` (`services/chat/context.rs`) |
+| C-14 | **Stop generation** | P0 | ✅ | `Escape` key + Send button toggles to "Stop" while streaming; cancel via `tokio::broadcast` channel |
+| C-15 | **Drafts per-conversation** | P1 | ✅ | Input + advanced options auto-saved per conversation (`useDraftSync`) |
+| C-16 | **Undo/redo in chat input** | P1 | ✅ | Custom history stack (`Ctrl+Z` / `Ctrl+Shift+Z`); needed because WebKitGTK on Wayland doesn't drive native undo |
 
 ### 2.2 Multimodal Input
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
-| M-01 | **Image input** | P0 | ✅ | Paste, drag-drop, file-pick for vision models |
-| M-02 | **File drag-and-drop** | P0 | ✅ | Drop PDFs, text, code files for summarization |
-| M-03 | **Document preview** | P1 | ✅ | Thumbnail/preview of attached files before sending |
-| M-04 | **Clipboard image paste** | P0 | ✅ | Ctrl+V image directly from clipboard |
-| M-05 | **Audio input** | P2 | Backlog | Whisper-based speech-to-text |
+| M-01 | **Image input** | P0 | ✅ | File picker (Attach Images menu) + drag-drop. Up to 10 images × 20 MB each |
+| M-02 | **Text-file drag-and-drop** | P0 | ✅ | Dropping non-image files calls `link_folder` and ingests them as folder context (`useAttachments.ts:85`) |
+| M-03 | **Document preview** | P1 | ⚠️ | Image thumbnails via `AttachmentList.vue`; no preview for PDFs or text files (they go through folder-context pill instead) |
+| M-04 | **Clipboard image paste** | P0 | ❌ Removed | `Ctrl+V` was removed in v1.2.0 — was broken on WebKitGTK/Wayland; drag-drop replaces it. No `paste` event handler exists in code |
+| M-05 | **Audio input** | P2 | 🔲 Backlog | Whisper-based speech-to-text |
 
 ### 2.3 Model Management
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
-| MO-01 | **Browse local models** | P0 | ✅ | List with size, family, quantization, parameter count |
-| MO-02 | **Search Ollama library** | P0 | ✅ | Search `ollama.com/library` from within the app |
-| MO-03 | **Download/pull models** | P0 | ✅ | Progress bar, streamed progress events |
-| MO-04 | **Delete models** | P0 | ✅ | Individual deletion with size indicator |
-| MO-05 | **Model details view** | P0 | ✅ | Capabilities, README, tags via library API |
-| MO-06 | **Custom model creation** | P1 | Backlog | Create from Modelfile |
-| MO-07 | **Model tags/favorites** | P1 | ✅ | User tags and quick-access favorites |
-| MO-08 | **Configurable storage path** | P0 | Backlog | Choose where model blobs are stored |
-| MO-09 | **Model update notifications** | P1 | Backlog | Detect newer versions of pulled models |
+| MO-01 | **Browse local models** | P0 | ✅ | List with size, family, quantization, parameter count (`commands/models.rs::list_models`) |
+| MO-02 | **Search Ollama library** | P0 | ✅ | Search `ollama.com/library` via `services/library.rs`; `LibraryBrowser.vue` |
+| MO-03 | **Download/pull models** | P0 | ✅ | Progress bar via `model:pull-progress` events (`ModelsPage.vue:718`) |
+| MO-04 | **Delete models** | P0 | ✅ | Confirmation modal, size indicator (`ModelsPage.vue:729`) |
+| MO-05 | **Model details view** | P0 | ✅ | Capabilities, README, tags (`LibraryModelDetails.vue`, `LocalModelDetails.vue`) |
+| MO-06 | **Custom model creation** | P1 | ✅ | Create / edit from Modelfile with streaming progress and cancellation (`CreateModelPage.vue`, `commands/model_create.rs`). Reachable via "Create model" button on Models page |
+| MO-07 | **Model tags / favorites** | P1 | ✅ | Star + free-form tags; filter by tag in model list and selector (`model_user_data.rs`) |
+| MO-08 | **Configurable storage path** | P0 | ✅ | `Settings → Engine`; writes a systemd override and restarts Ollama (`ModelPathSettings.vue`, `commands/model_path.rs`) |
+| MO-09 | **Model update notifications** | P1 | 🔲 Backlog | Detect newer versions of pulled models |
+| MO-10 | **Cloud model run** | P0 | ✅ | Cloud tags (`:cloud` suffix) recognised; `addCloudModel` registers the model (`stores/models.ts`) |
 
 ### 2.4 Ollama Cloud Integration
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
-| CL-01 | **User authentication** | P0 | ✅ | Sign in via `ollama signin` OAuth flow (polling-based) |
+| CL-01 | **User authentication** | P0 | ✅ | `ollama signin` OAuth flow with polling-based status check (`AccountSettings.vue`, `auth/oauth.rs`) |
 | CL-02 | **Cloud model access** | P0 | ✅ | Run models hosted on Ollama Cloud |
-| CL-03 | **API key management** | P0 | Partial | Store/retrieve via keyring; UI management backlog |
-| CL-04 | **Private model sync** | P1 | Backlog | Push/pull private models |
-| CL-05 | **Usage dashboard** | P1 | Backlog | Cloud compute usage, cost tracking |
-| CL-06 | **Web search integration** | P0 | ✅ | Agentic tool-call loop via Ollama Web Search API |
+| CL-03 | **API key management** | P0 | ✅ | UI panel with input, visibility toggle, validate, delete; key stored via Secret Service (`ApiKeyPanel.vue`, `auth/api_key.rs`) |
+| CL-04 | **Private model sync** | P1 | 🔲 Backlog | Push/pull private models |
+| CL-05 | **Usage dashboard** | P1 | 🔲 Backlog | Cloud compute usage, cost tracking |
+| CL-06 | **Web search integration** | P0 | ✅ | Agentic tool-call loop via Ollama Web Search API; up to 5 iterations, forces `temperature=0.2`, `top_p=0.1` (`services/chat/orchestrator.rs:89`) |
 
 ### 2.5 Context & Generation Settings
+
+Three-layer settings architecture: **Global defaults → Per-model overrides → Per-chat
+adjustments**. Custom values from the inner layer override the outer layer; absent
+values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs`).
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
 | S-01 | **Temperature slider** | P0 | ✅ | Range 0.0–2.0 |
-| S-02 | **Context length slider** | P0 | ✅ | Adjustable num_ctx |
-| S-03 | **System prompt editor** | P0 | ✅ | Per-conversation; stored as system role message |
-| S-04 | **Top-P / Top-K** | P0 | ✅ | Fine-grained sampling control |
-| S-05 | **Repeat penalty** | P0 | ✅ | repeat_penalty, repeat_last_n |
-| S-06 | **Stop sequences** | P1 | ✅ | Custom stop tokens |
-| S-07 | **Seed control** | P1 | Backlog | Fixed seed for reproducible outputs |
-| S-08 | **Mirostat** | P1 | Backlog | Mirostat 1/2 with tau and eta |
-| S-09 | **Preset profiles** | P1 | Backlog | Save/load parameter presets |
-| S-10 | **Per-model defaults** | P1 | Backlog | Different default settings per model |
+| S-02 | **Context length slider** | P0 | ✅ | Stepped: 4k / 8k / 16k / 32k / 64k / 128k / 256k tokens |
+| S-03 | **System prompt editor** | P0 | ✅ | Per-conversation, stored as system role message; `SystemPromptPanel.vue` |
+| S-04 | **Top-P / Top-K** | P0 | ✅ | Hidden when Mirostat is active |
+| S-05 | **Repeat penalty** | P0 | ✅ | `repeat_penalty`, `repeat_last_n` |
+| S-06 | **Stop sequences** | P1 | ✅ | Up to 4 tokens (e.g. `###`, `<END>`); `StopSequencesInput.vue` |
+| S-07 | **Seed control** | P1 | ✅ | Fixed seed for reproducible outputs (`AdvancedChatOptions.vue`) |
+| S-08 | **Mirostat** | P1 | ✅ | Mirostat 1/2 with `tau` and `eta`; `MirostatSelector.vue` |
+| S-09 | **Preset profiles** | P1 | ✅ | Built-ins: Creative / Balanced / Precise / Code; user-defined presets saved per conversation (`PresetEditor.vue`) |
+| S-10 | **Per-model defaults** | P1 | ✅ | Each model stores its own options; auto-applied on selection (`useModelDefaults.ts`, `commands/model_settings.rs`) |
+| S-11 | **Reasoning / think mode toggle** | P1 | ✅ | Shown only when `modelCaps.thinking_toggleable`. Boolean for binary models, `low/medium/high` levels for GPT-OSS |
 
 ### 2.6 GPU & Performance
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
-| G-01 | **GPU status display** | P0 | ✅ | `detect_hardware` reads /proc/meminfo + DRM sysfs for GPU/VRAM |
-| G-02 | **Multi-GPU support** | P0 | ✅ | Via Ollama's multi-GPU scheduling |
-| G-03 | **CPU fallback indicator** | P0 | ✅ | Visual indicator when running on CPU vs GPU |
-| G-04 | **Performance metrics** | P1 | ✅ | Tokens/sec, TTFT, total duration stored per-message |
-| G-05 | **GPU layer configuration** | P1 | Backlog | num_gpu layers for partial offloading |
+| G-01 | **GPU / VRAM / RAM display** | P0 | ⚠️ | `detect_hardware` reads `/proc/meminfo` + DRM sysfs and feeds into `useModelLibrary`; rendered **only on the Models page** library browser (`ModelsPage.vue:508-535`). Not surfaced anywhere else |
+| G-02 | **Multi-GPU support** | P0 | ✅ | Inherited from Ollama's multi-GPU scheduling; no app-level work required |
+| G-03 | **CPU fallback indicator** | P0 | ❌ | No dedicated "running on CPU" indicator in the UI |
+| G-04 | **Per-message performance metrics** | P1 | ✅ | Tokens/sec, TTFT, total / load / prompt-eval / eval duration, seed, prompt_tokens — stored per message and rendered in `StatsBlock.vue` |
+| G-05 | **GPU layer configuration** | P1 | 🔲 Backlog | `num_gpu` layers for partial offloading |
 
 ### 2.7 Networking, Hosts & Sharing
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
-| N-01 | **LAN mode** | P0 | ✅ | Multiple Ollama endpoints including LAN servers |
-| N-02 | **Hosts Manager** | P0 | ✅ | Add/edit/remove hosts with name, URL, optional auth |
-| N-03 | **Quick host switching** | P0 | ✅ | Dropdown in top bar; model list refreshes on switch |
-| N-04 | **Host health indicator** | P1 | ✅ | Background ping every 30s; `host:status-change` event |
-| N-05 | **Proxy support** | P1 | Backlog | HTTP/SOCKS5 proxy |
+| N-01 | **LAN mode (multi-host)** | P0 | ✅ | Multiple Ollama endpoints including LAN servers; one active at a time |
+| N-02 | **Hosts Manager** | P0 | ⚠️ | Implemented inside `Settings → Connection` (`HostSettings.vue`). Standalone modal `HostManager.vue` exists but is **never imported** anywhere |
+| N-03 | **Quick host switching** | P0 | ⚠️ | No top-bar dropdown — `components/shared/TopBar.vue` is a 0-byte file. Host switching reachable via `Ctrl+H` → Settings → Connection. Active-host change takes effect on the next API call (`OllamaClient` reads active host from DB on each call) |
+| N-04 | **Host health indicator** | P1 | ✅ | Background ping every 30 s; `host:status-change` event (`commands/hosts.rs::start_host_health_loop`) |
+| N-05 | **Proxy support** | P1 | 🔲 Backlog | HTTP/SOCKS5 proxy |
+| N-06 | **Per-host bearer token** | P1 | ✅ | Optional auth token stored in keyring (never in DB) |
 
 ### 2.8 Coding Tools Integration
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
-| CT-01 | **`ollama launch` support** | P1 | Backlog | Quick-launch coding tools |
-| CT-02 | **Anthropic Messages API compat** | P1 | Backlog | Local models with Claude Code–compatible tools |
-| CT-03 | **Tool calling visualization** | P1 | ✅ | `chat:tool-call` / `chat:tool-result` events render inline |
+| CT-01 | **`ollama launch` support** | P1 | ⚠️ | `LaunchPage.vue` is a static reference card list (Claude / Codex / OpenCode / Droid / Pi) with copyable `ollama launch <tool>` commands. No actual launching from inside the app |
+| CT-02 | **Anthropic Messages API compat** | P1 | 🔲 Backlog | Local models with Claude Code–compatible tools |
+| CT-03 | **Tool calling visualization** | P1 | ✅ | `chat:tool-call` and `chat:tool-result` events; `<tool_call>` markers parsed and rendered inline by `MessageBubble.vue:75` and `SearchBlock.vue` |
 
 ### 2.9 Local Folder Context (Lightweight RAG)
 
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
-| LFC-01 | **Link local directories** | P1 | ✅ | Attach folders to conversations |
-| LFC-02 | **File parsing** | P1 | ✅ | `.txt`, `.md`, `.py`, `.rs`, `.js`, `.ts`, `.json`, `.yaml`, `.toml`, etc. |
-| LFC-03 | **Selective file inclusion** | P1 | ✅ | Tree-view picker per linked folder |
-| LFC-04 | **Context size indicator** | P1 | ✅ | Estimated token count vs model `num_ctx` limit |
-| LFC-05 | **Auto-refresh** | P2 | Backlog | Watch for file changes |
+| LFC-01 | **Link local directories or single files** | P1 | ✅ | Via Attach menu → "Link Folder Context" / "Link File Context", or by drag-drop. Persisted in `folder_contexts` table |
+| LFC-02 | **File parsing** | P1 | ⚠️ | Reads **all text files recursively** with `ignore::WalkBuilder` (respects `.gitignore`, skips hidden files and binaries via null-byte check). No file-extension allow-list. Caps: 50 MB total, 1000 files |
+| LFC-03 | **Selective file inclusion** | P1 | 🟡 | Backend commands `list_folder_files` and `update_included_files` exist and are exposed in `lib/tauri.ts`, but **no UI component calls them**. Linked folder is shown as a single removable pill, not a tree picker |
+| LFC-04 | **Context size indicator** | P1 | ✅ | Token estimate (`chars / 4`) returned by `link_folder` and shown on the pill; full context bar shows `prompt_eval_count + eval_count` while streaming |
+| LFC-05 | **Auto-refresh** | P2 | 🔲 Backlog | `auto_refresh` column exists in DB schema but is always `false` |
+| LFC-06 | **Path safety** | P0 | ✅ | `guard_path` rejects `/proc /sys /dev /etc /root /boot /var /usr/bin /usr/sbin` and `~/.ssh /.gnupg /.aws /.kube`; canonicalise-then-prefix-check defends against traversal |
 
-> **Design note:** No vector DB, no embedding model. Files are read, parsed to text, and prepended to the conversation context as a system message.
+> **Design note:** No vector DB, no embedding model. Files are read, parsed to text, and
+> injected into the conversation as a `<context_background>` system message at the head
+> of the prompt.
+
+### 2.10 Linux Desktop Integration
+
+| ID | Feature | Priority | Status | Notes |
+|---|---|---|---|---|
+| L-01 | **System tray** | P0 | ⚠️ | Show / Hide / Quit menu only (`system/tray.rs`); no host or model controls. Icon adapts to light/dark theme |
+| L-02 | **Desktop notifications** | P1 | ✅ | `notify-rust` → D-Bus. Fires on generation complete/failed, backup success/failure, restore, model creation events |
+| L-03 | **Smart-focus notifications** | P2 | ✅ | `report_active_view` tracks the currently visible page; notifications skipped when the relevant chat is already in focus |
+| L-04 | **Wayland support** | P0 | ✅ | WebKitGTK 4.1 native Wayland backend |
+| L-05 | **Secret Service (KWallet / GNOME Keyring / KeePassXC)** | P0 | ✅ | API keys, OAuth tokens, per-host bearers — all via `keyring` crate, never on disk |
+| L-06 | **xdg-desktop-portal file dialogs** | P0 | ✅ | Tauri dialog plugin |
+| L-07 | **Systemd Ollama service control** | P1 | 🟡 | `start_ollama` / `stop_ollama` / `ollama_service_status` commands implemented and exposed in `lib/tauri.ts`, but the only caller is `ErrorScreen.vue`, which itself is never imported anywhere — so currently unreachable from the UI |
+| L-08 | **Connection error screen with retry** | P1 | 🟡 | `ErrorScreen.vue` exists with full retry / start-Ollama logic, but is **not wired into the router or `App.vue`**. Users currently see no friendly screen when Ollama is unreachable |
+| L-09 | **Ollama model storage path override** | P1 | ✅ | `Settings → Engine` writes a systemd override and restarts Ollama (`ModelPathSettings.vue`) |
+
+### 2.11 Backup & Maintenance
+
+| ID | Feature | Priority | Status | Notes |
+|---|---|---|---|---|
+| B-01 | **SQLite backup** | P1 | ✅ | `Settings → Maintenance → Backup`; uses SQLite online backup API (`commands/chat.rs::backup_database`) |
+| B-02 | **SQLite restore** | P1 | ✅ | `Settings → Maintenance → Restore` with confirmation |
+| B-03 | **Per-conversation JSON export** | P1 | 🟡 | `export_conversation` command implemented; **no UI button** invokes it |
 
 ---
 
@@ -228,35 +269,47 @@ The **only exception** is the `<think>` reasoning block: monospace font, pulsing
 
 ### 3.5 Keyboard Shortcuts
 
-| Shortcut | Action |
-|---|---|
-| `Enter` | Send message |
-| `Shift+Enter` | New line in input |
-| `Ctrl+N` | New conversation |
-| `Ctrl+K` | Quick model switcher |
-| `Ctrl+,` | Open settings |
-| `Ctrl+Shift+C` | Copy last response |
-| `Ctrl+/` | Toggle sidebar |
-| `Escape` | Stop generation |
-| `Ctrl+↑/↓` | Navigate chat history |
-| `Ctrl+Shift+M` | Toggle Compact / TWM Mode |
-| `Ctrl+H` | Open Hosts Manager |
+Implemented in `composables/useKeyboard.ts` (global) and `ChatInput.vue` (input-scoped).
+
+| Shortcut | Action | Status |
+|---|---|---|
+| `Enter` | Send message | ✅ |
+| `Shift+Enter` | New line in input | ✅ |
+| `Ctrl+N` | New conversation | ✅ |
+| `Ctrl+K` | Open conversation search (`ConversationList`) | ✅ |
+| `Ctrl+M` | Open model switcher | ✅ |
+| `Ctrl+,` | Open settings | ✅ |
+| `Ctrl+Shift+C` | Copy last assistant response | ✅ |
+| `Ctrl+/` | Toggle sidebar | ✅ |
+| `Escape` | Stop generation | ✅ |
+| `Ctrl+↑ / Ctrl+↓` | Navigate to previous/next conversation | ✅ |
+| `Ctrl+Shift+M` | Toggle Compact mode (collapses 48 px icon strip only) | ⚠️ |
+| `Ctrl+H` | Open `Settings → Connection` tab | ✅ |
+| `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo inside the chat input (custom history stack) | ✅ |
 
 ### 3.6 Compact / TWM Mode
 
-For tiling WM users (Hyprland, Sway, i3):
+> **Status:** ⚠️ Partial. Toggled via `Ctrl+Shift+M` (`settingsStore.compactMode`).
+> Currently only collapses the 48 px icon strip (`App.vue:14`). The padding-, font-,
+> top-bar-collapse, and minimum-width changes described below are **not yet
+> implemented** and remain as design intent for tiling WM users (Hyprland, Sway, i3).
 
-| Behavior | Standard | Compact |
-|---|---|---|
-| **Sidebar** | Visible (260px) | Hidden; overlay via `Ctrl+/` |
-| **Message padding** | 16px / 12px | 8px / 6px |
-| **Top bar** | Full controls | Model name + host dot only |
-| **Font sizes** | 15px / 14px | 13px / 12px |
-| **Min useful width** | ~500px | ~320px |
+| Behaviour | Standard | Compact (target) | Compact (today) |
+|---|---|---|---|
+| **Icon strip** | Visible (48 px) | — | Hidden (`w-0`) ✅ |
+| **Sidebar** | Visible (220 px) | Hidden; overlay via `Ctrl+/` | Unchanged |
+| **Message padding** | 16 px / 12 px | 8 px / 6 px | Unchanged |
+| **Top bar** | Full controls | Model name + host dot only | n/a — there is no top bar |
+| **Font sizes** | 15 px / 14 px | 13 px / 12 px | Unchanged |
+| **Min useful width** | ~500 px | ~320 px | ~500 px |
 
 ### 3.7 Connection Error Screen
 
-Displayed when the active Ollama host is unreachable:
+> **Status:** 🟡 Component exists (`components/shared/ErrorScreen.vue`) with full retry +
+> systemd-start logic, **but is not currently wired into the router or `App.vue`**, so
+> users do not see it when Ollama is unreachable. Re-wiring it is tracked as P1.
+
+Designed appearance:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -276,7 +329,7 @@ Displayed when the active Ollama host is unreachable:
 └─────────────────────────────────────────────┘
 ```
 
-Auto-retry every 5 seconds; screen auto-dismisses on connection.
+Designed behaviour: auto-retry every 5 seconds; screen auto-dismisses on connection.
 
 ---
 
@@ -462,12 +515,31 @@ Optional:
 
 | Phase | Scope | Status |
 |---|---|---|
-| **Phase 1 — MVP** | Chat, streaming, local model management, settings, Connection Error screen, Compact/TWM mode, system tray | ✅ Complete |
-| **Phase 2 — Cloud** | Authentication (polling flow), cloud models, web search tool calls, API key management | ✅ Complete |
-| **Phase 3 — Polish** | Hosts Manager, multimodal input, file drag-drop, chat backup/restore, keyboard shortcuts | ✅ Complete |
-| **Phase 4 — Advanced** | Folder context, chat export, hardware detection, library browser, thinking blocks | ✅ Complete |
-| **Phase 5 — Distribution** | AUR (bin + git), `.deb`, AppImage, documentation, CONTRIBUTING guide | ✅ v1.0.0 |
-| **Phase 6 — v1.x** | Custom model creation, model tagging, preset profiles, Flatpak, plugin system | Planned |
+| **Phase 1 — MVP** | Chat, streaming, local model management, settings, system tray | ✅ Complete (v1.0.0) |
+| **Phase 2 — Cloud** | OAuth signin (polling), cloud models, web search agent loop | ✅ Complete (v1.0.0) |
+| **Phase 3 — Polish** | Hosts CRUD, multimodal input, drag-drop, SQLite backup/restore, keyboard shortcuts | ✅ Complete (v1.0.0–1.1.0) |
+| **Phase 4 — Advanced** | Folder context (whole-folder ingest), hardware detection, library browser, thinking blocks | ✅ Complete (v1.0.0) |
+| **Phase 5 — Distribution** | AUR (bin + git), `.deb`, AppImage, documentation site | ✅ v1.0.1 |
+| **Phase 6 — v1.2** | Custom model creation, model tagging/favorites, preset profiles, per-model defaults, seed control, Mirostat, stop sequences, configurable model path, API key UI, conversation search | ✅ v1.2.0 |
+| **Phase 7 — v1.3 (planned)** | Wire `ErrorScreen` into router, expose chat export button, folder-context tree picker, top-bar host switcher, true Compact/TWM layout (padding/font/top-bar collapse), Markdown export | Planned |
+| **Phase 8 — v2.x** | Multi-chat tabs, chat branching, plugin system, Flatpak, proxy support, mobile companion | Planned |
+
+### 9.1 Known UI Gaps (from v1.2.0 audit)
+
+The following commands or components exist in the codebase but are **not currently
+reachable from the UI**. They are tracked as P1 for v1.3:
+
+| Item | What's missing | Where it lives |
+|---|---|---|
+| Per-conversation JSON export | No button calls `export_conversation` | `commands/chat.rs:257` |
+| Folder-context tree picker | No component calls `list_folder_files` / `update_included_files` | `commands/folders.rs:265,310` |
+| Token-estimate refresh | No component calls `estimate_tokens` | `commands/folders.rs:375` |
+| Connection Error screen | `ErrorScreen.vue` is never imported | `components/shared/ErrorScreen.vue` |
+| Standalone Hosts modal | `HostManager.vue` is never imported (Hosts are managed inside Settings instead) | `components/hosts/HostManager.vue` |
+| Top-bar layout | `components/shared/TopBar.vue` is a 0-byte file | `components/shared/TopBar.vue` |
+| Sidebar search box | `Sidebar.vue:43` `<input>` is bound to a local ref that never filters anything (real search is in `ConversationList`) | `components/sidebar/Sidebar.vue` |
+| Systemd Ollama start/stop | Only caller is the unwired `ErrorScreen.vue` | `commands/service.rs` |
+| True Compact / TWM mode | Only the icon strip is collapsed; padding / font / top-bar behaviour from §3.6 not implemented | `App.vue:14` |
 
 ---
 

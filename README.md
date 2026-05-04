@@ -32,23 +32,42 @@ environment.
 ## ✨ Features
 
 - **⚡ Real-time Streaming** — Token-by-token rendering with live Markdown,
-  Shiki syntax highlighting, and KaTeX math rendering.
+  Shiki syntax highlighting, and KaTeX math.
 - **🧠 Thinking Blocks** — Collapsible `<think>` panels for models that expose
-  chain-of-thought reasoning (e.g., DeepSeek R1).
-- **🖥️ Multi-host Management** — Add multiple Ollama endpoints, monitor health
-  status/latency, and switch between them instantly.
-- **🔒 Secure Keyring** — API keys and OAuth tokens stored in the system Secret
-  Service (KWallet / GNOME Keyring).
-- **📦 Model Manager** — Pull, tag, favorite, and create custom models from
-  Modelfiles directly in the UI.
-- **🎛️ Three-layer Settings** — Granular control: Global defaults → Per-model
-  overrides → Per-chat adjustments.
-- **🌐 Web Search** — Built-in agentic tool-call loop via the Ollama Web Search
-  API with collapsible result cards.
-- **📁 Folder Context** — Attach a local directory as context and include
-  specific files in your prompt.
-- **🐧 Native Linux UX** — System tray, desktop notifications, systemd service
-  control, and first-class Wayland support.
+  chain-of-thought reasoning (e.g., DeepSeek R1, GPT-OSS).
+- **🗜️ Smart Context Management** — Automatic sliding-window truncation on every
+  send, plus a one-click **Compact** action that summarises the conversation
+  and continues in a new chat with the summary as the system prompt.
+- **🖥️ Multi-host Management** — Manage multiple Ollama endpoints (local, LAN,
+  Cloud) with background health pings every 30 seconds. Switch between hosts
+  from `Settings → Connection`.
+- **🔒 Secure Keyring** — API keys, OAuth tokens, and per-host bearer tokens
+  stored in the system Secret Service (KWallet, GNOME Keyring, KeePassXC) —
+  never in the database, never on disk.
+- **📦 Model Manager** — Pull (with progress), delete, star, tag, and create
+  custom models from Modelfiles. Configurable model storage path with a
+  systemd override.
+- **🎛️ Three-layer Settings** — Global defaults → Per-model overrides →
+  Per-chat adjustments. Mirostat 1/2, fixed seed, stop sequences, presets
+  (Creative / Balanced / Precise / Code) and user-defined profiles.
+- **🌐 Web Search** — Built-in agentic tool-call loop (up to 5 iterations) via
+  the Ollama Web Search API, with collapsible result cards.
+- **📁 Folder Context** — Drop a folder or text file onto the chat input and
+  it's ingested as a system message. (Per-file selection from a tree picker is
+  planned for v1.3 — today the whole folder is ingested, capped at 50 MB /
+  1000 files.)
+- **🖼️ Multimodal Input** — Attach images via the menu or drag-drop; up to 10
+  images × 20 MB. Vision-model support follows the Ollama capability flag.
+  (`Ctrl+V` paste was removed in v1.2.0 — it was broken on
+  WebKitGTK/Wayland.)
+- **⌨️ Keyboard-first** — `Ctrl+N` new chat, `Ctrl+K` search conversations,
+  `Ctrl+M` model switcher, `Ctrl+,` settings, `Ctrl+H` connection settings,
+  `Escape` stop generation, plus full undo/redo in the input.
+- **💾 Backup & Restore** — Native SQLite online backup from
+  `Settings → Maintenance`.
+- **🐧 Native Linux UX** — System tray (Show / Hide / Quit), desktop
+  notifications via D-Bus, smart-focus suppression, and first-class Wayland
+  support.
 
 ---
 
