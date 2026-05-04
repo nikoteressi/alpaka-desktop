@@ -100,6 +100,7 @@ alpaka-desktop/
 │       │   ├── model_path.rs     # validate_model_path + apply_model_path (systemd override)
 │       │   ├── model_settings.rs # Per-model default options + ChatOptions validation
 │       │   ├── model_user_data.rs# Favorites, tags
+│       │   ├── proxy.rs          # get_proxy_config, save_proxy, delete_proxy, test_proxy
 │       │   ├── service.rs        # Start/stop ollama systemd service
 │       │   ├── settings.rs       # KV settings get/set/delete
 │       │   ├── system.rs         # report_active_view, open_browser
@@ -210,6 +211,7 @@ alpaka-desktop/
 │   │   │   ├── AccountSettings.vue   # OAuth signin + API key panel
 │   │   │   ├── ApiKeyPanel.vue
 │   │   │   ├── HostSettings.vue      # Host CRUD lives here, not in HostManager.vue
+│   │   │   ├── ProxySettings.vue     # HTTP/SOCKS5 proxy config (URL, username, keyring password)
 │   │   │   ├── ModelPathSettings.vue
 │   │   │   ├── PresetEditor.vue
 │   │   │   ├── SettingsRow.vue
@@ -330,6 +332,12 @@ tauri::generate_handler![
     commands::settings::delete_setting,
     commands::settings::delete_all_settings,
 
+    // ── Proxy ─────────────────────────────────────────────────────────────
+    commands::proxy::get_proxy_config,  // returns { proxy_url, username, has_password }
+    commands::proxy::save_proxy,        // saves URL+username to DB, password to keyring, rebuilds client
+    commands::proxy::delete_proxy,      // clears all proxy config, rebuilds client without proxy
+    commands::proxy::test_proxy,        // probes active host /api/version via a temporary proxy client
+
     // ── Folder Context ────────────────────────────────────────────────────
     commands::folders::link_folder,
     commands::folders::unlink_folder,
@@ -366,8 +374,11 @@ pub struct AppState {
     /// Path to the SQLite database file (used by backup_database).
     pub db_path: PathBuf,
 
-    /// Shared reqwest HTTP client (connection pooling, rustls TLS).
-    pub http_client: reqwest::Client,
+    /// Shared reqwest HTTP client wrapped in RwLock for runtime proxy switching.
+    /// Rebuilt by `save_proxy` / `delete_proxy` without app restart.
+    /// `build_http_client(proxy_url, username, password)` creates the client with
+    /// optional HTTP or SOCKS5 proxy support.
+    pub http_client: RwLock<reqwest::Client>,
 
     /// Send on this channel to interrupt an in-progress generation.
     /// None when no generation is running.
