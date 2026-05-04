@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- HTTP/SOCKS5 proxy support — configure a proxy URL, optional username, and password (stored in the system keyring) in Settings → Connection; a "Test proxy" button verifies end-to-end connectivity
+
 ### Fixed
 - Cancelling generation (Stop button or Esc) no longer emits `chat:done`, persists a partial message to the database, or triggers a completion notification; partial content is preserved in-session via the new `chat:cancelled` event
 - Esc key now correctly clears the streaming indicator (previously `isStreaming` stayed true after pressing Esc)

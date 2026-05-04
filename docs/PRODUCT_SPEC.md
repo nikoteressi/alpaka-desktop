@@ -143,7 +143,7 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 | N-02 | **Hosts Manager** | P0 | ⚠️ | Implemented inside `Settings → Connection` (`HostSettings.vue`). Standalone modal `HostManager.vue` exists but is **never imported** anywhere |
 | N-03 | **Quick host switching** | P0 | ⚠️ | No top-bar dropdown — `components/shared/TopBar.vue` is a 0-byte file. Host switching reachable via `Ctrl+H` → Settings → Connection. Active-host change takes effect on the next API call (`OllamaClient` reads active host from DB on each call) |
 | N-04 | **Host health indicator** | P1 | ✅ | Background ping every 30 s; `host:status-change` event (`commands/hosts.rs::start_host_health_loop`) |
-| N-05 | **Proxy support** | P1 | 🔲 Backlog | HTTP/SOCKS5 proxy |
+| N-05 | **Proxy support** | P1 | ✅ | HTTP/SOCKS5 proxy URL + optional username/password (keyring); Test button; Settings → Connection (`ProxySettings.vue`, `commands/proxy.rs`) |
 | N-06 | **Per-host bearer token** | P1 | ✅ | Optional auth token stored in keyring (never in DB) |
 
 ### 2.8 Coding Tools Integration

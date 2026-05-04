@@ -53,7 +53,12 @@ pub async fn core_get_modelfile(client: &OllamaClient, name: &str) -> Result<Str
 
 #[tauri::command]
 pub async fn get_modelfile(state: State<'_, AppState>, name: String) -> Result<String, AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_get_modelfile(&client, &name).await
 }
 
@@ -287,7 +292,12 @@ pub async fn create_model<R: Runtime>(
     name: String,
     modelfile: String,
 ) -> Result<(), AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
 
     let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
     {

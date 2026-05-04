@@ -53,7 +53,12 @@ pub async fn core_list_models(client: &OllamaClient) -> Result<Vec<Model>, AppEr
 
 #[tauri::command]
 pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<Model>, AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_list_models(&client).await
 }
 
@@ -72,7 +77,12 @@ pub async fn core_delete_model(client: &OllamaClient, name: &str) -> Result<(), 
 
 #[tauri::command]
 pub async fn delete_model(state: State<'_, AppState>, name: String) -> Result<(), AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_delete_model(&client, &name).await
 }
 
@@ -144,7 +154,12 @@ pub async fn pull_model<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     name: String,
 ) -> Result<(), AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_pull_model(&client, &name, &app).await
 }
 
@@ -200,7 +215,12 @@ pub async fn get_model_capabilities(
     state: State<'_, AppState>,
     name: String,
 ) -> Result<ModelCapabilities, AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     let resp = client
         .post("/api/show")
         .json(&serde_json::json!({ "name": name, "verbose": false }))
