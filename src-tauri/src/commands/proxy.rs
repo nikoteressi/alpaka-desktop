@@ -89,8 +89,7 @@ pub async fn save_proxy(
             tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
                 .await;
 
-        let new_client = crate::state::build_http_client("", "", "") // codeql[rust/hard-coded-cryptographic-value] empty strings are "no proxy / no credentials" sentinels, not real secrets
-            .map_err(AppError::Http)?;
+        let new_client = crate::state::build_http_client("", "", None).map_err(AppError::Http)?;
         let mut guard = state
             .http_client
             .write()
@@ -116,8 +115,9 @@ pub async fn save_proxy(
 
     // Validate URL and build the client BEFORE writing anything to persistent storage.
     // An unsupported scheme or malformed URL is rejected here; nothing is written on failure.
-    let new_client = crate::state::build_http_client(&proxy_url, &username, &effective_password)
-        .map_err(AppError::Http)?;
+    let new_client =
+        crate::state::build_http_client(&proxy_url, &username, Some(&effective_password))
+            .map_err(AppError::Http)?;
 
     let db = state.db.clone();
     let url_clone = proxy_url.clone();
@@ -172,8 +172,7 @@ pub async fn delete_proxy(state: State<'_, AppState>) -> Result<(), AppError> {
         log::warn!("Could not remove proxy password from keyring: {e}");
     }
 
-    let new_client = crate::state::build_http_client("", "", "") // codeql[rust/hard-coded-cryptographic-value] empty strings are "no proxy / no credentials" sentinels, not real secrets
-        .map_err(AppError::Http)?;
+    let new_client = crate::state::build_http_client("", "", None).map_err(AppError::Http)?;
     let mut guard = state
         .http_client
         .write()
@@ -213,15 +212,16 @@ pub async fn test_proxy(
         .unwrap_or_default()
     };
 
-    let client = match crate::state::build_http_client(&proxy_url, &username, &effective_password) {
-        Ok(c) => c,
-        Err(e) => {
-            return Ok(ProxyTestResult {
-                success: false,
-                message: format!("Invalid proxy URL: {e}"),
-            })
-        }
-    };
+    let client =
+        match crate::state::build_http_client(&proxy_url, &username, Some(&effective_password)) {
+            Ok(c) => c,
+            Err(e) => {
+                return Ok(ProxyTestResult {
+                    success: false,
+                    message: format!("Invalid proxy URL: {e}"),
+                })
+            }
+        };
 
     let db = state.db.clone();
     let host_url_result = tokio::task::spawn_blocking(move || {
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn build_client_rejects_unsupported_scheme() {
-        let err = build_http_client("ftp://proxy.corp.net:21", "", "").unwrap_err(); // codeql[rust/hard-coded-cryptographic-value]
+        let err = build_http_client("ftp://proxy.corp.net:21", "", None).unwrap_err();
         assert!(
             err.contains("Unsupported proxy scheme"),
             "expected unsupported-scheme error, got: {err}"
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn build_client_rejects_malformed_url() {
-        let err = build_http_client("not-a-url", "", "").unwrap_err(); // codeql[rust/hard-coded-cryptographic-value]
+        let err = build_http_client("not-a-url", "", None).unwrap_err();
         assert!(
             err.contains("Invalid proxy URL"),
             "expected invalid-URL error, got: {err}"

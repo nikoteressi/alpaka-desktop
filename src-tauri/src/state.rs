@@ -48,11 +48,12 @@ pub struct AppState {
 
 /// Builds a reqwest client configured with an optional HTTP or SOCKS5 proxy.
 ///
-/// Pass empty strings for `proxy_url` to build without a proxy.
+/// Pass an empty `proxy_url` to build without a proxy.
+/// Pass `None` for `password` when no credentials are needed.
 pub fn build_http_client(
     proxy_url: &str,
     username: &str,
-    password: &str,
+    password: Option<&str>,
 ) -> Result<reqwest::Client, String> {
     let mut builder = reqwest::Client::builder()
         .use_rustls_tls()
@@ -73,6 +74,7 @@ pub fn build_http_client(
             ));
         }
         let mut proxy = reqwest::Proxy::all(proxy_url).map_err(|e| e.to_string())?;
+        let password = password.unwrap_or_default();
         if !username.is_empty() || !password.is_empty() {
             proxy = proxy.basic_auth(username, password);
         }
@@ -100,13 +102,12 @@ impl AppState {
             })
             .unwrap_or_default();
 
-        let proxy_password =
+        let proxy_password: Option<String> =
             crate::auth::keyring::get_token(crate::auth::keyring::PROXY_PASSWORD_ACCOUNT)
                 .ok()
-                .flatten()
-                .unwrap_or_default();
+                .flatten();
 
-        let http_client = build_http_client(&proxy_url, &proxy_username, &proxy_password)
+        let http_client = build_http_client(&proxy_url, &proxy_username, proxy_password.as_deref())
             .unwrap_or_else(|e| {
                 log::warn!(
                     "Proxy configuration invalid at startup; connecting without proxy. \
@@ -140,26 +141,26 @@ mod tests {
 
     #[test]
     fn test_build_http_client_no_proxy() {
-        assert!(build_http_client("", "", "").is_ok());
+        assert!(build_http_client("", "", None).is_ok());
     }
 
     #[test]
     fn test_build_http_client_http_proxy() {
-        assert!(build_http_client("http://proxy.example.com:3128", "", "").is_ok());
+        assert!(build_http_client("http://proxy.example.com:3128", "", None).is_ok());
     }
 
     #[test]
     fn test_build_http_client_socks5_proxy() {
-        assert!(build_http_client("socks5://proxy.example.com:1080", "", "").is_ok());
+        assert!(build_http_client("socks5://proxy.example.com:1080", "", None).is_ok());
     }
 
     #[test]
     fn test_build_http_client_with_credentials() {
-        assert!(build_http_client("http://proxy.example.com:3128", "user", "pass").is_ok());
+        assert!(build_http_client("http://proxy.example.com:3128", "user", Some("pass")).is_ok());
     }
 
     #[test]
     fn test_build_http_client_invalid_url() {
-        assert!(build_http_client("not_a_url", "", "").is_err());
+        assert!(build_http_client("not_a_url", "", None).is_err());
     }
 }
