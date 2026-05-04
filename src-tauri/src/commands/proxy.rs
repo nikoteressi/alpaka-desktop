@@ -31,10 +31,14 @@ pub async fn get_proxy_config(state: State<'_, AppState>) -> Result<ProxyConfig,
     })
     .await??;
 
-    let has_password = matches!(
-        keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT),
-        Ok(Some(_))
-    );
+    let has_password = tokio::task::spawn_blocking(|| {
+        matches!(
+            keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT),
+            Ok(Some(_))
+        )
+    })
+    .await
+    .unwrap_or(false);
 
     Ok(ProxyConfig {
         proxy_url,
@@ -73,17 +77,21 @@ pub async fn save_proxy(
         .await??;
     }
 
-    // Rebuild client using stored password (may differ from the `password` param which could be empty)
-    let stored_password = tokio::task::spawn_blocking(|| {
-        keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT)
-            .ok()
-            .flatten()
-            .unwrap_or_default()
-    })
-    .await
-    .unwrap_or_default();
+    // Determine effective password: if one was just written, use it; otherwise read from keyring
+    let effective_password = if !password.is_empty() {
+        password.clone()
+    } else {
+        tokio::task::spawn_blocking(|| {
+            keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT)
+                .ok()
+                .flatten()
+                .unwrap_or_default()
+        })
+        .await
+        .unwrap_or_default()
+    };
 
-    let new_client = crate::state::build_http_client(&proxy_url, &username, &stored_password)
+    let new_client = crate::state::build_http_client(&proxy_url, &username, &effective_password)
         .map_err(AppError::Http)?;
     *state.http_client.write().unwrap() = new_client;
 
@@ -105,8 +113,8 @@ pub async fn delete_proxy(state: State<'_, AppState>) -> Result<(), AppError> {
     })
     .await??;
 
-    let _ = tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
-        .await;
+    tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
+        .await??;
 
     let new_client = crate::state::build_http_client("", "", "").map_err(AppError::Http)?;
     *state.http_client.write().unwrap() = new_client;
@@ -134,18 +142,27 @@ pub async fn test_proxy(
         .map_err(|e| AppError::Http(format!("Invalid proxy URL: {e}")))?;
 
     let db = state.db.clone();
-    let host_url = tokio::task::spawn_blocking(move || {
+    let host_url_result = tokio::task::spawn_blocking(move || {
         let conn = db
             .lock()
             .map_err(|_| AppError::Db("lock poisoned".into()))?;
         let hosts = db::hosts::list_all(&conn)?;
-        let active = hosts
-            .into_iter()
-            .find(|h| h.is_active)
-            .ok_or_else(|| AppError::NotFound("no active host".into()))?;
-        Ok::<String, AppError>(active.url)
+        match hosts.into_iter().find(|h| h.is_active) {
+            Some(h) => Ok(h.url),
+            None => Err(AppError::NotFound("no active host".into())),
+        }
     })
-    .await??;
+    .await;
+
+    let host_url = match host_url_result {
+        Ok(Ok(url)) => url,
+        Ok(Err(_)) | Err(_) => {
+            return Ok(ProxyTestResult {
+                success: false,
+                message: "No active host configured".into(),
+            })
+        }
+    };
 
     let url = format!("{}/api/version", host_url.trim_end_matches('/'));
 
