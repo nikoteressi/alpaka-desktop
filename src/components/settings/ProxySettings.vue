@@ -110,7 +110,9 @@ const isTesting = ref(false);
 const testResult = ref<ProxyTestResult | null>(null);
 const errorMsg = ref("");
 
-const hasSavedProxy = computed(() => proxyUrl.value.trim() !== "");
+const hasSavedProxy = computed(
+  () => proxyUrl.value.trim() !== "" || hasPassword.value,
+);
 
 onMounted(async () => {
   try {

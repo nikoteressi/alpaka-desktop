@@ -52,7 +52,12 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         options: Option<ChatOptions>,
         original_user_content: Option<&str>,
     ) -> Result<OrchestrationResult, AppError> {
-        let http = self.state.http_client.read().unwrap().clone();
+        let http = self
+            .state
+            .http_client
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
         let client = match OllamaClient::from_state(http, self.state.db.clone()).await {
             Ok(c) => c,
             Err(e) => {

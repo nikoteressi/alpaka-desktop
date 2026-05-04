@@ -9,7 +9,11 @@ pub async fn search_ollama_library(
     query: String,
     filter: Option<String>,
 ) -> Result<Vec<LibraryModel>, AppError> {
-    let client = state.http_client.read().unwrap().clone();
+    let client = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     crate::services::library::search(&client, &query, filter.as_deref()).await
 }
 
@@ -18,7 +22,11 @@ pub async fn get_library_tags(
     state: State<'_, AppState>,
     slug: String,
 ) -> Result<Vec<LibraryTag>, AppError> {
-    let client = state.http_client.read().unwrap().clone();
+    let client = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     crate::services::library::get_tags(&client, &slug).await
 }
 
@@ -27,6 +35,10 @@ pub async fn get_library_model_readme(
     state: State<'_, AppState>,
     slug: String,
 ) -> Result<crate::services::library::LibraryModelDetails, AppError> {
-    let client = state.http_client.read().unwrap().clone();
+    let client = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     crate::services::library::get_readme(&client, &slug).await
 }

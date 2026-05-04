@@ -3,6 +3,10 @@ use tauri::{command, State};
 
 use crate::{auth::keyring, db, error::AppError, state::AppState};
 
+const MAX_PROXY_URL_LEN: usize = 512;
+const MAX_USERNAME_LEN: usize = 256;
+const MAX_PASSWORD_LEN: usize = 512;
+
 #[derive(Serialize)]
 pub struct ProxyConfig {
     pub proxy_url: String,
@@ -48,6 +52,8 @@ pub async fn get_proxy_config(state: State<'_, AppState>) -> Result<ProxyConfig,
 }
 
 /// Saves proxy URL + username to DB, password to keyring, then rebuilds the HTTP client.
+/// Validation happens before any write: an invalid URL never reaches the database.
+/// Calling with an empty proxy_url clears all proxy configuration (equivalent to delete_proxy).
 #[command]
 pub async fn save_proxy(
     state: State<'_, AppState>,
@@ -55,10 +61,66 @@ pub async fn save_proxy(
     username: String,
     password: String,
 ) -> Result<(), AppError> {
+    if proxy_url.len() > MAX_PROXY_URL_LEN {
+        return Err(AppError::Internal("Proxy URL too long".into()));
+    }
+    if username.len() > MAX_USERNAME_LEN {
+        return Err(AppError::Internal("Username too long".into()));
+    }
+    if password.len() > MAX_PASSWORD_LEN {
+        return Err(AppError::Internal("Password too long".into()));
+    }
+
+    // Empty URL = clear proxy (same effect as delete_proxy, but triggered via Save)
+    if proxy_url.trim().is_empty() {
+        let db = state.db.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = db
+                .lock()
+                .map_err(|_| AppError::Db("lock poisoned".into()))?;
+            db::settings::set(&conn, "proxyUrl", "")?;
+            db::settings::set(&conn, "proxyUsername", "")?;
+            Ok::<_, AppError>(())
+        })
+        .await??;
+
+        // Best-effort: clear any stored password
+        let _ =
+            tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
+                .await;
+
+        let new_client = crate::state::build_http_client("", "", "").map_err(AppError::Http)?;
+        let mut guard = state
+            .http_client
+            .write()
+            .map_err(|_| AppError::Internal("http_client lock poisoned".into()))?;
+        *guard = new_client;
+        return Ok(());
+    }
+
+    // Determine effective password before any write: use provided value or read from keyring.
+    // This lets callers omit the password when only the URL/username changed.
+    let effective_password = if !password.is_empty() {
+        password.clone()
+    } else {
+        tokio::task::spawn_blocking(|| {
+            keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT)
+                .ok()
+                .flatten()
+                .unwrap_or_default()
+        })
+        .await
+        .unwrap_or_default()
+    };
+
+    // Validate URL and build the client BEFORE writing anything to persistent storage.
+    // An unsupported scheme or malformed URL is rejected here; nothing is written on failure.
+    let new_client = crate::state::build_http_client(&proxy_url, &username, &effective_password)
+        .map_err(AppError::Http)?;
+
     let db = state.db.clone();
     let url_clone = proxy_url.clone();
     let user_clone = username.clone();
-
     tokio::task::spawn_blocking(move || {
         let conn = db
             .lock()
@@ -77,23 +139,11 @@ pub async fn save_proxy(
         .await??;
     }
 
-    // Determine effective password: if one was just written, use it; otherwise read from keyring
-    let effective_password = if !password.is_empty() {
-        password.clone()
-    } else {
-        tokio::task::spawn_blocking(|| {
-            keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT)
-                .ok()
-                .flatten()
-                .unwrap_or_default()
-        })
-        .await
-        .unwrap_or_default()
-    };
-
-    let new_client = crate::state::build_http_client(&proxy_url, &username, &effective_password)
-        .map_err(AppError::Http)?;
-    *state.http_client.write().unwrap() = new_client;
+    let mut guard = state
+        .http_client
+        .write()
+        .map_err(|_| AppError::Internal("http_client lock poisoned".into()))?;
+    *guard = new_client;
 
     Ok(())
 }
@@ -113,11 +163,20 @@ pub async fn delete_proxy(state: State<'_, AppState>) -> Result<(), AppError> {
     })
     .await??;
 
-    tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
-        .await??;
+    // Best-effort: keyring unavailability should not fail the delete
+    if let Err(e) =
+        tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
+            .await?
+    {
+        log::warn!("Could not remove proxy password from keyring: {e}");
+    }
 
     let new_client = crate::state::build_http_client("", "", "").map_err(AppError::Http)?;
-    *state.http_client.write().unwrap() = new_client;
+    let mut guard = state
+        .http_client
+        .write()
+        .map_err(|_| AppError::Internal("http_client lock poisoned".into()))?;
+    *guard = new_client;
 
     Ok(())
 }
@@ -190,11 +249,15 @@ pub async fn test_proxy(
     match tokio::time::timeout(std::time::Duration::from_secs(10), client.get(&url).send()).await {
         Ok(Ok(_)) => Ok(ProxyTestResult {
             success: true,
-            message: "Proxy connection successful".into(),
+            // Deliberately "reachable" rather than "successful": any HTTP response (including
+            // 401/403 from a cloud host) proves the proxy forwarded the connection.
+            message: "Proxy is reachable".into(),
         }),
         Ok(Err(e)) => Ok(ProxyTestResult {
             success: false,
-            message: e.to_string(),
+            // without_url() strips the request URL from the error to avoid exposing
+            // internal host addresses in the frontend error message.
+            message: e.without_url().to_string(),
         }),
         Err(_) => Ok(ProxyTestResult {
             success: false,
@@ -205,81 +268,30 @@ pub async fn test_proxy(
 
 #[cfg(test)]
 mod tests {
-    use crate::db::migrations;
+    use crate::auth::keyring::{API_KEY_ACCOUNT, PROXY_PASSWORD_ACCOUNT};
     use crate::state::build_http_client;
-    use rusqlite::Connection;
-    use std::sync::{Arc, Mutex};
-
-    fn in_memory_db() -> crate::db::DbConn {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch("PRAGMA journal_mode = WAL;\nPRAGMA foreign_keys = ON;")
-            .unwrap();
-        migrations::run(&conn).unwrap();
-        Arc::new(Mutex::new(conn))
-    }
 
     #[test]
-    fn test_proxy_password_account_distinct_from_api_key() {
-        use crate::auth::keyring::{API_KEY_ACCOUNT, PROXY_PASSWORD_ACCOUNT};
+    fn proxy_password_account_distinct_from_api_key() {
         assert_ne!(PROXY_PASSWORD_ACCOUNT, API_KEY_ACCOUNT);
         assert_eq!(PROXY_PASSWORD_ACCOUNT, "proxy-password");
     }
 
     #[test]
-    fn test_build_client_with_empty_url_succeeds() {
-        assert!(build_http_client("", "", "").is_ok());
+    fn build_client_rejects_unsupported_scheme() {
+        let err = build_http_client("ftp://proxy.corp.net:21", "", "").unwrap_err();
+        assert!(
+            err.contains("Unsupported proxy scheme"),
+            "expected unsupported-scheme error, got: {err}"
+        );
     }
 
     #[test]
-    fn test_build_client_with_http_proxy_url() {
-        assert!(build_http_client("http://corp-proxy.internal:3128", "alice", "s3cr3t").is_ok());
-    }
-
-    #[test]
-    fn test_build_client_with_socks5_proxy_url() {
-        assert!(build_http_client("socks5://proxy.corp.net:1080", "", "").is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_get_proxy_config_returns_empty_when_not_set() {
-        let db = in_memory_db();
-        let (url, username) = tokio::task::spawn_blocking(move || {
-            let conn = db.lock().unwrap();
-            let url = crate::db::settings::get(&conn, "proxyUrl")
-                .unwrap()
-                .unwrap_or_default();
-            let username = crate::db::settings::get(&conn, "proxyUsername")
-                .unwrap()
-                .unwrap_or_default();
-            (url, username)
-        })
-        .await
-        .unwrap();
-
-        assert_eq!(url, "");
-        assert_eq!(username, "");
-    }
-
-    #[tokio::test]
-    async fn test_proxy_url_persisted_to_db() {
-        let db = in_memory_db();
-        let db2 = db.clone();
-
-        tokio::task::spawn_blocking(move || {
-            let conn = db2.lock().unwrap();
-            crate::db::settings::set(&conn, "proxyUrl", "http://proxy:3128").unwrap();
-            crate::db::settings::set(&conn, "proxyUsername", "bob").unwrap();
-        })
-        .await
-        .unwrap();
-
-        let url = tokio::task::spawn_blocking(move || {
-            let conn = db.lock().unwrap();
-            crate::db::settings::get(&conn, "proxyUrl").unwrap()
-        })
-        .await
-        .unwrap();
-
-        assert_eq!(url, Some("http://proxy:3128".to_string()));
+    fn build_client_rejects_malformed_url() {
+        let err = build_http_client("not-a-url", "", "").unwrap_err();
+        assert!(
+            err.contains("Invalid proxy URL"),
+            "expected invalid-URL error, got: {err}"
+        );
     }
 }

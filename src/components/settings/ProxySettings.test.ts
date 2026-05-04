@@ -103,7 +103,7 @@ describe("ProxySettings", () => {
     mockInvoke.mockReset();
     mockInvoke.mockResolvedValue({
       success: true,
-      message: "Proxy connection successful",
+      message: "Proxy is reachable",
     });
 
     const testBtn = wrapper
@@ -118,7 +118,7 @@ describe("ProxySettings", () => {
         proxyUrl: "http://p:3128",
       }),
     );
-    expect(wrapper.text()).toContain("Proxy connection successful");
+    expect(wrapper.text()).toContain("Proxy is reachable");
   });
 
   it("shows error message when test_proxy returns success: false", async () => {
@@ -178,5 +178,46 @@ describe("ProxySettings", () => {
       .findAll("button")
       .find((b) => b.text().includes("Test"));
     expect(testBtn!.attributes("disabled")).toBeDefined();
+  });
+
+  it("clears password field and updates hasPassword after successful save with password", async () => {
+    mockInvoke.mockResolvedValueOnce({
+      proxy_url: "http://proxy:3128",
+      username: "",
+      has_password: false,
+    });
+    const wrapper = mountComponent();
+    await flushPromises();
+    mockInvoke.mockReset();
+    mockInvoke.mockResolvedValue(undefined);
+
+    const inputs = wrapper.findAll("input");
+    await inputs[2].setValue("secret");
+
+    const saveBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Save"));
+    await saveBtn!.trigger("click");
+    await flushPromises();
+
+    // Password field should be cleared after save
+    expect(inputs[2].element.value).toBe("");
+    // Placeholder should switch to the masked indicator
+    expect(inputs[2].attributes("placeholder")).toBe("••••••••");
+  });
+
+  it("shows Clear button when has_password is true even if URL is empty", async () => {
+    mockInvoke.mockResolvedValue({
+      proxy_url: "",
+      username: "",
+      has_password: true,
+    });
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const clearBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Clear"));
+    expect(clearBtn?.exists()).toBe(true);
   });
 });
