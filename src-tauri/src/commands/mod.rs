@@ -9,6 +9,7 @@ pub mod model_path;
 pub mod model_settings;
 pub mod model_user_data;
 pub mod models;
+pub mod proxy;
 pub mod service;
 pub mod settings;
 pub mod system;
