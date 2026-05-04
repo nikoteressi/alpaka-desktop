@@ -194,6 +194,8 @@
                 />
               </template>
             </SettingsRow>
+
+            <ProxySettings />
           </div>
 
           <!-- Models Section -->
@@ -475,6 +477,7 @@ import ToggleSwitch from "../components/shared/ToggleSwitch.vue";
 import SettingsRow from "../components/settings/SettingsRow.vue";
 import AccountSettings from "../components/settings/AccountSettings.vue";
 import HostSettings from "../components/settings/HostSettings.vue";
+import ProxySettings from "../components/settings/ProxySettings.vue";
 import ModelPathSettings from "../components/settings/ModelPathSettings.vue";
 import PresetEditor from "../components/settings/PresetEditor.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
