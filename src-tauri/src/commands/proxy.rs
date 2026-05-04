@@ -89,7 +89,8 @@ pub async fn save_proxy(
             tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
                 .await;
 
-        let new_client = crate::state::build_http_client("", "", "").map_err(AppError::Http)?;
+        let new_client = crate::state::build_http_client("", "", "") // codeql[rust/hard-coded-cryptographic-value] empty strings are "no proxy / no credentials" sentinels, not real secrets
+            .map_err(AppError::Http)?;
         let mut guard = state
             .http_client
             .write()
@@ -171,7 +172,8 @@ pub async fn delete_proxy(state: State<'_, AppState>) -> Result<(), AppError> {
         log::warn!("Could not remove proxy password from keyring: {e}");
     }
 
-    let new_client = crate::state::build_http_client("", "", "").map_err(AppError::Http)?;
+    let new_client = crate::state::build_http_client("", "", "") // codeql[rust/hard-coded-cryptographic-value] empty strings are "no proxy / no credentials" sentinels, not real secrets
+        .map_err(AppError::Http)?;
     let mut guard = state
         .http_client
         .write()
@@ -279,7 +281,7 @@ mod tests {
 
     #[test]
     fn build_client_rejects_unsupported_scheme() {
-        let err = build_http_client("ftp://proxy.corp.net:21", "", "").unwrap_err();
+        let err = build_http_client("ftp://proxy.corp.net:21", "", "").unwrap_err(); // codeql[rust/hard-coded-cryptographic-value]
         assert!(
             err.contains("Unsupported proxy scheme"),
             "expected unsupported-scheme error, got: {err}"
@@ -288,7 +290,7 @@ mod tests {
 
     #[test]
     fn build_client_rejects_malformed_url() {
-        let err = build_http_client("not-a-url", "", "").unwrap_err();
+        let err = build_http_client("not-a-url", "", "").unwrap_err(); // codeql[rust/hard-coded-cryptographic-value]
         assert!(
             err.contains("Invalid proxy URL"),
             "expected invalid-URL error, got: {err}"

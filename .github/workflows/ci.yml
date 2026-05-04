@@ -339,7 +339,7 @@ jobs:
         if: needs.changes.outputs.rust == 'true'
         run: |
           mkdir -p coverage-rust
-          cargo llvm-cov nextest --no-report --workspace --locked
+          cargo llvm-cov nextest --no-report --workspace --locked --features test-mode
           cargo llvm-cov report --lcov --output-path coverage-rust/lcov.info
           cargo llvm-cov report --html --output-dir coverage-rust/html
         working-directory: src-tauri
