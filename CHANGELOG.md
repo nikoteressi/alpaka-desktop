@@ -21,6 +21,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Security
 - Tauri capability narrowed from broad `fs:allow-read-file` to a scoped `read_image_file` command with an extension allowlist (`jpg`, `jpeg`, `png`, `gif`, `webp`, `bmp`) and 20 MB size guard; unused `opener:allow-open-path` capability removed
 
+---
+
+## [1.2.1] - 2026-05-04
+
 ### Security
 - API key is now restricted to `https://api.ollama.com` only: `is_cloud_host` requires HTTPS scheme, preventing the key from being attached to plaintext HTTP connections; `validate_api_key` rejects any host that is not the cloud endpoint before reading the key from the keyring
 
