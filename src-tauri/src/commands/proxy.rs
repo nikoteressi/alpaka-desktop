@@ -65,11 +65,7 @@ pub async fn save_proxy(
     })
     .await??;
 
-    if password.is_empty() {
-        let _ =
-            tokio::task::spawn_blocking(|| keyring::delete_token(keyring::PROXY_PASSWORD_ACCOUNT))
-                .await;
-    } else {
+    if !password.is_empty() {
         let pass_clone = password.clone();
         tokio::task::spawn_blocking(move || {
             keyring::set_token(keyring::PROXY_PASSWORD_ACCOUNT, &pass_clone)
@@ -77,7 +73,17 @@ pub async fn save_proxy(
         .await??;
     }
 
-    let new_client = crate::state::build_http_client(&proxy_url, &username, &password)
+    // Rebuild client using stored password (may differ from the `password` param which could be empty)
+    let stored_password = tokio::task::spawn_blocking(|| {
+        keyring::get_token(keyring::PROXY_PASSWORD_ACCOUNT)
+            .ok()
+            .flatten()
+            .unwrap_or_default()
+    })
+    .await
+    .unwrap_or_default();
+
+    let new_client = crate::state::build_http_client(&proxy_url, &username, &stored_password)
         .map_err(AppError::Http)?;
     *state.http_client.write().unwrap() = new_client;
 
