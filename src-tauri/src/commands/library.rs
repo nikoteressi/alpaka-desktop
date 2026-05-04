@@ -9,7 +9,8 @@ pub async fn search_ollama_library(
     query: String,
     filter: Option<String>,
 ) -> Result<Vec<LibraryModel>, AppError> {
-    crate::services::library::search(&state.http_client, &query, filter.as_deref()).await
+    let client = state.http_client.read().unwrap().clone();
+    crate::services::library::search(&client, &query, filter.as_deref()).await
 }
 
 #[tauri::command]
@@ -17,7 +18,8 @@ pub async fn get_library_tags(
     state: State<'_, AppState>,
     slug: String,
 ) -> Result<Vec<LibraryTag>, AppError> {
-    crate::services::library::get_tags(&state.http_client, &slug).await
+    let client = state.http_client.read().unwrap().clone();
+    crate::services::library::get_tags(&client, &slug).await
 }
 
 #[tauri::command]
@@ -25,5 +27,6 @@ pub async fn get_library_model_readme(
     state: State<'_, AppState>,
     slug: String,
 ) -> Result<crate::services::library::LibraryModelDetails, AppError> {
-    crate::services::library::get_readme(&state.http_client, &slug).await
+    let client = state.http_client.read().unwrap().clone();
+    crate::services::library::get_readme(&client, &slug).await
 }

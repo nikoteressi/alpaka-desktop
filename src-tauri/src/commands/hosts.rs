@@ -157,7 +157,8 @@ pub async fn core_ping_host(
 
 #[tauri::command]
 pub async fn ping_host(state: State<'_, AppState>, id: String) -> Result<PingStatus, AppError> {
-    core_ping_host(state.db.clone(), state.http_client.clone(), id).await
+    let http = state.http_client.read().unwrap().clone();
+    core_ping_host(state.db.clone(), http, id).await
 }
 
 /// MED-10: Start the host health check loop with a shutdown channel.
@@ -174,7 +175,8 @@ pub fn start_host_health_loop(
         };
         let client = {
             let state = app.state::<AppState>();
-            state.http_client.clone()
+            let c = state.http_client.read().unwrap().clone();
+            c
         };
 
         // Pin the shutdown receiver so it can be used in select!

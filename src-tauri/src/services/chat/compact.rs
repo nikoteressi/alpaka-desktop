@@ -60,8 +60,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         );
 
         // 3. Call Ollama non-streaming for summary
-        let client =
-            OllamaClient::from_state(self.state.http_client.clone(), self.state.db.clone()).await?;
+        let http = self.state.http_client.read().unwrap().clone();
+        let client = OllamaClient::from_state(http, self.state.db.clone()).await?;
         let req = ChatRequest {
             model: model.clone(),
             messages: vec![Message {

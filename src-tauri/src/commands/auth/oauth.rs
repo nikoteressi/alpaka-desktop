@@ -45,7 +45,8 @@ pub async fn get_auth_status(
     state: tauri::State<'_, crate::state::AppState>,
     host_id: String,
 ) -> Result<bool, AppError> {
-    perform_auth_status_check(&state.http_client, state.db.clone(), host_id).await
+    let client = state.http_client.read().unwrap().clone();
+    perform_auth_status_check(&client, state.db.clone(), host_id).await
 }
 
 pub async fn perform_auth_status_check(
