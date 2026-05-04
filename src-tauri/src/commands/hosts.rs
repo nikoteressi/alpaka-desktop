@@ -173,16 +173,15 @@ pub fn start_host_health_loop(
             let state = app.state::<AppState>();
             state.db.clone()
         };
-        let client = {
-            let state = app.state::<AppState>();
-            let c = state.http_client.read().unwrap().clone();
-            c
-        };
 
         // Pin the shutdown receiver so it can be used in select!
         tokio::pin!(shutdown_rx);
 
         loop {
+            // Re-acquire the client on each iteration so proxy changes applied
+            // at runtime (via commands/proxy.rs) are picked up immediately.
+            let client = app.state::<AppState>().http_client.read().unwrap().clone();
+
             let hosts = match tokio::task::spawn_blocking({
                 let db = db.clone();
                 move || {
