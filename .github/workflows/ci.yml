@@ -500,7 +500,8 @@ jobs:
             libssl-dev \
             pkg-config \
             webkit2gtk-driver \
-            xvfb
+            xvfb \
+            zstd
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
@@ -533,10 +534,10 @@ jobs:
 
       - name: Install Ollama
         env:
-          OLLAMA_VERSION: "0.6.5"
+          OLLAMA_VERSION: "0.23.0"
         run: |
-          curl -fsSL "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64" \
-            -o /usr/local/bin/ollama
+          curl -fsSL "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst" \
+            | zstd -d | tar -xf - -C /usr/local bin/ollama
           chmod +x /usr/local/bin/ollama
 
       - name: Start Ollama and pull test model
