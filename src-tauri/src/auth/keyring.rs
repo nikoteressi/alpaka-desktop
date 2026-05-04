@@ -27,6 +27,9 @@ pub const SERVICE_NAME: &str = "ollama-desktop";
 /// from per-host OAuth bearer tokens, which use the host's UUID as the account name.
 pub const API_KEY_ACCOUNT: &str = "ollama-api-key";
 
+/// Fixed keyring account name for the proxy server password.
+pub const PROXY_PASSWORD_ACCOUNT: &str = "proxy-password";
+
 /// Sets a bearer token in the system's secure credential store (keyring).
 ///
 /// Under Linux, this uses the Secret Service API.
