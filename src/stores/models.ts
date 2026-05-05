@@ -453,7 +453,7 @@ export const useModelStore = defineStore("models", {
         this.pushing[cloudName] = {
           ...this.pushing[cloudName],
           phase: "error",
-          error: e instanceof Error ? e.message : String(e),
+          error: extractErrorMessage(e),
         };
       }
     },
