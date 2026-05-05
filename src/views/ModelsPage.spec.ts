@@ -851,9 +851,129 @@ describe("ModelsPage", () => {
       (t) => t.id,
     );
     expect(tabIds).toContain("local");
+    expect(tabIds).toContain("mine");
     expect(tabIds).toContain("library");
     expect(tabIds).toContain("cloud");
     expect(tabIds).toContain("engine");
+  });
+
+  // ── mine tab ──────────────────────────────────────────────────────────────
+
+  it("shows mine tab when activeTab switches to mine", async () => {
+    const { wrapper } = await mountPage((store) => {
+      store.isLoading = false;
+      store.error = null;
+      store.models = [];
+    });
+
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "mine");
+    await nextTick();
+
+    expect(wrapper.text()).toContain("Pull a private model");
+  });
+
+  it("shows empty mine tab when no namespaced models and no pushes", async () => {
+    const { wrapper } = await mountPage((store) => {
+      store.isLoading = false;
+      store.error = null;
+      store.models = [];
+      store.pushing = {};
+    });
+
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "mine");
+    await nextTick();
+
+    expect(wrapper.text()).toContain("No private models yet");
+    expect(wrapper.text()).toContain("username/modelname");
+  });
+
+  it("shows namespaced models in mine tab", async () => {
+    const { wrapper } = await mountPage((store) => {
+      store.isLoading = false;
+      store.error = null;
+      store.models = [
+        makeModel("llama3:8b"),
+        makeModel("myuser/custom-model:latest"),
+      ];
+    });
+
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "mine");
+    await nextTick();
+
+    const cards = wrapper.findAll(".stub-model-card");
+    expect(cards.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows active uploads section when pushing is in progress", async () => {
+    const { wrapper } = await mountPage((store) => {
+      store.isLoading = false;
+      store.error = null;
+      store.models = [];
+      store.pushing = {
+        "myuser/mymodel:latest": {
+          model: "myuser/mymodel:latest",
+          status: "uploading...",
+          percent: 45,
+        },
+      };
+    });
+
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "mine");
+    await nextTick();
+
+    expect(wrapper.text()).toContain("Active Uploads");
+    expect(wrapper.text()).toContain("myuser/mymodel:latest");
+    expect(wrapper.text()).toContain("uploading...");
+  });
+
+  it("pull button is disabled when user is not signed in", async () => {
+    const { useAuthStore } = await import("../stores/auth");
+    const authStore = useAuthStore();
+    authStore.user = null;
+
+    const { wrapper } = await mountPage((store) => {
+      store.isLoading = false;
+      store.error = null;
+      store.models = [];
+    });
+
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "mine");
+    await nextTick();
+
+    const pullBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Pull"));
+    expect(pullBtn).toBeDefined();
+    expect((pullBtn!.element as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("pull button is enabled when user is signed in and model name is entered", async () => {
+    const { useAuthStore } = await import("../stores/auth");
+    const authStore = useAuthStore();
+    authStore.user = { id: "u1", username: "alice" };
+
+    const { wrapper } = await mountPage((store) => {
+      store.isLoading = false;
+      store.error = null;
+      store.models = [];
+    });
+
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "mine");
+    await nextTick();
+
+    const input = wrapper.find('input[type="text"]');
+    await input.setValue("myuser/model:latest");
+    await nextTick();
+
+    const pullBtn = wrapper.findAll("button").find((b) => b.text() === "Pull");
+    expect(pullBtn).toBeDefined();
+    expect((pullBtn!.element as HTMLButtonElement).disabled).toBe(false);
   });
 
   // ── isCloudLoading skeleton loader ────────────────────────────────────────

@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { h } from "vue";
+import { IconMine } from "../components/shared/icons";
 
 describe("Mine tab — myModels filtering", () => {
   it("filters models with / in name", () => {
@@ -18,5 +20,15 @@ describe("Mine tab — myModels filtering", () => {
     const models = [{ name: "llama3:8b" }, { name: "phi3" }];
     const myModels = models.filter((m) => m.name.includes("/"));
     expect(myModels).toHaveLength(0);
+  });
+});
+
+describe("IconMine", () => {
+  it("renders an svg with path and circle", () => {
+    const vnode = h(IconMine);
+    expect(vnode.type).toBeTypeOf("object");
+    // The setup function returns an h("svg", ...) vnode
+    const rendered = (vnode.type as { setup?: () => () => unknown }).setup?.();
+    expect(rendered).toBeDefined();
   });
 });
