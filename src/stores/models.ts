@@ -43,6 +43,8 @@ import type {
   CreateDonePayload,
   CreateErrorPayload,
   ModelUpdatesCheckedPayload,
+  PushProgressPayload,
+  PushState,
 } from "../types/models";
 
 export type { ModelCapabilities };
@@ -66,6 +68,8 @@ export const useModelStore = defineStore("models", {
     _searchVersion: 0,
     modelsWithUpdates: new Set<string>(),
     isCheckingUpdates: false,
+    pushing: {} as Record<string, PushState>,
+    privateModels: [] as string[],
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],
@@ -397,6 +401,30 @@ export const useModelStore = defineStore("models", {
                 this.isCheckingUpdates = false;
               },
             ),
+            listen<PushProgressPayload>("model:push-progress", (event) => {
+              const { model, status, percent } = event.payload;
+              if (this.pushing[model]) {
+                this.pushing[model].status = status;
+                this.pushing[model].percent = percent;
+              }
+            }),
+            listen<{ model: string }>("model:push-done", (event) => {
+              const { model } = event.payload;
+              if (this.pushing[model]) {
+                this.pushing[model].phase = "done";
+                this.pushing[model].percent = 100;
+              }
+            }),
+            listen<{ model: string; error: string }>(
+              "model:push-error",
+              (event) => {
+                const { model, error } = event.payload;
+                if (this.pushing[model]) {
+                  this.pushing[model].phase = "error";
+                  this.pushing[model].error = error;
+                }
+              },
+            ),
           ])),
         );
         this._unlisten = unlistens;
@@ -410,6 +438,53 @@ export const useModelStore = defineStore("models", {
 
     clearCreateState(name: string) {
       delete this.creating[name];
+    },
+
+    async pushModel(localName: string, cloudName: string): Promise<void> {
+      this.pushing[cloudName] = {
+        name: localName,
+        cloudName,
+        status: "starting...",
+        percent: 0,
+        phase: "running",
+      };
+      try {
+        await invoke("push_model", { name: cloudName });
+      } catch (e: unknown) {
+        this.pushing[cloudName] = {
+          ...this.pushing[cloudName],
+          phase: "error",
+          error: e instanceof Error ? e.message : String(e),
+        };
+      }
+    },
+
+    async fetchPrivateModels(): Promise<void> {
+      try {
+        const raw = await invoke<string | null>("get_setting", {
+          key: "private_cloud_models",
+        });
+        this.privateModels = raw ? (JSON.parse(raw) as string[]) : [];
+      } catch {
+        this.privateModels = [];
+      }
+    },
+
+    async addPrivateModel(cloudName: string): Promise<void> {
+      if (this.privateModels.includes(cloudName)) return;
+      this.privateModels = [...this.privateModels, cloudName];
+      await invoke("set_setting", {
+        key: "private_cloud_models",
+        value: JSON.stringify(this.privateModels),
+      });
+    },
+
+    async removePrivateModel(cloudName: string): Promise<void> {
+      this.privateModels = this.privateModels.filter((n) => n !== cloudName);
+      await invoke("set_setting", {
+        key: "private_cloud_models",
+        value: JSON.stringify(this.privateModels),
+      });
     },
 
     formatBytes(bytes: number) {

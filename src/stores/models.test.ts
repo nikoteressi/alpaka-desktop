@@ -155,7 +155,7 @@ describe("useModelStore", () => {
     await store.initListeners();
     await store.initListeners();
 
-    expect(mockListen).toHaveBeenCalledTimes(6); // once for each event, not 12
+    expect(mockListen).toHaveBeenCalledTimes(9); // once for each event, not 18
   });
 
   it("fetchModels sets error from tagged-enum object { Http: 'connection refused' }", async () => {
@@ -995,6 +995,115 @@ describe("useModelStore", () => {
     it("formats gigabytes", () => {
       const store = useModelStore();
       expect(store.formatBytes(1024 * 1024 * 1024)).toBe("1 GB");
+    });
+  });
+
+  describe("pushModel", () => {
+    it("sets pushing state and calls push_model invoke", async () => {
+      const store = useModelStore();
+      mockInvoke.mockImplementation(async (cmd: string) => {
+        if (cmd === "push_model") return undefined;
+        return undefined;
+      });
+
+      const pushPromise = store.pushModel(
+        "mymodel:latest",
+        "user/mymodel:latest",
+      );
+      expect(store.pushing["user/mymodel:latest"]).toBeDefined();
+      expect(store.pushing["user/mymodel:latest"].phase).toBe("running");
+
+      await pushPromise;
+      expect(mockInvoke).toHaveBeenCalledWith("push_model", {
+        name: "user/mymodel:latest",
+      });
+    });
+
+    it("sets error phase when push_model rejects", async () => {
+      const store = useModelStore();
+      mockInvoke.mockImplementation(async (cmd: string) => {
+        if (cmd === "push_model") throw new Error("unauthorized");
+        return undefined;
+      });
+
+      await store.pushModel("mymodel:latest", "user/mymodel:latest");
+      expect(store.pushing["user/mymodel:latest"].phase).toBe("error");
+      expect(store.pushing["user/mymodel:latest"].error).toContain(
+        "unauthorized",
+      );
+    });
+  });
+
+  describe("private models", () => {
+    it("fetchPrivateModels parses JSON from settings", async () => {
+      const store = useModelStore();
+      mockInvoke.mockImplementation(async (cmd: string) => {
+        if (cmd === "get_setting")
+          return JSON.stringify(["user/model-a:latest", "user/model-b:v1"]);
+        return undefined;
+      });
+
+      await store.fetchPrivateModels();
+      expect(store.privateModels).toEqual([
+        "user/model-a:latest",
+        "user/model-b:v1",
+      ]);
+    });
+
+    it("fetchPrivateModels handles missing setting gracefully", async () => {
+      const store = useModelStore();
+      mockInvoke.mockImplementation(async (cmd: string) => {
+        if (cmd === "get_setting") return null;
+        return undefined;
+      });
+
+      await store.fetchPrivateModels();
+      expect(store.privateModels).toEqual([]);
+    });
+
+    it("addPrivateModel appends and persists", async () => {
+      const store = useModelStore();
+      store.privateModels = ["user/existing:latest"];
+      mockInvoke.mockResolvedValue(undefined);
+
+      await store.addPrivateModel("user/new-model:latest");
+
+      expect(store.privateModels).toContain("user/new-model:latest");
+      expect(mockInvoke).toHaveBeenCalledWith("set_setting", {
+        key: "private_cloud_models",
+        value: JSON.stringify([
+          "user/existing:latest",
+          "user/new-model:latest",
+        ]),
+      });
+    });
+
+    it("addPrivateModel ignores duplicates", async () => {
+      const store = useModelStore();
+      store.privateModels = ["user/model:latest"];
+      mockInvoke.mockResolvedValue(undefined);
+
+      await store.addPrivateModel("user/model:latest");
+
+      expect(store.privateModels).toHaveLength(1);
+      expect(mockInvoke).not.toHaveBeenCalledWith(
+        "set_setting",
+        expect.anything(),
+      );
+    });
+
+    it("removePrivateModel removes and persists", async () => {
+      const store = useModelStore();
+      store.privateModels = ["user/a:latest", "user/b:v1"];
+      mockInvoke.mockResolvedValue(undefined);
+
+      await store.removePrivateModel("user/a:latest");
+
+      expect(store.privateModels).toEqual(["user/b:v1"]);
+      expect(mockInvoke).toHaveBeenCalledWith("set_setting", {
+        key: "private_cloud_models",
+        value: JSON.stringify(["user/b:v1"]),
+      });
     });
   });
 });
