@@ -373,7 +373,7 @@ const router = useRouter();
 const settingsStore = useSettingsStore();
 const modelStore = useModelStore();
 const authStore = useAuthStore();
-const isSignedIn = ref(false);
+const isSignedIn = computed(() => !!authStore.user);
 const isPushable = computed(() => props.model.name.includes("/"));
 const isPushing = computed(() => !!modelStore.pushing[props.model.name]);
 const pushProgress = computed(() => modelStore.pushing[props.model.name]);
@@ -422,9 +422,6 @@ async function saveTags() {
 }
 
 onMounted(async () => {
-  authStore.checkOllamaSignedIn().then((v) => {
-    isSignedIn.value = v;
-  });
   try {
     const stored = await applyModelDefaults(props.model.name);
     edited.value = { ...stored };
