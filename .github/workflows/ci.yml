@@ -121,7 +121,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@26f6d4f2c533a43e6b5da0b4a5dd983f98f7b49a # v6.0.4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -235,7 +235,7 @@ jobs:
 
       - name: Setup pnpm
         if: needs.changes.outputs.frontend == 'true'
-        uses: pnpm/action-setup@26f6d4f2c533a43e6b5da0b4a5dd983f98f7b49a # v6.0.4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Node.js
         if: needs.changes.outputs.frontend == 'true'
@@ -276,7 +276,7 @@ jobs:
             exit 0
           fi
 
-          ADVISORY=$(echo "$PR_LABELS" | jq -r '.[].name' | grep -E '^type: (ci|docs)$' | head -1 || true)
+          ADVISORY=$(echo "$PR_LABELS" | jq -r '.[].name' | grep -E '^(type: (ci|docs)|dependencies)$' | head -1 || true)
 
           if [[ -n "$ADVISORY" ]]; then
             echo "WARNING: CHANGELOG.md not updated, but PR is labeled '${ADVISORY}' — advisory only."
@@ -345,7 +345,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@26f6d4f2c533a43e6b5da0b4a5dd983f98f7b49a # v6.0.4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -368,14 +368,14 @@ jobs:
         if: |
           (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
           (needs.changes.outputs.rust == 'true' || needs.changes.outputs.frontend == 'true')
-        uses: SonarSource/sonarcloud-github-action@383f7e52eae3ab0510c3cb0e7d9d150bbaeab838 # v3
+        uses: SonarSource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: Upload TypeScript coverage report
         if: needs.changes.outputs.frontend == 'true'
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vitest-coverage
           path: coverage/
@@ -383,7 +383,7 @@ jobs:
 
       - name: Upload Rust coverage report
         if: needs.changes.outputs.rust == 'true'
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cargo-coverage
           path: src-tauri/coverage-rust/html/
@@ -428,7 +428,7 @@ jobs:
           shared-key: e2e
 
       - name: Cache tauri-driver binary
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-tauri-driver-smoke
         with:
           path: ~/.cargo/bin/tauri-driver
@@ -439,7 +439,7 @@ jobs:
         run: cargo install tauri-driver --locked
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@26f6d4f2c533a43e6b5da0b4a5dd983f98f7b49a # v6.0.4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -460,7 +460,7 @@ jobs:
 
       - name: Upload smoke test artifacts
         if: failure()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: smoke-artifacts
           path: e2e-desktop/.artifacts/
@@ -510,7 +510,7 @@ jobs:
           shared-key: e2e
 
       - name: Cache tauri-driver binary
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         id: cache-tauri-driver-integration
         with:
           path: ~/.cargo/bin/tauri-driver
@@ -521,7 +521,7 @@ jobs:
         run: cargo install tauri-driver --locked
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@26f6d4f2c533a43e6b5da0b4a5dd983f98f7b49a # v6.0.4
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
 
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -556,7 +556,7 @@ jobs:
 
       - name: Upload integration test artifacts
         if: failure()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: integration-artifacts
           path: e2e-desktop/.artifacts/

@@ -21,6 +21,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Clearing a draft on an unsaved conversation no longer logs "Conversation not found" warnings
 - Linked file context (text files attached via "Link File Context") is now correctly passed to the model; non-UTF-8 and permission-denied files previously returned empty content silently
 - File link errors in the chat input now show the actual backend error message instead of a generic fallback
+- E2E tests (`wdio run`) were crashing with `Failed to match capabilities` after Dependabot bumped `@wdio/local-runner`, `@wdio/mocha-framework`, `@wdio/types`, and `webdriverio` to v9 while `@wdio/cli` and `@wdio/spec-reporter` remained on v8; all wdio packages are now uniformly on v9.27.1
 
 ### Security
 - Tauri capability narrowed from broad `fs:allow-read-file` to a scoped `read_image_file` command with an extension allowlist (`jpg`, `jpeg`, `png`, `gif`, `webp`, `bmp`) and 20 MB size guard; unused `opener:allow-open-path` capability removed

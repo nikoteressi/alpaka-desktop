@@ -1,20 +1,21 @@
 import path from 'path'
 import { fileURLToPath } from 'url'
-import type { Options } from '@wdio/types'
+import type { Options, Capabilities } from '@wdio/types'
 import { startTauriDriver, stopTauriDriver } from './helpers/tauri-driver.js'
 import { clearTestDb } from './fixtures/db.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const APP_BINARY = path.resolve(__dirname, '../src-tauri/target/release/alpaka-desktop')
 
-export const config: Options.Testrunner = {
+export const config: Options.Testrunner & Capabilities.WithRequestedTestrunnerCapabilities = {
   runner: 'local',
   specs: ['./smoke/**/*.spec.ts'],
   maxInstances: 1,
   capabilities: [
     {
-      maxInstances: 1,
+      'wdio:maxInstances': 1,
       browserName: 'wry',
+      'wdio:enforceWebDriverClassic': true,
       'tauri:options': {
         application: APP_BINARY,
       },
