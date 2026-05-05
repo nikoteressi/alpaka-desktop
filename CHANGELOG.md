@@ -15,6 +15,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - G-05: GPU layer offloading configuration — Settings → Engine tab now has a "GPU Layers" input (`num_gpu`). Set to `-1` for auto (all layers), `0` for CPU-only, or any positive integer for partial offloading. Current GPU/VRAM is shown as a guide. The G-01 hardware display on the Models page reflects the configured offloading mode.
 - HTTP/SOCKS5 proxy support — configure a proxy URL, optional username, and password (stored in the system keyring) in Settings → Connection; a "Test proxy" button verifies end-to-end connectivity
 
+### Changed
+- Pre-release V1.3.0 cleanup: cleared all 26 open SonarCloud findings on `main`; refactored cognitive-complexity hotspots in `useKeyboard` (shortcut registry, complexity 27→6), `MessageBubble` (parser extracted to `src/lib/messageParser.ts`, complexity 29→~8), and `chat` store (`finalizeStreamedMessage` 10-param signature collapsed to a stats object); split monolithic `ChatInput.vue` (extracted `ChatInputComposer`), `ModelsPage.vue` (extracted `views/models/` tab components), and `SettingsPage.vue` (extracted `views/settings/` tab components); dramatically expanded unit and E2E coverage
+- Removed personal-email fallback in `AccountSettings.vue` — display now shows `—` when no email is set
+
 ### Fixed
 - Cancelling generation (Stop button or Esc) no longer emits `chat:done`, persists a partial message to the database, or triggers a completion notification; partial content is preserved in-session via the new `chat:cancelled` event
 - Esc key now correctly clears the streaming indicator (previously `isStreaming` stayed true after pressing Esc)
