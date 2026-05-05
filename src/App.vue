@@ -99,6 +99,12 @@
             >
               <span class="block w-full truncate">{{ item.name }}</span>
             </CustomTooltip>
+            <span
+              v-if="navBadges[item.path] > 0"
+              class="ml-auto flex-shrink-0 min-w-[18px] h-[18px] rounded-full bg-[var(--accent)] text-white text-[10px] font-bold flex items-center justify-center px-1 shadow-[0_0_6px_var(--accent)]"
+            >
+              {{ navBadges[item.path] }}
+            </span>
           </div>
         </nav>
 
@@ -229,6 +235,10 @@ const navItems: NavItem[] = [
   { name: "Settings", path: "/settings", icon: IconSettings },
 ];
 
+const navBadges = computed<Record<string, number>>(() => ({
+  "/models": modelStore.updatesAvailableCount,
+}));
+
 function isActive(path: string): boolean {
   return route.path === path;
 }
@@ -268,6 +278,9 @@ onMounted(async () => {
       }),
       initStreamListeners().catch((err: unknown) => {
         console.error("[App] Stream listeners failed:", err);
+      }),
+      modelStore.fetchInitialUpdateStatus().catch((err: unknown) => {
+        console.error("[App] Model update status fetch failed:", err);
       }),
     ]);
 
