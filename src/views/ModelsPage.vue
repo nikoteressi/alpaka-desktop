@@ -525,10 +525,13 @@
                         Offloading: CPU only
                       </p>
                       <p
-                        v-else-if="(settingsStore.chatOptions.num_gpu ?? -1) > 0"
+                        v-else-if="
+                          (settingsStore.chatOptions.num_gpu ?? -1) > 0
+                        "
                         class="text-[10px] text-[var(--text-dim)] mt-1"
                       >
-                        Offloading: {{ settingsStore.chatOptions.num_gpu }} layers
+                        Offloading:
+                        {{ settingsStore.chatOptions.num_gpu }} layers
                       </p>
                     </div>
                     <div

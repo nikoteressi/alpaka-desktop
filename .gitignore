@@ -24,7 +24,6 @@ dist-ssr
 
 # Claude Code / AI tool runtime dirs
 .claude
-CLAUDE.md
 .superpowers/
 .playwright-mcp/
 .playwright-mcp.worktrees/
