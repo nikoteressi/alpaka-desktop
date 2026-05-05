@@ -69,7 +69,6 @@ export const useModelStore = defineStore("models", {
     modelsWithUpdates: new Set<string>(),
     isCheckingUpdates: false,
     pushing: {} as Record<string, PushState>,
-    privateModels: [] as string[],
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],
@@ -413,7 +412,6 @@ export const useModelStore = defineStore("models", {
               if (this.pushing[model]) {
                 this.pushing[model].phase = "done";
                 this.pushing[model].percent = 100;
-                this.addPrivateModel(model);
               }
             }),
             listen<{ model: string; error: string }>(
@@ -458,34 +456,6 @@ export const useModelStore = defineStore("models", {
           error: e instanceof Error ? e.message : String(e),
         };
       }
-    },
-
-    async fetchPrivateModels(): Promise<void> {
-      try {
-        const raw = await invoke<string | null>("get_setting", {
-          key: "private_cloud_models",
-        });
-        this.privateModels = raw ? (JSON.parse(raw) as string[]) : [];
-      } catch {
-        this.privateModels = [];
-      }
-    },
-
-    async addPrivateModel(cloudName: string): Promise<void> {
-      if (this.privateModels.includes(cloudName)) return;
-      this.privateModels = [...this.privateModels, cloudName];
-      await invoke("set_setting", {
-        key: "private_cloud_models",
-        value: JSON.stringify(this.privateModels),
-      });
-    },
-
-    async removePrivateModel(cloudName: string): Promise<void> {
-      this.privateModels = this.privateModels.filter((n) => n !== cloudName);
-      await invoke("set_setting", {
-        key: "private_cloud_models",
-        value: JSON.stringify(this.privateModels),
-      });
     },
 
     formatBytes(bytes: number) {

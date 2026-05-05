@@ -42,3 +42,20 @@ pub async fn get_library_model_readme(
         .clone();
     crate::services::library::get_readme(&client, &slug).await
 }
+
+#[tauri::command]
+pub async fn get_user_models(
+    state: State<'_, AppState>,
+    username: String,
+) -> Result<Vec<LibraryModel>, AppError> {
+    if username.is_empty() {
+        return Ok(Vec::new());
+    }
+    let client = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let query = format!("{}/", username);
+    crate::services::library::search(&client, &query, None).await
+}

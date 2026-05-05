@@ -174,9 +174,9 @@ const USER_AGENT: &str =
 fn validate_slug(slug: &str) -> Result<(), AppError> {
     if slug.is_empty()
         || slug.len() > 128
-        || !slug
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':')
+        || !slug.chars().all(|c| {
+            c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == ':' || c == '/'
+        })
     {
         return Err(AppError::Internal(format!(
             "Invalid model slug: '{}'",

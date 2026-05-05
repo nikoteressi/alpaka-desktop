@@ -109,8 +109,8 @@
           Edit Modelfile
         </button>
         <button
-          v-if="isSignedIn"
-          @click="showPushDialog = true"
+          v-if="ollamaUsername"
+          @click="openPushDialog"
           :disabled="activePushState?.phase === 'running'"
           class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -323,10 +323,8 @@
           Push to Ollama Cloud
         </p>
         <p class="text-[12px] text-[var(--text-muted)] mb-4 leading-relaxed">
-          Enter the cloud name for this model. Use your Ollama username as the
-          namespace (e.g.
-          <code class="font-mono text-[var(--accent)]">username/model:tag</code
-          >).
+          The model will be published to your Ollama account at ollama.com. You
+          can edit the name below.
         </p>
         <input
           v-model="pushCloudName"
@@ -384,7 +382,7 @@ const { startNewChat } = useAppOrchestration();
 const { applyModelDefaults, saveAsModelDefault, resetModelDefaults } =
   useModelDefaults();
 
-const isSignedIn = ref(false);
+const ollamaUsername = ref("");
 const showPushDialog = ref(false);
 const pushCloudName = ref("");
 const pushError = ref("");
@@ -396,11 +394,25 @@ const activePushState = computed(() => {
   );
 });
 
+function openPushDialog() {
+  const base =
+    props.model.name.split("/").pop()?.split(":")[0] ?? props.model.name;
+  pushCloudName.value = ollamaUsername.value
+    ? `${ollamaUsername.value}/${base}`
+    : base;
+  pushError.value = "";
+  showPushDialog.value = true;
+}
+
 async function startPush() {
   pushError.value = "";
   const cloudName = pushCloudName.value.trim();
   if (!cloudName) {
-    pushError.value = "Enter a cloud model name (e.g. username/model:tag)";
+    pushError.value = "Enter a cloud model name (e.g. username/model)";
+    return;
+  }
+  if (!cloudName.includes("/")) {
+    pushError.value = "Name must include your username (e.g. username/model)";
     return;
   }
   showPushDialog.value = false;
@@ -445,9 +457,9 @@ async function saveTags() {
 
 onMounted(async () => {
   try {
-    isSignedIn.value = await invoke<boolean>("check_ollama_signed_in");
+    ollamaUsername.value = await invoke<string>("get_ollama_username");
   } catch {
-    isSignedIn.value = false;
+    ollamaUsername.value = "";
   }
   try {
     const stored = await applyModelDefaults(props.model.name);

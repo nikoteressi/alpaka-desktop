@@ -1,5 +1,72 @@
 <template>
   <div class="flex-1 flex flex-col gap-6">
+    <!-- My Models section (only when signed in to ollama.com) -->
+    <div
+      v-if="ollamaUsername"
+      class="bg-[var(--bg-surface)]/50 backdrop-blur-xl border border-[var(--border)] rounded-2xl p-5 shadow-2xl"
+    >
+      <div class="flex items-center gap-3 mb-4 px-1">
+        <div
+          class="w-8 h-8 rounded-lg bg-[var(--accent-muted)] border border-[var(--accent)]/20 flex items-center justify-center"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#4a80d0"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="8" r="4" />
+            <path d="M20 21a8 8 0 1 0-16 0" />
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-[15px] font-bold text-[var(--text)]">My Models</h2>
+          <p class="text-[11px] text-[var(--text-muted)] font-medium">
+            Models published under
+            <span class="text-[var(--accent)]">{{ ollamaUsername }}</span> on
+            ollama.com
+          </p>
+        </div>
+      </div>
+
+      <div
+        v-if="isLoadingUserModels"
+        class="text-[13px] text-[var(--text-dim)] py-2 px-1"
+      >
+        Loading…
+      </div>
+      <div
+        v-else-if="userModels.length === 0"
+        class="text-[13px] text-[var(--text-dim)] py-2 px-1"
+      >
+        No published models found.
+      </div>
+      <div v-else class="flex flex-col gap-2">
+        <div
+          v-for="model in userModels"
+          :key="model.slug"
+          class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] transition-colors cursor-pointer group"
+          @click="emit('select', model)"
+        >
+          <div class="min-w-0">
+            <p class="text-[13px] font-semibold text-[var(--text)] truncate">
+              {{ model.name }}
+            </p>
+            <p
+              v-if="model.description"
+              class="text-[11px] text-[var(--text-muted)] truncate mt-0.5"
+            >
+              {{ model.description }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Search Bar Section -->
     <div
       class="bg-[var(--bg-surface)]/50 backdrop-blur-xl border border-[var(--border)] rounded-2xl p-5 shadow-2xl transition-all duration-300 hover:border-[var(--accent)]/20"
@@ -172,13 +239,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { useModelStore } from "../../stores/models";
 import { storeToRefs } from "pinia";
 import ModelCard from "./ModelCard.vue";
 import type { LibraryModel } from "../../types/models";
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "select", model: LibraryModel): void;
 }>();
 
@@ -211,6 +279,29 @@ function onSearchInput() {
   activeTagFilter.value = null;
   modelStore.searchLibrary(searchQuery.value);
 }
+
+const ollamaUsername = ref("");
+const userModels = ref<LibraryModel[]>([]);
+const isLoadingUserModels = ref(false);
+
+async function loadUserModels() {
+  try {
+    ollamaUsername.value = await invoke<string>("get_ollama_username");
+    if (!ollamaUsername.value) return;
+    isLoadingUserModels.value = true;
+    userModels.value = await invoke<LibraryModel[]>("get_user_models", {
+      username: ollamaUsername.value,
+    });
+  } catch {
+    // silent — user may not be signed in
+  } finally {
+    isLoadingUserModels.value = false;
+  }
+}
+
+onMounted(() => {
+  loadUserModels();
+});
 </script>
 
 <style scoped>
