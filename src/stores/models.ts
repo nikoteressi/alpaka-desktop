@@ -448,7 +448,7 @@ export const useModelStore = defineStore("models", {
         phase: "running",
       };
       try {
-        await invoke("push_model", { name: cloudName });
+        await invoke("push_model", { localName, cloudName });
       } catch (e: unknown) {
         this.pushing[cloudName] = {
           ...this.pushing[cloudName],

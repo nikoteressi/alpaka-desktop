@@ -1015,7 +1015,8 @@ describe("useModelStore", () => {
 
       await pushPromise;
       expect(mockInvoke).toHaveBeenCalledWith("push_model", {
-        name: "user/mymodel:latest",
+        localName: "mymodel:latest",
+        cloudName: "user/mymodel:latest",
       });
     });
 

@@ -320,9 +320,26 @@ struct PushErrorFrame {
 
 pub async fn core_push_model<R: tauri::Runtime>(
     client: &OllamaClient,
-    name: &str,
+    local_name: &str,
+    cloud_name: &str,
     app: &tauri::AppHandle<R>,
 ) -> Result<(), AppError> {
+    // Copy the local model to the cloud name so /api/push can find it.
+    let copy_resp = client
+        .post("/api/copy")
+        .json(&serde_json::json!({ "source": local_name, "destination": cloud_name }))
+        .send()
+        .await?;
+    if !copy_resp.status().is_success() {
+        let err_msg = format!("Failed to copy model: {}", copy_resp.status());
+        let _ = app.emit(
+            "model:push-error",
+            serde_json::json!({ "model": cloud_name, "error": err_msg }),
+        );
+        return Err(AppError::Http(err_msg));
+    }
+
+    let name = cloud_name;
     let payload = serde_json::json!({ "name": name, "stream": true });
     let resp = client.post("/api/push").json(&payload).send().await?;
 
@@ -398,7 +415,8 @@ pub async fn core_push_model<R: tauri::Runtime>(
 pub async fn push_model<R: tauri::Runtime>(
     state: State<'_, AppState>,
     app: tauri::AppHandle<R>,
-    name: String,
+    local_name: String,
+    cloud_name: String,
 ) -> Result<(), AppError> {
     let http = state
         .http_client
@@ -406,7 +424,7 @@ pub async fn push_model<R: tauri::Runtime>(
         .unwrap_or_else(|e| e.into_inner())
         .clone();
     let client = OllamaClient::from_state(http, state.db.clone()).await?;
-    core_push_model(&client, &name, &app).await
+    core_push_model(&client, &local_name, &cloud_name, &app).await
 }
 
 #[cfg(test)]
@@ -626,6 +644,11 @@ not json at all
     #[tokio::test]
     async fn test_core_push_model_success() {
         let mut server = Server::new_async().await;
+        let copy_mock = server
+            .mock("POST", "/api/copy")
+            .with_status(200)
+            .create_async()
+            .await;
         let mock = server
             .mock("POST", "/api/push")
             .with_status(200)
@@ -639,7 +662,14 @@ not json at all
         let req_client = reqwest::Client::new();
         let client = OllamaClient::new(req_client, server.url(), None);
         let app = tauri::test::mock_app();
-        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        let result = core_push_model(
+            &client,
+            "mymodel:latest",
+            "user/mymodel:latest",
+            app.handle(),
+        )
+        .await;
+        copy_mock.assert_async().await;
         mock.assert_async().await;
         assert!(result.is_ok());
     }
@@ -647,6 +677,11 @@ not json at all
     #[tokio::test]
     async fn test_core_push_model_invalid_chunk_skips_line() {
         let mut server = Server::new_async().await;
+        let copy_mock = server
+            .mock("POST", "/api/copy")
+            .with_status(200)
+            .create_async()
+            .await;
         let mock = server
             .mock("POST", "/api/push")
             .with_status(200)
@@ -656,7 +691,14 @@ not json at all
         let req_client = reqwest::Client::new();
         let client = OllamaClient::new(req_client, server.url(), None);
         let app = tauri::test::mock_app();
-        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        let result = core_push_model(
+            &client,
+            "mymodel:latest",
+            "user/mymodel:latest",
+            app.handle(),
+        )
+        .await;
+        copy_mock.assert_async().await;
         mock.assert_async().await;
         assert!(result.is_ok());
     }
@@ -664,6 +706,11 @@ not json at all
     #[tokio::test]
     async fn test_core_push_model_http_error() {
         let mut server = Server::new_async().await;
+        let copy_mock = server
+            .mock("POST", "/api/copy")
+            .with_status(200)
+            .create_async()
+            .await;
         let mock = server
             .mock("POST", "/api/push")
             .with_status(403)
@@ -672,7 +719,14 @@ not json at all
         let req_client = reqwest::Client::new();
         let client = OllamaClient::new(req_client, server.url(), None);
         let app = tauri::test::mock_app();
-        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        let result = core_push_model(
+            &client,
+            "mymodel:latest",
+            "user/mymodel:latest",
+            app.handle(),
+        )
+        .await;
+        copy_mock.assert_async().await;
         mock.assert_async().await;
         assert!(result.is_err());
     }
@@ -680,6 +734,11 @@ not json at all
     #[tokio::test]
     async fn test_core_push_model_error_in_stream() {
         let mut server = Server::new_async().await;
+        let copy_mock = server
+            .mock("POST", "/api/copy")
+            .with_status(200)
+            .create_async()
+            .await;
         let mock = server
             .mock("POST", "/api/push")
             .with_status(200)
@@ -689,7 +748,14 @@ not json at all
         let req_client = reqwest::Client::new();
         let client = OllamaClient::new(req_client, server.url(), None);
         let app = tauri::test::mock_app();
-        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        let result = core_push_model(
+            &client,
+            "mymodel:latest",
+            "user/mymodel:latest",
+            app.handle(),
+        )
+        .await;
+        copy_mock.assert_async().await;
         mock.assert_async().await;
         assert!(result.is_err());
     }
