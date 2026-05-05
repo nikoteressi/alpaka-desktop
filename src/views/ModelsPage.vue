@@ -328,6 +328,9 @@
                         :date="formatDateShort(model.modified_at)"
                         :quant="model.details.quantization_level"
                         :is-installed="true"
+                        :has-update="
+                          modelStore.hasUpdate(model.name as string)
+                        "
                         :is-favorite="
                           modelStore.isFavorite(model.name as string)
                         "
@@ -342,7 +345,21 @@
                         :on-edit-tags="
                           () => openTagEditor(model.name as string)
                         "
-                        action-label="Run"
+                        :on-action="
+                          modelStore.hasUpdate(model.name as string)
+                            ? () => modelStore.pullModel(model.name as string)
+                            : undefined
+                        "
+                        :action-label="
+                          modelStore.hasUpdate(model.name as string)
+                            ? 'Update'
+                            : undefined
+                        "
+                        :action-color="
+                          modelStore.hasUpdate(model.name as string)
+                            ? '#fbbf24'
+                            : undefined
+                        "
                       />
                       <!-- Inline tag editor -->
                       <div
