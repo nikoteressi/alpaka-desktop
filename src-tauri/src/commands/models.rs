@@ -306,12 +306,8 @@ pub async fn get_model_capabilities(
     })
 }
 
-// pull_model will need more than just client and base_url because it emits events.
-// We can pass an `app: &AppHandle` to the core function.
-
 #[derive(Debug, Deserialize)]
 struct PushProgress {
-    #[serde(default)]
     status: String,
     completed: Option<u64>,
     total: Option<u64>,
@@ -323,7 +319,7 @@ pub async fn core_push_model<R: tauri::Runtime>(
     name: &str,
     app: &tauri::AppHandle<R>,
 ) -> Result<(), AppError> {
-    let payload = serde_json::json!({ "model": name });
+    let payload = serde_json::json!({ "name": name, "stream": true });
     let resp = client.post("/api/push").json(&payload).send().await?;
 
     if !resp.status().is_success() {
@@ -642,6 +638,23 @@ not json at all
     }
 
     #[tokio::test]
+    async fn test_core_push_model_invalid_chunk_skips_line() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body("{\"status\":\"pushing layer\"}\nnot json at all\n{\"status\":\"pushed\"}\n")
+            .create_async()
+            .await;
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
     async fn test_core_push_model_http_error() {
         let mut server = Server::new_async().await;
         let mock = server
@@ -663,7 +676,7 @@ not json at all
         let mock = server
             .mock("POST", "/api/push")
             .with_status(200)
-            .with_body("{\"error\":\"unauthorized\"}\n")
+            .with_body("{\"status\":\"pushing manifest\",\"error\":\"unauthorized\"}\n")
             .create_async()
             .await;
         let req_client = reqwest::Client::new();
