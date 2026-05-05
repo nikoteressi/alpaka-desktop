@@ -3,9 +3,7 @@ use crate::state::AppState;
 use tauri::{Runtime, State};
 
 #[tauri::command]
-pub async fn get_models_with_updates(
-    state: State<'_, AppState>,
-) -> Result<Vec<String>, AppError> {
+pub async fn get_models_with_updates(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
     let cache = state
         .models_with_updates
         .read()
@@ -14,9 +12,7 @@ pub async fn get_models_with_updates(
 }
 
 #[tauri::command]
-pub async fn check_model_updates<R: Runtime>(
-    app: tauri::AppHandle<R>,
-) -> Result<(), AppError> {
+pub async fn check_model_updates<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), AppError> {
     tauri::async_runtime::spawn(async move {
         crate::services::model_updates::do_update_check(&app).await;
     });

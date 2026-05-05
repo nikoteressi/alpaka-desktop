@@ -21,7 +21,14 @@ const MOCK_MODELS = [
     modified_at: "",
     size: 1000,
     digest: "abc",
-    details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+    details: {
+      parent_model: "",
+      format: "gguf",
+      family: "llama",
+      families: null,
+      parameter_size: "8B",
+      quantization_level: "Q4_0",
+    },
   },
   {
     name: "mistral:latest" as ModelName,
@@ -29,7 +36,14 @@ const MOCK_MODELS = [
     modified_at: "",
     size: 2000,
     digest: "def",
-    details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+    details: {
+      parent_model: "",
+      format: "gguf",
+      family: "llama",
+      families: null,
+      parameter_size: "8B",
+      quantization_level: "Q4_0",
+    },
   },
 ];
 
@@ -316,7 +330,14 @@ describe("useModelStore", () => {
             modified_at: "",
             size: 0,
             digest: "",
-            details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+            details: {
+              parent_model: "",
+              format: "gguf",
+              family: "llama",
+              families: null,
+              parameter_size: "8B",
+              quantization_level: "Q4_0",
+            },
           },
           {
             name: "llama3:8b" as ModelName,
@@ -324,7 +345,14 @@ describe("useModelStore", () => {
             modified_at: "",
             size: 0,
             digest: "",
-            details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+            details: {
+              parent_model: "",
+              format: "gguf",
+              family: "llama",
+              families: null,
+              parameter_size: "8B",
+              quantization_level: "Q4_0",
+            },
           },
         ];
         store.modelUserData["llama3:8b"] = {
@@ -507,13 +535,24 @@ describe("useModelStore", () => {
       modified_at: "",
       size: 0,
       digest: "",
-      details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+      details: {
+        parent_model: "",
+        format: "gguf",
+        family: "llama",
+        families: null,
+        parameter_size: "8B",
+        quantization_level: "Q4_0",
+      },
     };
 
     it("returns true for exact name match", () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest" as ModelName, model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
       expect(store.isInstalled("llama3:latest")).toBe(true);
     });
@@ -521,7 +560,11 @@ describe("useModelStore", () => {
     it("returns true when model name starts with prefix + ':'", () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest" as ModelName, model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
       expect(store.isInstalled("llama3")).toBe(true);
     });
@@ -529,7 +572,11 @@ describe("useModelStore", () => {
     it("returns false when model is not installed", () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest" as ModelName, model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
       expect(store.isInstalled("mistral")).toBe(false);
     });
@@ -545,7 +592,14 @@ describe("useModelStore", () => {
           modified_at: "",
           size: 0,
           digest: "",
-          details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+          details: {
+            parent_model: "",
+            format: "gguf",
+            family: "llama",
+            families: null,
+            parameter_size: "8B",
+            quantization_level: "Q4_0",
+          },
         },
         {
           name: "model-b" as ModelName,
@@ -553,7 +607,14 @@ describe("useModelStore", () => {
           modified_at: "",
           size: 0,
           digest: "",
-          details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+          details: {
+            parent_model: "",
+            format: "gguf",
+            family: "llama",
+            families: null,
+            parameter_size: "8B",
+            quantization_level: "Q4_0",
+          },
         },
       ];
       const sorted = store.sortedModels;
@@ -649,13 +710,24 @@ describe("useModelStore", () => {
       modified_at: "",
       size: 0,
       digest: "",
-      details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
+      details: {
+        parent_model: "",
+        format: "gguf",
+        family: "llama",
+        families: null,
+        parameter_size: "8B",
+        quantization_level: "Q4_0",
+      },
     };
 
     it("does not pull when model is already installed", async () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest" as ModelName, model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
 
       await store.addCloudModel("llama3:latest");

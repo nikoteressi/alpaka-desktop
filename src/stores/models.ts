@@ -115,8 +115,7 @@ export const useModelStore = defineStore("models", {
       });
       return [...tagSet].sort((a, b) => a.localeCompare(b));
     },
-    hasUpdate: (state) => (name: string) =>
-      state.modelsWithUpdates.has(name),
+    hasUpdate: (state) => (name: string) => state.modelsWithUpdates.has(name),
     updatesAvailableCount: (state) => state.modelsWithUpdates.size,
   },
   actions: {
