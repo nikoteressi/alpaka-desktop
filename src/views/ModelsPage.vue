@@ -728,9 +728,10 @@ watch(
   (checking) => {
     if (checking) return;
     if (checkDoneTimer) clearTimeout(checkDoneTimer);
+    const count = modelStore.updatesAvailableCount;
     checkDoneMessage.value =
-      modelStore.updatesAvailableCount > 0
-        ? `${modelStore.updatesAvailableCount} update${modelStore.updatesAvailableCount > 1 ? "s" : ""} available`
+      count > 0
+        ? `${count} ${count > 1 ? "updates" : "update"} available`
         : "All models up to date";
     checkDoneTimer = setTimeout(() => (checkDoneMessage.value = null), 4000);
   },

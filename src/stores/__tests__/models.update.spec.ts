@@ -51,4 +51,42 @@ describe("model update state", () => {
     expect(store.hasUpdate("llama3")).toBe(false);
     expect(store.updatesAvailableCount).toBe(2);
   });
+
+  it("isCheckingUpdates starts false", () => {
+    const store = useModelStore();
+    expect(store.isCheckingUpdates).toBe(false);
+  });
+
+  it("triggerUpdateCheck sets isCheckingUpdates true while running", async () => {
+    let resolve!: () => void;
+    vi.mocked(invoke).mockImplementationOnce(
+      () => new Promise<void>((r) => (resolve = r)),
+    );
+    const store = useModelStore();
+    const promise = store.triggerUpdateCheck();
+    expect(store.isCheckingUpdates).toBe(true);
+    resolve();
+    await promise;
+  });
+
+  it("triggerUpdateCheck resets isCheckingUpdates on invoke failure", async () => {
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("fail"));
+    const store = useModelStore();
+    await store.triggerUpdateCheck();
+    expect(store.isCheckingUpdates).toBe(false);
+  });
+
+  it("triggerUpdateCheck is a no-op when already checking", async () => {
+    let resolve!: () => void;
+    vi.mocked(invoke).mockImplementationOnce(
+      () => new Promise<void>((r) => (resolve = r)),
+    );
+    const store = useModelStore();
+    vi.mocked(invoke).mockClear();
+    store.triggerUpdateCheck(); // don't await — leave it running
+    expect(store.isCheckingUpdates).toBe(true);
+    await store.triggerUpdateCheck(); // second call should return immediately
+    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(1); // only the first call hit invoke
+    resolve();
+  });
 });
