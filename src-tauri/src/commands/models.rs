@@ -45,6 +45,11 @@ pub struct PullProgress {
     pub completed: Option<u64>,
 }
 
+#[derive(Debug, Deserialize)]
+struct StreamError {
+    error: String,
+}
+
 pub async fn core_list_models(client: &OllamaClient) -> Result<Vec<Model>, AppError> {
     let resp = client.get("/api/tags").send().await?;
     let tags_resp: TagsResponse = resp.json().await?;
@@ -190,6 +195,15 @@ pub async fn core_push_model<R: tauri::Runtime>(
                 for line in text.lines() {
                     if line.trim().is_empty() {
                         continue;
+                    }
+                    // Daemon embeds auth/namespace errors as {"error":"..."} lines.
+                    if let Ok(e) = serde_json::from_str::<StreamError>(line) {
+                        let _ = app.emit(
+                            "model:push-error",
+                            serde_json::json!({ "model": name, "error": e.error }),
+                        );
+                        crate::system::notifications::notify_model_push_failed(app, name, &e.error);
+                        return Err(AppError::Http(e.error));
                     }
                     if let Ok(progress) = serde_json::from_str::<PullProgress>(line) {
                         let percent =
@@ -674,5 +688,29 @@ not valid json at all
         mock.assert_async().await;
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_stream_error_field_returns_err() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body(
+                r#"{"status":"starting upload","completed":0,"total":100}
+{"error":"unauthorized: access denied"}
+"#,
+            )
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "myuser/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
     }
 }

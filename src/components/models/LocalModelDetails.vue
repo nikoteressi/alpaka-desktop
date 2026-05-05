@@ -109,58 +109,74 @@
           Edit Modelfile
         </button>
         <!-- Push to Cloud — only for username/modelname models -->
-        <template v-if="isPushable">
-          <div v-if="isPushing" class="flex flex-col gap-1.5 mt-2">
-            <div class="flex items-center justify-between">
-              <span class="text-[12px] text-[var(--text-muted)]">{{
-                pushProgress?.status
-              }}</span>
-              <span class="text-[12px] text-[var(--accent)]"
-                >{{ Math.round(pushProgress?.percent ?? 0) }}%</span
-              >
-            </div>
-            <div
-              class="h-1 bg-[var(--bg-base)] rounded-sm overflow-hidden border border-white/5"
-            >
-              <div
-                class="bg-[var(--accent)] h-1 rounded-sm transition-all"
-                :style="{ width: (pushProgress?.percent ?? 0) + '%' }"
-              />
-            </div>
-          </div>
-          <button
-            v-else
-            data-testid="push-to-cloud-btn"
-            :disabled="!isSignedIn"
-            :title="
-              !isSignedIn
-                ? 'Sign in with Ollama to push to Cloud'
+        <button
+          v-if="isPushable"
+          data-testid="push-to-cloud-btn"
+          :disabled="!isSignedIn || isPushing"
+          :title="
+            !isSignedIn
+              ? 'Sign in with Ollama to push to Cloud'
+              : isPushing
+                ? 'Uploading…'
                 : 'Push model to your Ollama Cloud account'
-            "
-            @click="pushToCloud"
-            class="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-            :class="
-              isSignedIn
-                ? 'text-[var(--accent)] border-[var(--accent-border)] hover:bg-[var(--accent-muted)]'
-                : 'text-[var(--text-dim)] border-[var(--border)] opacity-50 cursor-not-allowed'
-            "
+          "
+          @click="pushToCloud"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors"
+          :class="(!isSignedIn || isPushing) && 'opacity-50 cursor-not-allowed'"
+        >
+          <svg
+            v-if="!isPushing"
+            class="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
           >
-            <svg
-              class="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8-4-4m0 0L8 8m4-4v12"
-              />
-            </svg>
-            Push to Cloud
-          </button>
-        </template>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8-4-4m0 0L8 8m4-4v12"
+            />
+          </svg>
+          <svg
+            v-else
+            class="w-3.5 h-3.5 animate-spin"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 100 10h-2a8 8 0 01-8-8z"
+            />
+          </svg>
+          {{ isPushing ? "Pushing…" : "Push to Cloud" }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Push progress bar — shown below the header card during upload -->
+    <div
+      v-if="isPushable && isPushing"
+      class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-4 py-3 -mt-1"
+    >
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[12px] text-[var(--text-muted)]">{{
+          pushProgress?.status ?? "Uploading…"
+        }}</span>
+        <span class="text-[12px] text-[var(--accent)]"
+          >{{ Math.round(pushProgress?.percent ?? 0) }}%</span
+        >
+      </div>
+      <div
+        class="h-1 bg-[var(--bg-base)] rounded-sm overflow-hidden border border-white/5"
+      >
+        <div
+          class="bg-[var(--accent)] h-1 rounded-sm transition-all"
+          :style="{ width: (pushProgress?.percent ?? 0) + '%' }"
+        />
       </div>
     </div>
 

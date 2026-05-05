@@ -533,6 +533,12 @@
                   >
                     Pull a private model
                   </p>
+                  <p
+                    v-if="!authStore.user"
+                    class="text-[11px] text-[var(--text-dim)] mb-2 px-1"
+                  >
+                    Sign in to your Ollama account to pull private models.
+                  </p>
                   <div class="flex gap-2">
                     <input
                       v-model="privateModelName"
@@ -812,6 +818,7 @@ import LibraryBrowser from "../components/models/LibraryBrowser.vue";
 import CloudTagSelector from "../components/models/CloudTagSelector.vue";
 import CreateModelPage from "../components/models/CreateModelPage.vue";
 import { useModelStore, modelMatchesTag } from "../stores/models";
+import { useAuthStore } from "../stores/auth";
 import { useSettingsStore } from "../stores/settings";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppOrchestration } from "../composables/useAppOrchestration";
@@ -831,6 +838,7 @@ import {
 const modelStore = useModelStore();
 const { selectedModel } = storeToRefs(modelStore);
 const settingsStore = useSettingsStore();
+const authStore = useAuthStore();
 
 const selectedLocalModel = ref<Model | null>(null);
 
