@@ -1,5 +1,5 @@
-/// Parses `"slug:tag"` or `"slug"` (→ `"latest"` tag).
-/// Returns `None` for cloud models (`:cloud` suffix), private models (`/` in name), or empty input.
+// Parses `"slug:tag"` or `"slug"` (→ `"latest"` tag).
+// Returns `None` for cloud models (`:cloud` suffix), private models (`/` in name), empty input, or empty slug.
 pub(crate) fn parse_model_name(name: &str) -> Option<(String, String)> {
     if name.is_empty() || name.contains('/') {
         return None;
@@ -8,19 +8,25 @@ pub(crate) fn parse_model_name(name: &str) -> Option<(String, String)> {
         .split_once(':')
         .map(|(s, t)| (s.to_string(), t.to_string()))
         .unwrap_or_else(|| (name.to_string(), "latest".to_string()));
+    if slug.is_empty() {
+        return None;
+    }
     if tag == "cloud" {
         return None;
     }
     Some((slug, tag))
 }
 
-/// Returns true when `local_digest` (sha256:hex64) does NOT start with `lib_hash` (short 7-12 hex).
-/// A mismatch means a newer version is available.
+// Returns true when `local_digest` (sha256:hex64) does NOT start with `lib_hash` (short 7-12 hex).
+// A mismatch means a newer version is available.
 pub(crate) fn digest_has_update(local_digest: &str, lib_hash: &str) -> bool {
     if lib_hash.is_empty() {
         return false;
     }
     let local_hex = local_digest.trim_start_matches("sha256:");
+    if local_hex.is_empty() {
+        return false;
+    }
     !local_hex.starts_with(lib_hash)
 }
 
@@ -85,5 +91,15 @@ mod tests {
     #[test]
     fn digest_without_prefix_still_matches() {
         assert!(!digest_has_update("abc123def456789", "abc123d"));
+    }
+
+    #[test]
+    fn parse_colon_only_returns_none() {
+        assert_eq!(parse_model_name(":"), None);
+    }
+
+    #[test]
+    fn empty_local_digest_means_no_update() {
+        assert!(!digest_has_update("", "abc123d"));
     }
 }
