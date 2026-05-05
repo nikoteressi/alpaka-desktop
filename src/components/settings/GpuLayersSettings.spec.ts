@@ -139,4 +139,19 @@ describe("GpuLayersSettings", () => {
 
     expect(spy).toHaveBeenCalledWith({ num_gpu: -1 });
   });
+
+  it("clamps input value to maximum of 999", async () => {
+    mockInvoke.mockResolvedValue(undefined);
+    const store = useSettingsStore();
+    const spy = vi.spyOn(store, "updateChatOptions").mockResolvedValue();
+
+    const wrapper = mountComponent();
+    await wrapper.vm.$nextTick();
+
+    const input = wrapper.find("input[type='number']");
+    await input.setValue("9999");
+    await input.trigger("change");
+
+    expect(spy).toHaveBeenCalledWith({ num_gpu: 999 });
+  });
 });

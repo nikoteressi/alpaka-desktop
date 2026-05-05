@@ -58,7 +58,9 @@ const layerLabel = computed(() => {
 function onNumGpuChange(e: Event) {
   const raw = (e.target as HTMLInputElement).value;
   const parsed = Number.parseInt(raw, 10);
-  const clamped = Number.isNaN(parsed) ? -1 : Math.max(-1, parsed);
+  const clamped = Number.isNaN(parsed)
+    ? -1
+    : Math.max(-1, Math.min(999, parsed));
   settingsStore.updateChatOptions({ num_gpu: clamped });
 }
 
