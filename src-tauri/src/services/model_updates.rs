@@ -1,3 +1,12 @@
+use std::time::Duration;
+
+use tauri::{Emitter, Manager, Runtime};
+
+use crate::commands::models::{core_list_models, Model};
+use crate::ollama::client::OllamaClient;
+use crate::services::library;
+use crate::state::AppState;
+
 // Parses `"slug:tag"` or `"slug"` (→ `"latest"` tag).
 // Returns `None` for cloud models (`:cloud` suffix), private models (`/` in name), empty input, or empty slug.
 pub(crate) fn parse_model_name(name: &str) -> Option<(String, String)> {
@@ -28,6 +37,97 @@ pub(crate) fn digest_has_update(local_digest: &str, lib_hash: &str) -> bool {
         return false;
     }
     !local_hex.starts_with(lib_hash)
+}
+
+async fn check_single_model_update(http: &reqwest::Client, model: &Model) -> bool {
+    let (slug, tag) = match parse_model_name(&model.name) {
+        Some(p) => p,
+        None => return false,
+    };
+
+    let tags = match library::get_tags(http, &slug).await {
+        Ok(t) => t,
+        Err(e) => {
+            log::debug!("[model_updates] Could not fetch tags for '{}': {}", slug, e);
+            return false;
+        }
+    };
+
+    let target = format!("{}:{}", slug, tag);
+    match tags.iter().find(|t| t.name == target) {
+        Some(lib_tag) => digest_has_update(&model.digest, &lib_tag.hash),
+        None => false,
+    }
+}
+
+pub(crate) async fn do_update_check<R: Runtime>(app: &tauri::AppHandle<R>) {
+    let state = app.state::<AppState>();
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let db = state.db.clone();
+
+    let client = match OllamaClient::from_state(http.clone(), db).await {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("[model_updates] Ollama client unavailable: {}", e);
+            return;
+        }
+    };
+
+    let models = match core_list_models(&client).await {
+        Ok(m) => m,
+        Err(e) => {
+            log::warn!("[model_updates] Could not list models: {}", e);
+            return;
+        }
+    };
+
+    let mut outdated: Vec<String> = Vec::new();
+    for model in &models {
+        if check_single_model_update(&http, model).await {
+            outdated.push(model.name.clone());
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+
+    if let Ok(mut cache) = state.models_with_updates.write() {
+        *cache = outdated.clone();
+    }
+
+    log::info!(
+        "[model_updates] Update check complete: {} model(s) outdated",
+        outdated.len()
+    );
+    let _ = app.emit(
+        "model:updates-checked",
+        serde_json::json!({ "outdated": outdated }),
+    );
+}
+
+pub async fn run_update_check_loop<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+) {
+    tokio::pin!(shutdown_rx);
+
+    tokio::select! {
+        _ = &mut shutdown_rx => return,
+        _ = tokio::time::sleep(Duration::from_secs(30)) => {}
+    }
+
+    loop {
+        do_update_check(&app).await;
+
+        tokio::select! {
+            _ = &mut shutdown_rx => break,
+            _ = tokio::time::sleep(Duration::from_secs(6 * 3600)) => {}
+        }
+    }
+
+    log::info!("[model_updates] Update check loop shut down.");
 }
 
 #[cfg(test)]
