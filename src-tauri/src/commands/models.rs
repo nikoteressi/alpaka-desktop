@@ -107,13 +107,16 @@ pub async fn core_pull_model<R: tauri::Runtime>(
     }
 
     let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
 
     while let Some(chunk_res) = stream.next().await {
         match chunk_res {
             Ok(bytes) => {
-                let text = String::from_utf8_lossy(&bytes);
-                for line in text.lines() {
-                    if line.trim().is_empty() {
+                buf.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = buf.find('\n') {
+                    let line = buf.drain(..=pos).collect::<String>();
+                    let line = line.trim();
+                    if line.is_empty() {
                         continue;
                     }
                     if let Ok(progress) = serde_json::from_str::<PullProgress>(line) {
@@ -187,13 +190,16 @@ pub async fn core_push_model<R: tauri::Runtime>(
     }
 
     let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
 
     while let Some(chunk_res) = stream.next().await {
         match chunk_res {
             Ok(bytes) => {
-                let text = String::from_utf8_lossy(&bytes);
-                for line in text.lines() {
-                    if line.trim().is_empty() {
+                buf.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = buf.find('\n') {
+                    let line = buf.drain(..=pos).collect::<String>();
+                    let line = line.trim();
+                    if line.is_empty() {
                         continue;
                     }
                     // Daemon embeds auth/namespace errors as {"error":"..."} lines.

@@ -146,15 +146,17 @@
             <svg
               v-else
               class="w-3.5 h-3.5 animate-spin"
-              fill="none"
               viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
+              fill="none"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 100 10h-2a8 8 0 01-8-8z"
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-dasharray="56"
+                stroke-dashoffset="14"
               />
             </svg>
             {{ isPushing ? "Pushing…" : "Push to Cloud" }}

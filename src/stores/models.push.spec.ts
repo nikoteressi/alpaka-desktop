@@ -62,4 +62,29 @@ describe("models store — pushModel", () => {
     expect(listenCalls).toContain("model:push-done");
     expect(listenCalls).toContain("model:push-error");
   });
+
+  it("model:push-done triggers fetchModels and clears pushing entry", async () => {
+    const listeners: Record<string, (e: { payload: unknown }) => void> = {};
+    vi.mocked(listen).mockImplementation((event, cb) => {
+      listeners[event as string] = cb as (e: { payload: unknown }) => void;
+      return Promise.resolve(() => {});
+    });
+    vi.mocked(invoke).mockResolvedValue([]);
+
+    const store = useModelStore();
+    await store.initListeners();
+
+    store.pushing["myuser/mymodel:latest"] = {
+      model: "myuser/mymodel:latest",
+      status: "uploading",
+      percent: 80,
+    };
+
+    listeners["model:push-done"]({
+      payload: { model: "myuser/mymodel:latest" },
+    });
+
+    expect(store.pushing["myuser/mymodel:latest"]).toBeUndefined();
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith("list_models");
+  });
 });

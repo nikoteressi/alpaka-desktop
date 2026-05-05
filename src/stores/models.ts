@@ -244,13 +244,11 @@ export const useModelStore = defineStore("models", {
       }
     },
     async pushModel(name: string) {
-      if (this.pushing[name]) return; // Already pushing
+      if (this.pushing[name]) return;
       this.pushing[name] = { model: name, status: "starting...", percent: 0 };
       try {
         await invoke("push_model", { name });
-        delete this.pushing[name];
-      } catch (e: unknown) {
-        this.error = extractErrorMessage(e);
+      } finally {
         delete this.pushing[name];
       }
     },

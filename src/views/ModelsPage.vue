@@ -578,15 +578,17 @@
                         <svg
                           v-else
                           class="w-3.5 h-3.5 animate-spin"
-                          fill="none"
                           viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          stroke-width="2.5"
+                          fill="none"
                         >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 100 10h-2a8 8 0 01-8-8z"
+                          <circle
+                            cx="12"
+                            cy="12"
+                            r="9"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-dasharray="56"
+                            stroke-dashoffset="14"
                           />
                         </svg>
                         {{ isPrivatePulling ? "Pulling…" : "Pull" }}
@@ -931,8 +933,11 @@ async function doPullPrivateModel() {
   if (!name || !authStore.user || isPrivatePulling.value) return;
   pullingPrivateName.value = name;
   privateModelName.value = "";
-  await modelStore.pullModel(name as ModelName);
-  pullingPrivateName.value = "";
+  try {
+    await modelStore.pullModel(name as ModelName);
+  } finally {
+    pullingPrivateName.value = "";
+  }
 }
 
 const activeTagFilter = ref<string | null>(null);
