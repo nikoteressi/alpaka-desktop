@@ -311,7 +311,11 @@ struct PushProgress {
     status: String,
     completed: Option<u64>,
     total: Option<u64>,
-    error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PushErrorFrame {
+    error: String,
 }
 
 pub async fn core_push_model<R: tauri::Runtime>(
@@ -341,14 +345,17 @@ pub async fn core_push_model<R: tauri::Runtime>(
                     if line.trim().is_empty() {
                         continue;
                     }
-                    if let Ok(progress) = serde_json::from_str::<PushProgress>(line) {
-                        if let Some(err) = progress.error {
+                    // Check for bare error frame first (Ollama may send {"error":"..."} without a status field)
+                    if let Ok(err_frame) = serde_json::from_str::<PushErrorFrame>(line) {
+                        if !err_frame.error.is_empty() {
                             let _ = app.emit(
                                 "model:push-error",
-                                serde_json::json!({ "model": name, "error": err }),
+                                serde_json::json!({ "model": name, "error": err_frame.error }),
                             );
-                            return Err(AppError::Http(format!("Push error: {}", err)));
+                            return Err(AppError::Http(format!("Push error: {}", err_frame.error)));
                         }
+                    }
+                    if let Ok(progress) = serde_json::from_str::<PushProgress>(line) {
                         let percent =
                             if let (Some(c), Some(t)) = (progress.completed, progress.total) {
                                 if t > 0 {
@@ -676,7 +683,7 @@ not json at all
         let mock = server
             .mock("POST", "/api/push")
             .with_status(200)
-            .with_body("{\"status\":\"pushing manifest\",\"error\":\"unauthorized\"}\n")
+            .with_body("{\"error\":\"unauthorized\"}\n")
             .create_async()
             .await;
         let req_client = reqwest::Client::new();
