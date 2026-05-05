@@ -124,8 +124,8 @@ importers:
         specifier: ^8
         version: 8.43.0
       '@wdio/types':
-        specifier: ^8
-        version: 8.41.0
+        specifier: ^9
+        version: 9.27.1
       eslint:
         specifier: ^9.0.0
         version: 9.39.4(jiti@2.6.1)
