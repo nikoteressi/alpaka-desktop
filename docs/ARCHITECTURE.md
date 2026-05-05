@@ -305,6 +305,7 @@ tauri::generate_handler![
     commands::models::list_models,
     commands::models::delete_model,
     commands::models::pull_model,          // streams model:pull-progress events
+    commands::models::push_model,          // streams model:push-progress events; pushes username/ models to Ollama Cloud
     commands::models::get_model_capabilities,
     commands::models::get_modelfile,       // fetches Modelfile for existing model via /api/show
     commands::models::create_model,        // streams model:create-* events via /api/create
@@ -515,6 +516,10 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |
 | `model:pull-progress` | Rust → Vue | `{ model, status, completed?, total?, percent? }` | Download progress chunk |
 | `model:pull-done` | Rust → Vue | `{ model }` | Model download complete |
+| `model:pull-error` | Rust → Vue | `{ model, error }` | Model pull failed (stream-embedded error) |
+| `model:push-progress` | Rust → Vue | `{ model, status, completed?, total?, percent }` | Upload progress chunk |
+| `model:push-done` | Rust → Vue | `{ model }` | Model push to Cloud complete |
+| `model:push-error` | Rust → Vue | `{ model, error }` | Model push failed (HTTP error or stream error) |
 | `model:updates-checked` | Rust → Vue | `{ outdated: string[] }` | Background update check result; names of locally installed models with newer versions on ollama.com |
 | `model:create-progress` | Rust → Vue | `{ model: string, status: string }` | Model creation progress status line |
 | `model:create-done` | Rust → Vue | `{ model: string }` | Model creation complete |

@@ -146,6 +146,7 @@ describe("useModelStore", () => {
     const registeredEvents = mockListen.mock.calls.map(([event]) => event);
     expect(registeredEvents).toContain("model:pull-progress");
     expect(registeredEvents).toContain("model:pull-done");
+    expect(registeredEvents).toContain("model:pull-error");
     expect(store.listenersInitialized).toBe(true);
   });
 
@@ -155,7 +156,7 @@ describe("useModelStore", () => {
     await store.initListeners();
     await store.initListeners();
 
-    expect(mockListen).toHaveBeenCalledTimes(6); // once for each event, not 12
+    expect(mockListen).toHaveBeenCalledTimes(10); // once for each event, not 20
   });
 
   it("fetchModels sets error from tagged-enum object { Http: 'connection refused' }", async () => {

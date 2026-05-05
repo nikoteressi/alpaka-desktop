@@ -108,6 +108,83 @@
           </svg>
           Edit Modelfile
         </button>
+        <!-- Push to Cloud — only for username/modelname models -->
+        <CustomTooltip
+          v-if="isPushable"
+          :text="
+            !isSignedIn
+              ? 'Sign in to Ollama to push to Cloud'
+              : isPushing
+                ? 'Uploading…'
+                : 'Push model to your Ollama Cloud account'
+          "
+          wrapper-class="inline-flex"
+        >
+          <button
+            data-testid="push-to-cloud-btn"
+            :disabled="!isSignedIn || isPushing"
+            @click="pushToCloud"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors"
+            :class="
+              (!isSignedIn || isPushing) && 'opacity-50 cursor-not-allowed'
+            "
+          >
+            <svg
+              v-if="!isPushing"
+              class="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-8-4-4m0 0L8 8m4-4v12"
+              />
+            </svg>
+            <svg
+              v-else
+              class="w-3.5 h-3.5 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-dasharray="56"
+                stroke-dashoffset="14"
+              />
+            </svg>
+            {{ isPushing ? "Pushing…" : "Push to Cloud" }}
+          </button>
+        </CustomTooltip>
+      </div>
+    </div>
+
+    <!-- Push progress bar — shown below the header card during upload -->
+    <div
+      v-if="isPushable && isPushing"
+      class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-4 py-3 mb-4"
+    >
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[12px] text-[var(--text-muted)]">{{
+          pushProgress?.status ?? "Uploading…"
+        }}</span>
+        <span class="text-[12px] text-[var(--accent)]"
+          >{{ Math.round(pushProgress?.percent ?? 0) }}%</span
+        >
+      </div>
+      <div
+        class="h-1 bg-[var(--bg-base)] rounded-sm overflow-hidden border border-white/5"
+      >
+        <div
+          class="bg-[var(--accent)] h-1 rounded-sm transition-all"
+          :style="{ width: (pushProgress?.percent ?? 0) + '%' }"
+        />
       </div>
     </div>
 
@@ -279,6 +356,8 @@ import { ref, computed, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useSettingsStore } from "../../stores/settings";
 import { useModelStore } from "../../stores/models";
+import { useAuthStore } from "../../stores/auth";
+import CustomTooltip from "../shared/CustomTooltip.vue";
 import { useAppOrchestration } from "../../composables/useAppOrchestration";
 import { useModelDefaults } from "../../composables/useModelDefaults";
 import SettingsSlider from "../settings/SettingsSlider.vue";
@@ -295,6 +374,15 @@ const emit = defineEmits<{
 const router = useRouter();
 const settingsStore = useSettingsStore();
 const modelStore = useModelStore();
+const authStore = useAuthStore();
+const isSignedIn = computed(() => !!authStore.user);
+const isPushable = computed(() => props.model.name.includes("/"));
+const isPushing = computed(() => !!modelStore.pushing[props.model.name]);
+const pushProgress = computed(() => modelStore.pushing[props.model.name]);
+
+async function pushToCloud() {
+  await modelStore.pushModel(props.model.name);
+}
 const { startNewChat } = useAppOrchestration();
 const { applyModelDefaults, saveAsModelDefault, resetModelDefaults } =
   useModelDefaults();

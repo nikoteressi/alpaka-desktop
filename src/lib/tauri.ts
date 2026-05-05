@@ -18,6 +18,21 @@ export function extractErrorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+/**
+ * Tauri AppError serializes as a tagged object e.g. {"Http":"connection refused"}.
+ * This handles that case in addition to plain Error instances and strings.
+ */
+export function extractTauriError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object" && !Array.isArray(e)) {
+    const entries = Object.entries(e as Record<string, unknown>);
+    return entries.length > 0
+      ? entries.map(([k, v]) => `${k}: ${v}`).join("; ")
+      : JSON.stringify(e);
+  }
+  return String(e);
+}
+
 // ── Host types ────────────────────────────────────────────────────────────────
 
 export interface Host {

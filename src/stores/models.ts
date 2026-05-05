@@ -29,10 +29,11 @@ export function modelMatchesTag(
 }
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { extractErrorMessage } from "../lib/tauri";
+import { extractErrorMessage, extractTauriError } from "../lib/tauri";
 import type {
   Model,
   PullProgressPayload,
+  PushProgressPayload,
   LibraryModel,
   ModelCapabilities,
   LibraryTag,
@@ -51,6 +52,7 @@ export const useModelStore = defineStore("models", {
   state: () => ({
     models: [] as Model[],
     pulling: {} as Record<string, PullProgressPayload>,
+    pushing: {} as Record<string, PushProgressPayload>,
     creating: {} as Record<string, CreateState>,
     isLoading: false,
     error: null as string | null,
@@ -135,19 +137,7 @@ export const useModelStore = defineStore("models", {
             console.error("Failed to fetch capabilities for some models:", err),
         );
       } catch (e: unknown) {
-        // Tauri AppError serializes as a tagged object e.g. {"Http":"connection refused"}.
-        // Check instanceof Error first since Error properties are non-enumerable.
-        if (e instanceof Error) {
-          this.error = e.message;
-        } else if (e && typeof e === "object" && !Array.isArray(e)) {
-          const entries = Object.entries(e as Record<string, unknown>);
-          this.error =
-            entries.length > 0
-              ? entries.map(([k, v]) => `${k}: ${v}`).join("; ")
-              : JSON.stringify(e);
-        } else {
-          this.error = String(e);
-        }
+        this.error = extractTauriError(e);
         console.error("[models] fetchModels failed:", e);
       } finally {
         this.isLoading = false;
@@ -239,6 +229,15 @@ export const useModelStore = defineStore("models", {
       } catch (e: unknown) {
         this.error = extractErrorMessage(e);
         delete this.pulling[name];
+      }
+    },
+    async pushModel(name: string) {
+      if (this.pushing[name]) return;
+      this.pushing[name] = { model: name, status: "starting...", percent: 0 };
+      try {
+        await invoke("push_model", { name });
+      } finally {
+        delete this.pushing[name];
       }
     },
     /**
@@ -363,6 +362,13 @@ export const useModelStore = defineStore("models", {
               this.fetchModels();
               this.fetchCapabilities(payload.model);
             }),
+            listen<{ model: string; error: string }>(
+              "model:pull-error",
+              (event) => {
+                const { model } = event.payload;
+                delete this.pulling[model];
+              },
+            ),
             listen<CreateProgressPayload>("model:create-progress", (event) => {
               const { model, status } = event.payload;
               if (this.creating[model]) {
@@ -395,6 +401,22 @@ export const useModelStore = defineStore("models", {
               (event) => {
                 this.modelsWithUpdates = new Set(event.payload.outdated);
                 this.isCheckingUpdates = false;
+              },
+            ),
+            listen<PushProgressPayload>("model:push-progress", (event) => {
+              const payload = event.payload;
+              this.pushing[payload.model] = payload;
+            }),
+            listen<{ model: string }>("model:push-done", (event) => {
+              const { model } = event.payload;
+              delete this.pushing[model];
+              this.fetchModels();
+            }),
+            listen<{ model: string; error: string }>(
+              "model:push-error",
+              (event) => {
+                const { model } = event.payload;
+                delete this.pushing[model];
               },
             ),
           ])),

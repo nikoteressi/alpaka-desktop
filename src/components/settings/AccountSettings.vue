@@ -118,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "../../lib/urlOpener";
 import { useAuthStore } from "../../stores/auth";
@@ -127,6 +127,11 @@ import ApiKeyPanel from "./ApiKeyPanel.vue";
 
 const authStore = useAuthStore();
 const hostStore = useHostStore();
+
+onMounted(() => {
+  const hostId = hostStore.activeHostId || "default";
+  authStore.checkAuthStatus(hostId).catch(() => {});
+});
 
 const showSignInForm = ref(false);
 const signInError = ref("");
