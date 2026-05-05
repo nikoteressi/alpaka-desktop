@@ -33,6 +33,7 @@ import { extractErrorMessage } from "../lib/tauri";
 import type {
   Model,
   PullProgressPayload,
+  PushProgressPayload,
   LibraryModel,
   ModelCapabilities,
   LibraryTag,
@@ -51,6 +52,7 @@ export const useModelStore = defineStore("models", {
   state: () => ({
     models: [] as Model[],
     pulling: {} as Record<string, PullProgressPayload>,
+    pushing: {} as Record<string, PushProgressPayload>,
     creating: {} as Record<string, CreateState>,
     isLoading: false,
     error: null as string | null,
@@ -241,6 +243,17 @@ export const useModelStore = defineStore("models", {
         delete this.pulling[name];
       }
     },
+    async pushModel(name: string) {
+      if (this.pushing[name]) return; // Already pushing
+      this.pushing[name] = { model: name, status: "starting...", percent: 0 };
+      try {
+        await invoke("push_model", { name });
+        delete this.pushing[name];
+      } catch (e: unknown) {
+        this.error = extractErrorMessage(e);
+        delete this.pushing[name];
+      }
+    },
     /**
      * Ensures a cloud model is available by pulling it if not already installed.
      */
@@ -395,6 +408,22 @@ export const useModelStore = defineStore("models", {
               (event) => {
                 this.modelsWithUpdates = new Set(event.payload.outdated);
                 this.isCheckingUpdates = false;
+              },
+            ),
+            listen<PushProgressPayload>("model:push-progress", (event) => {
+              const payload = event.payload;
+              this.pushing[payload.model] = payload;
+            }),
+            listen<{ model: string }>("model:push-done", (event) => {
+              const { model } = event.payload;
+              delete this.pushing[model];
+              this.fetchModels();
+            }),
+            listen<{ model: string; error: string }>(
+              "model:push-error",
+              (event) => {
+                const { model } = event.payload;
+                delete this.pushing[model];
               },
             ),
           ])),
