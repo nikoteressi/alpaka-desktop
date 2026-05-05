@@ -461,3 +461,13 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* ── SETTINGS CARD ──────────────────────────────────────────── */
+.settings-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+}
