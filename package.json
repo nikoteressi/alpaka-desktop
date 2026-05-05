@@ -80,7 +80,7 @@
     "vitepress-plugin-mermaid": "^2.0.17",
     "vitest": "^2.1.0",
     "vue-tsc": "^3.0.0",
-    "webdriverio": "^8"
+    "webdriverio": "^9"
   },
   "engines": {
     "node": ">=20",
