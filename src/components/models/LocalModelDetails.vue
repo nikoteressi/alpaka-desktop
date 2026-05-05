@@ -108,6 +108,43 @@
           </svg>
           Edit Modelfile
         </button>
+        <button
+          v-if="isSignedIn"
+          @click="showPushDialog = true"
+          :disabled="activePushState?.phase === 'running'"
+          class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg
+            class="w-3.5 h-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="16 16 12 12 8 16" />
+            <line x1="12" y1="12" x2="12" y2="21" />
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+          </svg>
+          {{
+            activePushState?.phase === "running"
+              ? `Pushing… ${Math.round(activePushState.percent)}%`
+              : "Push to Cloud"
+          }}
+        </button>
+        <p
+          v-if="activePushState?.phase === 'done'"
+          class="text-[11px] text-green-500 font-medium"
+        >
+          Pushed successfully
+        </p>
+        <p
+          v-else-if="activePushState?.phase === 'error'"
+          class="text-[11px] text-red-400 font-medium max-w-[160px] leading-tight"
+        >
+          {{ activePushState.error }}
+        </p>
       </div>
     </div>
 
@@ -272,11 +309,59 @@
       </div>
     </div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="showPushDialog"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      @click.self="showPushDialog = false"
+    >
+      <div
+        class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl p-6 w-[380px] shadow-2xl animate-in fade-in zoom-in duration-150"
+      >
+        <p class="text-[15px] font-bold text-[var(--text)] mb-1">
+          Push to Ollama Cloud
+        </p>
+        <p class="text-[12px] text-[var(--text-muted)] mb-4 leading-relaxed">
+          Enter the cloud name for this model. Use your Ollama username as the
+          namespace (e.g.
+          <code class="font-mono text-[var(--accent)]">username/model:tag</code
+          >).
+        </p>
+        <input
+          v-model="pushCloudName"
+          @keydown.enter="startPush"
+          @keydown.escape="showPushDialog = false"
+          placeholder="username/model:latest"
+          class="w-full bg-[var(--bg-input)] border border-[var(--border)] focus:border-[var(--accent)]/60 rounded-xl px-4 py-2.5 text-[13px] text-[var(--text)] outline-none placeholder-[var(--text-dim)] mb-2"
+          autofocus
+        />
+        <p v-if="pushError" class="text-[11px] text-red-400 mb-2">
+          {{ pushError }}
+        </p>
+        <div class="flex gap-2 justify-end">
+          <button
+            @click="showPushDialog = false"
+            class="px-4 py-1.5 text-[12px] text-[var(--text-muted)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            @click="startPush"
+            class="px-4 py-1.5 text-[12px] font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors"
+          >
+            Push
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
+import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "../../stores/settings";
 import { useModelStore } from "../../stores/models";
 import { useAppOrchestration } from "../../composables/useAppOrchestration";
@@ -298,6 +383,32 @@ const modelStore = useModelStore();
 const { startNewChat } = useAppOrchestration();
 const { applyModelDefaults, saveAsModelDefault, resetModelDefaults } =
   useModelDefaults();
+
+const isSignedIn = ref(false);
+const showPushDialog = ref(false);
+const pushCloudName = ref("");
+const pushError = ref("");
+
+const activePushState = computed(() => {
+  const localName = props.model.name;
+  return (
+    Object.values(modelStore.pushing).find((s) => s.name === localName) ?? null
+  );
+});
+
+async function startPush() {
+  pushError.value = "";
+  const cloudName = pushCloudName.value.trim();
+  if (!cloudName) {
+    pushError.value = "Enter a cloud model name (e.g. username/model:tag)";
+    return;
+  }
+  showPushDialog.value = false;
+  await modelStore.pushModel(props.model.name, cloudName);
+  if (activePushState.value?.phase === "done") {
+    await modelStore.addPrivateModel(cloudName);
+  }
+}
 
 const loading = ref(true);
 const edited = ref<Partial<ChatOptions>>({});
@@ -336,6 +447,11 @@ async function saveTags() {
 }
 
 onMounted(async () => {
+  try {
+    isSignedIn.value = await invoke<boolean>("check_ollama_signed_in");
+  } catch {
+    isSignedIn.value = false;
+  }
   try {
     const stored = await applyModelDefaults(props.model.name);
     edited.value = { ...stored };

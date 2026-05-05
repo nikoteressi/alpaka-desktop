@@ -42,6 +42,8 @@ describe("LocalModelDetails", () => {
       props: { model: mockModel },
     });
 
+    await flushPromises();
+
     expect(invoke).toHaveBeenCalledWith("get_model_defaults", {
       modelName: "qwen2.5-coder:14b",
     });
