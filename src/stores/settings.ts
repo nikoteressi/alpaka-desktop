@@ -75,6 +75,7 @@ const DEFAULT_CHAT_OPTIONS: SettingsState["chatOptions"] = {
   mirostat: 0,
   mirostat_tau: 5,
   mirostat_eta: 0.1,
+  num_gpu: -1,
 };
 
 const getInitialState = (): SettingsState => ({
