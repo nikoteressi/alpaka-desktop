@@ -413,6 +413,7 @@ export const useModelStore = defineStore("models", {
               if (this.pushing[model]) {
                 this.pushing[model].phase = "done";
                 this.pushing[model].percent = 100;
+                this.addPrivateModel(model);
               }
             }),
             listen<{ model: string; error: string }>(

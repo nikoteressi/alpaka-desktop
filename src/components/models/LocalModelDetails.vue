@@ -405,9 +405,6 @@ async function startPush() {
   }
   showPushDialog.value = false;
   await modelStore.pushModel(props.model.name, cloudName);
-  if (activePushState.value?.phase === "done") {
-    await modelStore.addPrivateModel(cloudName);
-  }
 }
 
 const loading = ref(true);
