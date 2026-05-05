@@ -111,11 +111,7 @@
         <button
           v-if="isSignedIn"
           @click="openPushDialog"
-          :disabled="
-            isCheckingReadiness ||
-            isBaking ||
-            activePushState?.phase === 'running'
-          "
+          :disabled="activePushState?.phase === 'running'"
           class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg
@@ -131,26 +127,8 @@
             <line x1="12" y1="12" x2="12" y2="21" />
             <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
           </svg>
-          {{
-            isCheckingReadiness
-              ? "Checking…"
-              : activePushState?.phase === "running"
-                ? `Pushing… ${Math.round(activePushState.percent)}%`
-                : "Push to Cloud"
-          }}
+          Push to Cloud
         </button>
-        <p
-          v-if="activePushState?.phase === 'done'"
-          class="text-[11px] text-green-500 font-medium"
-        >
-          Pushed successfully
-        </p>
-        <p
-          v-else-if="activePushState?.phase === 'error'"
-          class="text-[11px] text-red-400 font-medium max-w-[160px] leading-tight"
-        >
-          {{ activePushState.error }}
-        </p>
       </div>
     </div>
 
@@ -325,104 +303,228 @@
       <div
         class="bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-2xl p-6 w-[400px] shadow-2xl animate-in fade-in zoom-in duration-150"
       >
-        <!-- Header -->
-        <p class="text-[15px] font-bold text-[var(--text)] mb-1">
-          Push to Ollama
-        </p>
-        <p class="text-[12px] text-[var(--text-muted)] mb-4 leading-relaxed">
-          <template v-if="pushDialogState === 'custom_model'">
-            This model will be published under your account on ollama.com.
-          </template>
-          <template v-else>
-            The model will be published to your Ollama account at ollama.com.
-            You can edit the name below.
-          </template>
-        </p>
-
-        <!-- Name input -->
-        <input
-          v-model="pushCloudName"
-          @keydown.enter="startPush"
-          @keydown.escape="closePushDialog"
-          placeholder="username/model:latest"
-          class="w-full bg-[var(--bg-input)] border border-[var(--border)] focus:border-[var(--accent)]/60 rounded-xl px-4 py-2.5 text-[13px] text-[var(--text)] outline-none placeholder-[var(--text-dim)] mb-3"
-          autofocus
-        />
-
-        <!-- State B: has_presets -->
-        <div v-if="pushDialogState === 'has_presets'" class="mb-3">
-          <label class="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox"
-              v-model="bakePresets"
-              class="mt-0.5 accent-[var(--accent)]"
-            />
-            <span class="text-[12px] text-[var(--text)]">
-              Bake my saved presets into this model
-            </span>
-          </label>
-          <p
-            v-if="bakePresets"
-            class="text-[11px] text-[var(--text-muted)] mt-1.5 ml-6 leading-relaxed"
-          >
-            Creates a local copy with your temperature, top_p, etc. baked in via
-            Modelfile
+        <!-- PHASE: setup -->
+        <template v-if="pushPhase === 'setup'">
+          <p class="text-[15px] font-bold text-[var(--text)] mb-1">
+            Push to Ollama
           </p>
-          <p
-            v-else
-            class="text-[11px] text-[var(--text-dim)] mt-1.5 ml-6 leading-relaxed"
-          >
-            Presets are app-local and will NOT be included in the pushed model
+          <p class="text-[12px] text-[var(--text-muted)] mb-4 leading-relaxed">
+            <template v-if="pushDialogState === 'custom_model'">
+              This model will be published under your account on ollama.com.
+            </template>
+            <template v-else>
+              The model will be published to your Ollama account at ollama.com.
+              You can edit the name below.
+            </template>
           </p>
-        </div>
 
-        <!-- State C: unmodified_warning -->
-        <div
-          v-if="pushDialogState === 'unmodified_warning'"
-          class="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
-        >
-          <p class="text-[12px] text-amber-400 leading-relaxed">
-            This appears to be an unmodified model. Push is most useful for
-            models you've customized with a Modelfile or saved presets. You can
-            still push it to use it across machines.
-          </p>
-        </div>
-
-        <p v-if="pushError" class="text-[11px] text-red-400 mb-2">
-          {{ pushError }}
-        </p>
-
-        <div class="flex gap-2 justify-end">
-          <button
-            @click="closePushDialog"
-            class="px-4 py-1.5 text-[12px] text-[var(--text-muted)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+          <!-- Readiness loading -->
+          <div
+            v-if="isCheckingReadiness"
+            class="flex items-center gap-2 text-[12px] text-[var(--text-muted)] mb-4"
           >
-            Cancel
-          </button>
-          <button
+            <svg
+              class="w-3.5 h-3.5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              />
+            </svg>
+            Checking model…
+          </div>
+
+          <!-- Name input -->
+          <input
+            ref="nameInputRef"
+            v-model="pushCloudName"
+            @keydown.enter="startPush"
+            @keydown.escape="closePushDialog"
+            placeholder="username/model:latest"
+            class="w-full bg-[var(--bg-input)] border border-[var(--border)] focus:border-[var(--accent)]/60 rounded-xl px-4 py-2.5 text-[13px] text-[var(--text)] outline-none placeholder-[var(--text-dim)] mb-3"
+          />
+
+          <!-- has_presets: bake checkbox -->
+          <div v-if="pushDialogState === 'has_presets'" class="mb-3">
+            <label class="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                v-model="bakePresets"
+                class="mt-0.5 accent-[var(--accent)]"
+              />
+              <span class="text-[12px] text-[var(--text)]">
+                Bake my saved presets into this model
+              </span>
+            </label>
+            <p
+              v-if="bakePresets"
+              class="text-[11px] text-[var(--text-muted)] mt-1.5 ml-6 leading-relaxed"
+            >
+              Creates a local copy with your temperature, top_p, etc. baked in
+              via Modelfile
+            </p>
+            <p
+              v-else
+              class="text-[11px] text-[var(--text-dim)] mt-1.5 ml-6 leading-relaxed"
+            >
+              Presets are app-local and will NOT be included in the pushed model
+            </p>
+          </div>
+
+          <!-- unmodified_warning -->
+          <div
             v-if="pushDialogState === 'unmodified_warning'"
-            @click="startPush"
-            :disabled="isBaking"
-            class="px-4 py-1.5 text-[12px] font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="mb-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
           >
-            Push anyway
-          </button>
-          <button
-            v-else
-            @click="startPush"
-            :disabled="isBaking"
-            class="px-4 py-1.5 text-[12px] font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            <p class="text-[12px] text-amber-400 leading-relaxed">
+              This appears to be an unmodified model. Push is most useful for
+              models you've customized with a Modelfile or saved presets. You
+              can still push it to use it across machines.
+            </p>
+          </div>
+
+          <p v-if="pushError" class="text-[11px] text-red-400 mb-2">
+            {{ pushError }}
+          </p>
+
+          <div class="flex gap-2 justify-end">
+            <button
+              @click="closePushDialog"
+              class="px-4 py-1.5 text-[12px] text-[var(--text-muted)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              @click="startPush"
+              class="px-4 py-1.5 text-[12px] font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors cursor-pointer"
+            >
+              {{
+                pushDialogState === "unmodified_warning"
+                  ? "Push anyway"
+                  : "Push"
+              }}
+            </button>
+          </div>
+        </template>
+
+        <!-- PHASE: pushing -->
+        <template v-else-if="pushPhase === 'pushing'">
+          <p class="text-[15px] font-bold text-[var(--text)] mb-4">
+            Pushing model…
+          </p>
+          <div
+            class="w-full bg-[var(--bg-input)] rounded-full h-2 mb-3 overflow-hidden"
           >
-            {{ isBaking ? "Creating…" : "Push" }}
-          </button>
-        </div>
+            <div
+              class="bg-[var(--accent)] h-2 rounded-full transition-all duration-300"
+              :style="{ width: `${activePushState?.percent ?? 0}%` }"
+            />
+          </div>
+          <p class="text-[12px] text-[var(--text-muted)] text-center">
+            {{ activePushState?.status ?? "Starting…" }}
+          </p>
+        </template>
+
+        <!-- PHASE: done -->
+        <template v-else-if="pushPhase === 'done'">
+          <div class="flex flex-col items-center gap-3 py-2">
+            <div
+              class="w-10 h-10 rounded-full bg-green-500/15 flex items-center justify-center"
+            >
+              <svg
+                class="w-5 h-5 text-green-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <p class="text-[15px] font-bold text-[var(--text)]">
+              Pushed successfully
+            </p>
+            <p
+              class="text-[12px] text-[var(--text-muted)] text-center leading-relaxed"
+            >
+              The model is now available on your ollama.com account.
+            </p>
+          </div>
+          <div class="flex justify-end mt-5">
+            <button
+              @click="closePushDialog"
+              class="px-4 py-1.5 text-[12px] font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </template>
+
+        <!-- PHASE: error -->
+        <template v-else-if="pushPhase === 'error'">
+          <div class="flex flex-col items-center gap-3 py-2">
+            <div
+              class="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center"
+            >
+              <svg
+                class="w-5 h-5 text-red-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </div>
+            <p class="text-[15px] font-bold text-[var(--text)]">Push failed</p>
+            <p
+              class="text-[12px] text-red-400 text-center leading-relaxed break-words max-w-full"
+            >
+              {{ pushError }}
+            </p>
+            <p
+              v-if="pushError.toLowerCase().includes('unauthorized')"
+              class="text-[11px] text-[var(--text-muted)] text-center leading-relaxed"
+            >
+              Make sure you are signed in by running
+              <code class="font-mono text-[var(--text)]">ollama signin</code> in
+              your terminal.
+            </p>
+          </div>
+          <div class="flex gap-2 justify-end mt-5">
+            <button
+              @click="closePushDialog"
+              class="px-4 py-1.5 text-[12px] text-[var(--text-muted)] rounded-lg hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+            <button
+              @click="retryPush"
+              class="px-4 py-1.5 text-[12px] font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg transition-colors cursor-pointer"
+            >
+              Try again
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "../../stores/settings";
@@ -452,6 +554,8 @@ type PushReadiness = {
   has_local_presets: boolean;
 };
 
+type PushPhase = "setup" | "pushing" | "done" | "error";
+
 const isSignedIn = ref(false);
 const ollamaUsername = ref("");
 const showPushDialog = ref(false);
@@ -460,12 +564,20 @@ const pushError = ref("");
 const pushReadiness = ref<PushReadiness | null>(null);
 const bakePresets = ref(true);
 const isCheckingReadiness = ref(false);
-const isBaking = ref(false);
+const pushPhase = ref<PushPhase>("setup");
+// The store key used for the in-flight push (cloudName or baked cloudName)
+const currentPushKey = ref("");
+const nameInputRef = ref<HTMLInputElement | null>(null);
 
+// Look up the active push by the tracked key so bake→push flow stays visible
 const activePushState = computed(() => {
-  const localName = props.model.name;
+  if (currentPushKey.value) {
+    return modelStore.pushing[currentPushKey.value] ?? null;
+  }
   return (
-    Object.values(modelStore.pushing).find((s) => s.name === localName) ?? null
+    Object.values(modelStore.pushing).find(
+      (s) => s.name === props.model.name,
+    ) ?? null
   );
 });
 
@@ -479,6 +591,20 @@ const pushDialogState = computed<
   return "unmodified_warning";
 });
 
+// Drive phase transitions from store events rather than await ordering
+watch(
+  () => activePushState.value?.phase,
+  (phase) => {
+    if (pushPhase.value !== "pushing") return;
+    if (phase === "done") {
+      pushPhase.value = "done";
+    } else if (phase === "error") {
+      pushError.value = activePushState.value?.error ?? "Push failed";
+      pushPhase.value = "error";
+    }
+  },
+);
+
 async function openPushDialog() {
   const base =
     props.model.name.split("/").pop()?.split(":")[0] ?? props.model.name;
@@ -487,6 +613,9 @@ async function openPushDialog() {
     : base;
   pushError.value = "";
   bakePresets.value = true;
+  pushPhase.value = "setup";
+  currentPushKey.value = "";
+  showPushDialog.value = true;
 
   isCheckingReadiness.value = true;
   try {
@@ -501,29 +630,39 @@ async function openPushDialog() {
     };
   } finally {
     isCheckingReadiness.value = false;
+    // Focus name input after readiness resolves
+    await nextTick();
+    nameInputRef.value?.focus();
   }
-
-  showPushDialog.value = true;
 }
 
 function closePushDialog() {
+  if (pushPhase.value === "pushing") return;
   showPushDialog.value = false;
+  pushPhase.value = "setup";
   pushReadiness.value = null;
   pushError.value = "";
+  currentPushKey.value = "";
 }
 
 async function startPush() {
   pushError.value = "";
   const cloudName = pushCloudName.value.trim();
+
   if (!cloudName) {
     pushError.value = "Enter a cloud model name (e.g. username/model)";
+    return;
+  }
+  if (!cloudName.includes("/")) {
+    pushError.value = "Name must include your username (e.g. username/model)";
     return;
   }
 
   const state = pushDialogState.value;
 
   if (state === "has_presets" && bakePresets.value) {
-    isBaking.value = true;
+    pushPhase.value = "pushing";
+    currentPushKey.value = cloudName;
     try {
       await invoke("bake_model_presets", {
         sourceName: props.model.name,
@@ -532,21 +671,31 @@ async function startPush() {
     } catch (err) {
       pushError.value =
         err instanceof Error ? err.message : "Failed to bake presets";
-      isBaking.value = false;
+      pushPhase.value = "error";
       return;
     }
-    isBaking.value = false;
-    showPushDialog.value = false;
+    // modelStore.pushModel(cloudName, cloudName) — key is cloudName, name is cloudName
     await modelStore.pushModel(cloudName, cloudName);
+    // Phase transition handled by watcher; no check needed here
     return;
   }
 
-  if (!cloudName.includes("/")) {
-    pushError.value = "Name must include your username (e.g. username/model)";
-    return;
-  }
-  showPushDialog.value = false;
+  pushPhase.value = "pushing";
+  currentPushKey.value = cloudName;
   await modelStore.pushModel(props.model.name, cloudName);
+  // Phase transition handled by watcher
+}
+
+async function retryPush() {
+  // Clear the stale push entry so the watcher won't fire immediately
+  if (currentPushKey.value && modelStore.pushing[currentPushKey.value]) {
+    delete modelStore.pushing[currentPushKey.value];
+  }
+  pushError.value = "";
+  pushPhase.value = "setup";
+  // Short yield so watcher sees phase reset before startPush fires
+  await nextTick();
+  await startPush();
 }
 
 const loading = ref(true);
