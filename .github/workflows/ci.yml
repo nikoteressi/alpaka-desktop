@@ -275,7 +275,7 @@ jobs:
             exit 0
           fi
 
-          ADVISORY=$(echo "$PR_LABELS" | jq -r '.[].name' | grep -E '^type: (ci|docs)$' | head -1 || true)
+          ADVISORY=$(echo "$PR_LABELS" | jq -r '.[].name' | grep -E '^(type: (ci|docs)|dependencies)$' | head -1 || true)
 
           if [[ -n "$ADVISORY" ]]; then
             echo "WARNING: CHANGELOG.md not updated, but PR is labeled '${ADVISORY}' — advisory only."
