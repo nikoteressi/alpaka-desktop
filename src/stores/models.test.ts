@@ -649,7 +649,7 @@ describe("useModelStore", () => {
       modified_at: "",
       size: 0,
       digest: "",
-      details: {},
+      details: { parent_model: "", format: "gguf", family: "llama", families: null, parameter_size: "8B", quantization_level: "Q4_0" },
     };
 
     it("does not pull when model is already installed", async () => {
