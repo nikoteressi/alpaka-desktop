@@ -91,7 +91,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | MO-06 | **Custom model creation** | P1 | ✅ | Create / edit from Modelfile with streaming progress and cancellation (`CreateModelPage.vue`, `commands/model_create.rs`). Reachable via "Create model" button on Models page |
 | MO-07 | **Model tags / favorites** | P1 | ✅ | Star + free-form tags; filter by tag in model list and selector (`model_user_data.rs`) |
 | MO-08 | **Configurable storage path** | P0 | ✅ | `Settings → Engine`; writes a systemd override and restarts Ollama (`ModelPathSettings.vue`, `commands/model_path.rs`) |
-| MO-09 | **Model update notifications** | P1 | 🔲 Backlog | Detect newer versions of pulled models |
+| MO-09 | **Model update notifications** | P1 | ✅ | Background check every 6 h compares local digest vs `ollama.com/library` hash; nav badge + per-card "Update" indicator; one-click re-pull (`services/model_updates.rs`, `stores/models.ts`) |
 | MO-10 | **Cloud model run** | P0 | ✅ | Cloud tags (`:cloud` suffix) recognised; `addCloudModel` registers the model (`stores/models.ts`) |
 
 ### 2.4 Ollama Cloud Integration

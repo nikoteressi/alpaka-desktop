@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Mutex, RwLock};
 
 use tokio::sync::{broadcast, oneshot};
@@ -44,6 +45,17 @@ pub struct AppState {
 
     /// Tracks the ID of the conversation currently visible to the user.
     pub active_conversation_id: RwLock<Option<String>>,
+
+    /// Cached list of locally-installed model names that have a newer digest on ollama.com.
+    /// Written by `do_update_check`; read by the `get_models_with_updates` IPC command.
+    pub models_with_updates: RwLock<Vec<String>>,
+
+    /// Set to `true` while a `do_update_check` run is in progress.
+    /// Prevents the manual `check_model_updates` command from spawning a concurrent scan.
+    pub update_check_running: AtomicBool,
+
+    /// Send on this channel to shut down the model-update background loop on app exit.
+    pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 
 /// Builds a reqwest client configured with an optional HTTP or SOCKS5 proxy.
@@ -131,6 +143,9 @@ impl AppState {
             health_loop_handle: std::sync::Mutex::new(None),
             is_chat_view: RwLock::new(true),
             active_conversation_id: RwLock::new(None),
+            models_with_updates: RwLock::new(Vec::new()),
+            update_check_running: AtomicBool::new(false),
+            update_check_loop_shutdown: Mutex::new(None),
         })
     }
 }

@@ -99,6 +99,7 @@ alpaka-desktop/
 │       │   ├── model_create.rs   # create_model + cancel_model_create (streaming)
 │       │   ├── model_path.rs     # validate_model_path + apply_model_path (systemd override)
 │       │   ├── model_settings.rs # Per-model default options + ChatOptions validation
+│       │   ├── model_updates.rs  # get_models_with_updates, check_model_updates (MO-09)
 │       │   ├── model_user_data.rs# Favorites, tags
 │       │   ├── proxy.rs          # get_proxy_config, save_proxy, delete_proxy, test_proxy
 │       │   ├── service.rs        # Start/stop ollama systemd service
@@ -114,6 +115,7 @@ alpaka-desktop/
 │       │   │   ├── context.rs    # apply_sliding_window (0.85 × num_ctx)
 │       │   │   └── orchestrator.rs # Agent loop (tool calls, max 5 iters)
 │       │   ├── library.rs        # LibraryService: scrape ollama.com/library
+│       │   ├── model_updates.rs  # ModelUpdateService: background 6h loop, digest comparison, do_update_check
 │       │   ├── prompt.rs         # PromptService: context assembly, history
 │       │   └── search.rs         # WebSearchService: tool call execution
 │       │
@@ -357,6 +359,10 @@ tauri::generate_handler![
     commands::service::stop_ollama,
     commands::service::ollama_service_status,
 
+    // ── Model Updates ─────────────────────────────────────────────────────
+    commands::model_updates::get_models_with_updates, // returns cached outdated model names
+    commands::model_updates::check_model_updates,     // triggers an immediate background digest check
+
     // ── System ────────────────────────────────────────────────────────────
     commands::system_info::detect_hardware,  // reads /proc/meminfo + DRM sysfs
     commands::system::report_active_view,    // tracks current page for tray
@@ -396,6 +402,15 @@ pub struct AppState {
 
     /// ID of the conversation currently visible (used by tray notifications).
     pub active_conversation_id: Mutex<Option<String>>,
+
+    /// Cached list of model names that have a newer digest on ollama.com/library.
+    pub models_with_updates: RwLock<Vec<String>>,
+
+    /// Guards against concurrent runs of do_update_check (manual + background loop).
+    pub update_check_running: AtomicBool,
+
+    /// Shutdown signal for the model-update background loop task.
+    pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 ```
 
@@ -500,6 +515,7 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |
 | `model:pull-progress` | Rust → Vue | `{ model, status, completed?, total?, percent? }` | Download progress chunk |
 | `model:pull-done` | Rust → Vue | `{ model }` | Model download complete |
+| `model:updates-checked` | Rust → Vue | `{ outdated: string[] }` | Background update check result; names of locally installed models with newer versions on ollama.com |
 | `model:create-progress` | Rust → Vue | `{ model: string, status: string }` | Model creation progress status line |
 | `model:create-done` | Rust → Vue | `{ model: string }` | Model creation complete |
 | `model:create-error` | Rust → Vue | `{ model: string, error: string, cancelled: boolean }` | Model creation failed or cancelled |

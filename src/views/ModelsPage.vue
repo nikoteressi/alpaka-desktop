@@ -275,11 +275,61 @@
                   </button>
                 </div>
                 <div v-else class="flex flex-col gap-1.5">
-                  <p
-                    class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider px-1 mb-1"
-                  >
-                    {{ modelStore.models.length }} Installed Models
-                  </p>
+                  <div class="flex items-center justify-between px-1 mb-1">
+                    <p
+                      class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider"
+                    >
+                      {{ modelStore.models.length }} Installed Models
+                    </p>
+                    <Transition name="fade-in" mode="out-in">
+                      <span
+                        v-if="checkDoneMessage"
+                        key="result"
+                        class="text-[11px]"
+                        :class="
+                          modelStore.updatesAvailableCount > 0
+                            ? 'text-amber-400'
+                            : 'text-[var(--text-dim)]'
+                        "
+                      >
+                        {{ checkDoneMessage }}
+                      </span>
+                      <CustomTooltip
+                        v-else
+                        key="btn"
+                        text="Check for model updates"
+                        wrapper-class="inline-flex"
+                      >
+                        <button
+                          @click="modelStore.triggerUpdateCheck()"
+                          :disabled="modelStore.isCheckingUpdates"
+                          class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <svg
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            :class="{
+                              'animate-spin': modelStore.isCheckingUpdates,
+                            }"
+                          >
+                            <polyline points="23 4 23 10 17 10" />
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                          </svg>
+                          {{
+                            modelStore.isCheckingUpdates
+                              ? "Checking..."
+                              : "Check for updates"
+                          }}
+                        </button>
+                      </CustomTooltip>
+                    </Transition>
+                  </div>
                   <!-- Tag filter bar — always visible when models exist -->
                   <div class="flex flex-wrap gap-1.5 mb-3 items-center">
                     <button
@@ -328,6 +378,7 @@
                         :date="formatDateShort(model.modified_at)"
                         :quant="model.details.quantization_level"
                         :is-installed="true"
+                        :has-update="modelStore.hasUpdate(model.name as string)"
                         :is-favorite="
                           modelStore.isFavorite(model.name as string)
                         "
@@ -342,7 +393,21 @@
                         :on-edit-tags="
                           () => openTagEditor(model.name as string)
                         "
-                        action-label="Run"
+                        :on-action="
+                          modelStore.hasUpdate(model.name as string)
+                            ? () => modelStore.pullModel(model.name as string)
+                            : undefined
+                        "
+                        :action-label="
+                          modelStore.hasUpdate(model.name as string)
+                            ? 'Update'
+                            : undefined
+                        "
+                        :action-color="
+                          modelStore.hasUpdate(model.name as string)
+                            ? '#fbbf24'
+                            : undefined
+                        "
                       />
                       <!-- Inline tag editor -->
                       <div
@@ -656,6 +721,22 @@ const settingsStore = useSettingsStore();
 
 const selectedLocalModel = ref<Model | null>(null);
 
+const checkDoneMessage = ref<string | null>(null);
+let checkDoneTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  () => modelStore.isCheckingUpdates,
+  (checking) => {
+    if (checking) return;
+    if (checkDoneTimer) clearTimeout(checkDoneTimer);
+    const count = modelStore.updatesAvailableCount;
+    checkDoneMessage.value =
+      count > 0
+        ? `${count} ${count > 1 ? "updates" : "update"} available`
+        : "All models up to date";
+    checkDoneTimer = setTimeout(() => (checkDoneMessage.value = null), 4000);
+  },
+);
+
 const createModelMode = ref<{
   name: string;
   modelfile: string;
@@ -928,6 +1009,14 @@ onUnmounted(() => {
 .fade-subpage-leave-to {
   opacity: 0;
   transform: scale(1.02) translateY(-10px);
+}
+.fade-in-enter-active,
+.fade-in-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-in-enter-from,
+.fade-in-leave-to {
+  opacity: 0;
 }
 
 @keyframes spin {

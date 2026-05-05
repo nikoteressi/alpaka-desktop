@@ -113,3 +113,7 @@ export interface CreateState {
   error?: string;
   logLines: string[];
 }
+
+export interface ModelUpdatesCheckedPayload {
+  outdated: string[];
+}
