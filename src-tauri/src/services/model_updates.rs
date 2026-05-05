@@ -33,7 +33,7 @@ pub(crate) fn digest_has_update(local_digest: &str, lib_hash: &str) -> bool {
         return false;
     }
     let local_hex = local_digest.trim_start_matches("sha256:");
-    if local_hex.is_empty() {
+    if local_hex.is_empty() || lib_hash.len() > local_hex.len() {
         return false;
     }
     !local_hex.starts_with(lib_hash)
@@ -201,5 +201,11 @@ mod tests {
     #[test]
     fn empty_local_digest_means_no_update() {
         assert!(!digest_has_update("", "abc123d"));
+    }
+
+    #[test]
+    fn lib_hash_longer_than_local_hex_means_no_update() {
+        // lib_hash longer than local hex must not falsely report an update
+        assert!(!digest_has_update("sha256:abc", "abc123def456789"));
     }
 }

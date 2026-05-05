@@ -171,16 +171,12 @@ pub fn run() {
                     .update_check_loop_shutdown
                     .lock()
                     .unwrap() = Some(upd_shutdown_tx);
-                let upd_handle = tauri::async_runtime::spawn(
+                let _ = tauri::async_runtime::spawn(
                     crate::services::model_updates::run_update_check_loop(
                         app.handle().clone(),
                         upd_shutdown_rx,
                     ),
                 );
-                *app.state::<AppState>()
-                    .update_check_loop_handle
-                    .lock()
-                    .unwrap() = Some(upd_handle);
             }
 
             Ok(())

@@ -64,7 +64,7 @@ export const useModelStore = defineStore("models", {
     isSearching: false,
     _searchTimer: null as ReturnType<typeof setTimeout> | null,
     _searchVersion: 0,
-    modelsWithUpdates: new Set<string>() as Set<string>,
+    modelsWithUpdates: new Set<string>(),
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],

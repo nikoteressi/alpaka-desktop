@@ -275,11 +275,33 @@
                   </button>
                 </div>
                 <div v-else class="flex flex-col gap-1.5">
-                  <p
-                    class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider px-1 mb-1"
-                  >
-                    {{ modelStore.models.length }} Installed Models
-                  </p>
+                  <div class="flex items-center justify-between px-1 mb-1">
+                    <p
+                      class="text-[11px] text-[var(--text-dim)] font-bold uppercase tracking-wider"
+                    >
+                      {{ modelStore.models.length }} Installed Models
+                    </p>
+                    <button
+                      @click="modelStore.triggerUpdateCheck()"
+                      class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
+                      title="Check for model updates"
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="23 4 23 10 17 10" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                      </svg>
+                      Check for updates
+                    </button>
+                  </div>
                   <!-- Tag filter bar — always visible when models exist -->
                   <div class="flex flex-wrap gap-1.5 mb-3 items-center">
                     <button

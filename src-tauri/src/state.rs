@@ -47,7 +47,6 @@ pub struct AppState {
 
     pub models_with_updates: RwLock<Vec<String>>,
     pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
-    pub update_check_loop_handle: std::sync::Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 /// Builds a reqwest client configured with an optional HTTP or SOCKS5 proxy.
@@ -137,7 +136,6 @@ impl AppState {
             active_conversation_id: RwLock::new(None),
             models_with_updates: RwLock::new(Vec::new()),
             update_check_loop_shutdown: Mutex::new(None),
-            update_check_loop_handle: std::sync::Mutex::new(None),
         })
     }
 }
