@@ -655,7 +655,7 @@ describe("useModelStore", () => {
     it("does not pull when model is already installed", async () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest", model: "llama3:latest", ...baseModel },
+        { name: "llama3:latest" as ModelName, model: "llama3:latest", ...baseModel },
       ];
 
       await store.addCloudModel("llama3:latest");
