@@ -69,7 +69,9 @@ describe("LaunchPage", () => {
     // Click the first copy button
     await wrapper.findAll("button")[0].trigger("click");
     await nextTick();
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("ollama launch claude");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      "ollama launch claude",
+    );
   });
 
   it("shows checkmark svg after copying (copiedCmd state set)", async () => {
@@ -149,7 +151,9 @@ describe("LaunchPage", () => {
   it("each tool shows its first letter as icon initial", () => {
     const wrapper = mount(LaunchPage);
     // The icon span shows tool.name[0]
-    const iconSpans = wrapper.findAll(".text-\\[var\\(--text-muted\\)\\].font-bold");
+    const iconSpans = wrapper.findAll(
+      ".text-\\[var\\(--text-muted\\)\\].font-bold",
+    );
     const initials = iconSpans.map((el) => el.text());
     expect(initials).toContain("C"); // Claude, Codex
     expect(initials).toContain("O"); // OpenCode

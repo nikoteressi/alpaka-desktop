@@ -35,12 +35,17 @@ describe("AdvancedTab — seed controls", () => {
 
   it("'Reset to random' button is hidden when seed is undefined", async () => {
     const settingsStore = useSettingsStore();
-    settingsStore.chatOptions = { ...settingsStore.chatOptions, seed: undefined };
+    settingsStore.chatOptions = {
+      ...settingsStore.chatOptions,
+      seed: undefined,
+    };
 
     const wrapper = mount(AdvancedTab, { global: { stubs: globalStubs } });
     await flushPromises();
 
-    const resetBtn = wrapper.findAll("button").find((b) => b.text() === "Reset to random");
+    const resetBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text() === "Reset to random");
     expect(resetBtn).toBeUndefined();
   });
 
@@ -51,7 +56,9 @@ describe("AdvancedTab — seed controls", () => {
     const wrapper = mount(AdvancedTab, { global: { stubs: globalStubs } });
     await flushPromises();
 
-    const resetBtn = wrapper.findAll("button").find((b) => b.text() === "Reset to random");
+    const resetBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text() === "Reset to random");
     expect(resetBtn).toBeDefined();
 
     await resetBtn!.trigger("click");
@@ -62,7 +69,10 @@ describe("AdvancedTab — seed controls", () => {
 
   it("seed @change handler parses integer and calls updateChatOptions", async () => {
     const settingsStore = useSettingsStore();
-    settingsStore.chatOptions = { ...settingsStore.chatOptions, seed: undefined };
+    settingsStore.chatOptions = {
+      ...settingsStore.chatOptions,
+      seed: undefined,
+    };
 
     const wrapper = mount(AdvancedTab, { global: { stubs: globalStubs } });
     await flushPromises();

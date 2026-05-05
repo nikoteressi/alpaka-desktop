@@ -275,7 +275,7 @@ describe("ChatView.vue", () => {
     const wrapper = mountChatView();
     await flushPromises();
     // Expanded body only exists when isSystemPromptExpanded is true
-    const body = wrapper.find('div.px-4.pb-4');
+    const body = wrapper.find("div.px-4.pb-4");
     expect(body.exists()).toBe(false);
   });
 
@@ -307,7 +307,7 @@ describe("ChatView.vue", () => {
     await button.trigger("click"); // collapse
     await nextTick();
 
-    const body = wrapper.find('div.px-4.pb-4');
+    const body = wrapper.find("div.px-4.pb-4");
     expect(body.exists()).toBe(false);
   });
 
@@ -426,7 +426,9 @@ describe("ChatView.vue", () => {
     });
     Object.defineProperty(scrollEl, "scrollTop", {
       get: () => _scrollTop,
-      set: (v: number) => { _scrollTop = v; },
+      set: (v: number) => {
+        _scrollTop = v;
+      },
       configurable: true,
     });
     Object.defineProperty(scrollEl, "clientHeight", {
@@ -459,7 +461,9 @@ describe("ChatView.vue", () => {
     });
     Object.defineProperty(scrollEl, "scrollTop", {
       get: () => _scrollTop,
-      set: (v: number) => { _scrollTop = v; },
+      set: (v: number) => {
+        _scrollTop = v;
+      },
       configurable: true,
     });
     Object.defineProperty(scrollEl, "clientHeight", {
@@ -485,7 +489,9 @@ describe("ChatView.vue", () => {
   // ------------------------------------------------------------------ watchers
 
   it("resets isSystemPromptExpanded when activeConversationId changes", async () => {
-    chatStore.messages["conv-1"] = [makeMessage("msg-s", "system", "Be concise.")];
+    chatStore.messages["conv-1"] = [
+      makeMessage("msg-s", "system", "Be concise."),
+    ];
     const wrapper = mountChatView();
     await flushPromises();
 
@@ -512,7 +518,9 @@ describe("ChatView.vue", () => {
 
     const scrollEl = wrapper.find(".overflow-y-auto").element as HTMLElement;
     // Mock scrollTo before triggering the watcher — prevents happy-dom from writing scrollTop.
-    const scrollToSpy = vi.spyOn(scrollEl, "scrollTo").mockImplementation(() => {});
+    const scrollToSpy = vi
+      .spyOn(scrollEl, "scrollTo")
+      .mockImplementation(() => {});
 
     // Add a new message — this triggers the itemsForScroller watcher (flush: 'post').
     // The watcher calls scrollToBottom('auto'), which uses nextTick + rAF (no timer).
@@ -578,7 +586,9 @@ describe("ChatView.vue", () => {
 
     // Mock scrollTo first — this prevents happy-dom from trying to set scrollTop (read-only)
     // when scrollToBottom's rAF fires after the button click.
-    const scrollToSpy = vi.spyOn(scrollEl, "scrollTo").mockImplementation(() => {});
+    const scrollToSpy = vi
+      .spyOn(scrollEl, "scrollTo")
+      .mockImplementation(() => {});
 
     // Scroll up to make button visible (distanceToBottom = 400 > 100).
     // Provide getter+setter pairs so happy-dom's scrollTo polyfill can write scrollTop.
@@ -590,7 +600,9 @@ describe("ChatView.vue", () => {
     });
     Object.defineProperty(scrollEl, "scrollTop", {
       get: () => _scrollTop,
-      set: (v: number) => { _scrollTop = v; },
+      set: (v: number) => {
+        _scrollTop = v;
+      },
       configurable: true,
     });
     Object.defineProperty(scrollEl, "clientHeight", {
@@ -629,10 +641,23 @@ describe("ChatView.vue", () => {
     await flushPromises();
 
     const chatInput = wrapper.findComponent({ name: "ChatInput" });
-    await chatInput.vm.$emit("send", "Hello world", undefined, false, undefined, undefined);
+    await chatInput.vm.$emit(
+      "send",
+      "Hello world",
+      undefined,
+      false,
+      undefined,
+      undefined,
+    );
     await flushPromises();
 
-    expect(mockSendMessage).toHaveBeenCalledWith("Hello world", undefined, false, undefined, undefined);
+    expect(mockSendMessage).toHaveBeenCalledWith(
+      "Hello world",
+      undefined,
+      false,
+      undefined,
+      undefined,
+    );
   });
 
   it("onStop: ChatInput stop event calls stopGeneration", async () => {

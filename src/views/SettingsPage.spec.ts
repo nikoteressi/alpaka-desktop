@@ -40,7 +40,10 @@ describe("SettingsPage — query-param tab routing", () => {
   });
 
   it("mounts without crashing with all tab components stubbed", async () => {
-    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: "/", component: { template: "<div />" } }] });
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { template: "<div />" } }],
+    });
     await router.push("/");
     await router.isReady();
 

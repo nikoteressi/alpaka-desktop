@@ -1553,7 +1553,8 @@ describe("ModelsPage", () => {
   it("open-library-details event from EngineTab calls openLibraryDetailsByName", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     vi.mocked(invoke).mockImplementation(async (cmd: string) => {
-      if (cmd === "get_library_model_readme") return { readme: "", launch_apps: [] };
+      if (cmd === "get_library_model_readme")
+        return { readme: "", launch_apps: [] };
       if (cmd === "get_library_tags") return [];
       return null;
     });

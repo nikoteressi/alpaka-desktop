@@ -37,7 +37,8 @@ const globalStubs = {
   SettingsRow: { template: "<div><slot name='control' /></div>" },
   ToggleSwitch: {
     name: "ToggleSwitch",
-    template: "<button class='toggle-switch' @click=\"$emit('change', !value)\" />",
+    template:
+      "<button class='toggle-switch' @click=\"$emit('change', !value)\" />",
     props: ["value"],
     emits: ["change"],
   },
@@ -57,7 +58,9 @@ describe("GeneralTab — confirmReset", () => {
     });
     await flushPromises();
 
-    const resetBtn = wrapper.findAll("button").find((b) => b.text() === "Reset all");
+    const resetBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text() === "Reset all");
     expect(resetBtn).toBeDefined();
 
     await resetBtn!.trigger("click");
@@ -74,18 +77,24 @@ describe("GeneralTab — confirmReset", () => {
   it("onConfirm callback from confirmReset calls settingsStore.resetToDefaults", async () => {
     const { useSettingsStore } = await import("../../stores/settings");
     const settingsStore = useSettingsStore();
-    const resetSpy = vi.spyOn(settingsStore, "resetToDefaults").mockResolvedValue(undefined);
+    const resetSpy = vi
+      .spyOn(settingsStore, "resetToDefaults")
+      .mockResolvedValue(undefined);
 
     const wrapper = mount(GeneralTab, {
       global: { stubs: globalStubs },
     });
     await flushPromises();
 
-    const resetBtn = wrapper.findAll("button").find((b) => b.text() === "Reset all");
+    const resetBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text() === "Reset all");
     await resetBtn!.trigger("click");
 
     // Extract and invoke the onConfirm callback captured by openModal
-    const callArgs = mockOpenModal.mock.calls[0][0] as { onConfirm: () => Promise<void> };
+    const callArgs = mockOpenModal.mock.calls[0][0] as {
+      onConfirm: () => Promise<void>;
+    };
     await callArgs.onConfirm();
 
     expect(resetSpy).toHaveBeenCalledOnce();
@@ -94,7 +103,9 @@ describe("GeneralTab — confirmReset", () => {
   it("ToggleSwitch @change fires updateSetting for cloud toggle", async () => {
     const { useSettingsStore } = await import("../../stores/settings");
     const settingsStore = useSettingsStore();
-    const updateSpy = vi.spyOn(settingsStore, "updateSetting").mockResolvedValue(undefined);
+    const updateSpy = vi
+      .spyOn(settingsStore, "updateSetting")
+      .mockResolvedValue(undefined);
 
     const wrapper = mount(GeneralTab, {
       global: { stubs: globalStubs },
@@ -113,7 +124,9 @@ describe("GeneralTab — confirmReset", () => {
   it("theme button @click calls setTheme", async () => {
     const { useSettingsStore } = await import("../../stores/settings");
     const settingsStore = useSettingsStore();
-    const setThemeSpy = vi.spyOn(settingsStore, "setTheme").mockImplementation(() => {});
+    const setThemeSpy = vi
+      .spyOn(settingsStore, "setTheme")
+      .mockImplementation(() => {});
 
     const wrapper = mount(GeneralTab, {
       global: { stubs: globalStubs },

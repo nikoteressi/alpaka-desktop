@@ -69,7 +69,9 @@ describe("ModelsTab — context length slider", () => {
     const wrapper = mount(ModelsTab, { global: { stubs: globalStubs } });
     await flushPromises();
 
-    const slider = wrapper.find("input[type='range']") as { element: HTMLInputElement };
+    const slider = wrapper.find("input[type='range']") as {
+      element: HTMLInputElement;
+    };
     // The :value binding should be 0 for 4096
     expect(slider.element.value).toBe("0");
   });

@@ -220,7 +220,10 @@ describe("SearchBlock — extractSiteName", () => {
 
   it("returns 'GitHub' for github.com URLs", () => {
     const wrapper = mount(SearchBlock, {
-      props: { query: "test", result: mkResult("https://github.com/user/repo") },
+      props: {
+        query: "test",
+        result: mkResult("https://github.com/user/repo"),
+      },
     });
     expect(wrapper.find(".search-accordion").text()).toContain("GitHub");
   });
@@ -229,28 +232,40 @@ describe("SearchBlock — extractSiteName", () => {
     // en.wikipedia.org → hostname.replace("www.","") is "en.wikipedia.org"
     // split(".")[0] is "en" which doesn't match — use wikipedia.org directly
     const wrapper = mount(SearchBlock, {
-      props: { query: "test", result: mkResult("https://wikipedia.org/wiki/Test") },
+      props: {
+        query: "test",
+        result: mkResult("https://wikipedia.org/wiki/Test"),
+      },
     });
     expect(wrapper.find(".search-accordion").text()).toContain("Wikipedia");
   });
 
   it("returns 'Reddit' for reddit.com URLs", () => {
     const wrapper = mount(SearchBlock, {
-      props: { query: "test", result: mkResult("https://www.reddit.com/r/test") },
+      props: {
+        query: "test",
+        result: mkResult("https://www.reddit.com/r/test"),
+      },
     });
     expect(wrapper.find(".search-accordion").text()).toContain("Reddit");
   });
 
   it("returns 'Medium' for medium.com URLs", () => {
     const wrapper = mount(SearchBlock, {
-      props: { query: "test", result: mkResult("https://medium.com/@author/article") },
+      props: {
+        query: "test",
+        result: mkResult("https://medium.com/@author/article"),
+      },
     });
     expect(wrapper.find(".search-accordion").text()).toContain("Medium");
   });
 
   it("returns 'arXiv' for arxiv.org URLs", () => {
     const wrapper = mount(SearchBlock, {
-      props: { query: "test", result: mkResult("https://arxiv.org/abs/1234.5678") },
+      props: {
+        query: "test",
+        result: mkResult("https://arxiv.org/abs/1234.5678"),
+      },
     });
     expect(wrapper.find(".search-accordion").text()).toContain("arXiv");
   });

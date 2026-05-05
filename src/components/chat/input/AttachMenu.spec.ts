@@ -20,7 +20,9 @@ describe("AttachMenu", () => {
 
   it("menu is closed by default", () => {
     const wrapper = mount(AttachMenu, { global: { stubs: globalStubs } });
-    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(false);
+    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(
+      false,
+    );
   });
 
   it("opens menu when toggle button is clicked", async () => {
@@ -35,7 +37,9 @@ describe("AttachMenu", () => {
     await btn.trigger("click");
     expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(true);
     await btn.trigger("click");
-    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(false);
+    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(
+      false,
+    );
   });
 
   it("trigger button is disabled when disabled prop is true", () => {
@@ -53,28 +57,32 @@ describe("AttachMenu", () => {
     await wrapper.find("button[aria-label='Attach']").trigger("click");
 
     // Click the Link File Context button — it's the second button in the menu
-    const menuButtons = wrapper.findAll("button").filter((b) =>
-      b.text().includes("Link File Context"),
-    );
+    const menuButtons = wrapper
+      .findAll("button")
+      .filter((b) => b.text().includes("Link File Context"));
     expect(menuButtons).toHaveLength(1);
     await menuButtons[0].trigger("click");
 
     expect(wrapper.emitted("pick-file")).toHaveLength(1);
-    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(false);
+    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(
+      false,
+    );
   });
 
   it("emits 'pick-folder' and closes menu when Link Folder Context is clicked", async () => {
     const wrapper = mount(AttachMenu, { global: { stubs: globalStubs } });
     await wrapper.find("button[aria-label='Attach']").trigger("click");
 
-    const menuButtons = wrapper.findAll("button").filter((b) =>
-      b.text().includes("Link Folder Context"),
-    );
+    const menuButtons = wrapper
+      .findAll("button")
+      .filter((b) => b.text().includes("Link Folder Context"));
     expect(menuButtons).toHaveLength(1);
     await menuButtons[0].trigger("click");
 
     expect(wrapper.emitted("pick-folder")).toHaveLength(1);
-    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(false);
+    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(
+      false,
+    );
   });
 
   it("Link File Context and Link Folder Context buttons are disabled when isLinking is true", async () => {
@@ -100,14 +108,16 @@ describe("AttachMenu", () => {
     (fileInput.element as HTMLInputElement).click = clickSpy;
 
     // Click "Attach Images"
-    const attachImgButton = wrapper.findAll("button").find((b) =>
-      b.text().includes("Attach Images"),
-    );
+    const attachImgButton = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Attach Images"));
     expect(attachImgButton).toBeDefined();
     await attachImgButton!.trigger("click");
 
     // Menu should be closed
-    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(false);
+    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(
+      false,
+    );
     // File input click was triggered
     expect(clickSpy).toHaveBeenCalledOnce();
   });
@@ -161,7 +171,9 @@ describe("AttachMenu", () => {
     document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     await nextTick();
 
-    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(false);
+    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(
+      false,
+    );
 
     wrapper.unmount();
   });
@@ -176,7 +188,9 @@ describe("AttachMenu", () => {
     expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(true);
 
     // Dispatch mousedown on the component's own root element (inside)
-    wrapper.element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    wrapper.element.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true }),
+    );
     await nextTick();
 
     // Should remain open
@@ -196,7 +210,9 @@ describe("AttachMenu", () => {
     (wrapper.vm as unknown as { close: () => void }).close();
     await nextTick();
 
-    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(false);
+    expect(wrapper.find('[class*="absolute bottom-full"]').exists()).toBe(
+      false,
+    );
   });
 
   it("removes mousedown listener on unmount (no memory leak)", () => {

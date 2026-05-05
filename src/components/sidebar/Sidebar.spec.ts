@@ -14,7 +14,9 @@ vi.mock("../../composables/useConversationLifecycle", () => ({
 
 // Tauri invoke is transitively imported by the chat store
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(() => Promise.resolve(() => {})),
+}));
 
 import Sidebar from "./Sidebar.vue";
 
@@ -56,7 +58,9 @@ describe("Sidebar", () => {
         stubs: { ConversationList: { template: "<div />" } },
       },
     });
-    expect(wrapper.find('input[type="text"]').attributes("placeholder")).toBe("Search...");
+    expect(wrapper.find('input[type="text"]').attributes("placeholder")).toBe(
+      "Search...",
+    );
   });
 
   it("updates search model when user types", async () => {
@@ -84,7 +88,9 @@ describe("Sidebar", () => {
   it("renders ConversationList as a child", () => {
     const wrapper = mount(Sidebar, {
       global: {
-        stubs: { ConversationList: { template: '<div data-testid="conv-list" />' } },
+        stubs: {
+          ConversationList: { template: '<div data-testid="conv-list" />' },
+        },
       },
     });
     expect(wrapper.find('[data-testid="conv-list"]').exists()).toBe(true);

@@ -1153,9 +1153,9 @@ describe("ChatInput — removeContext", () => {
 
     expect(mockInvoke).toHaveBeenCalledWith("unlink_folder", { id: "ctx-1" });
     // Context should be removed from store
-    expect(
-      chatStore.folderContexts["conv-test-1"] ?? [],
-    ).not.toContainEqual(expect.objectContaining({ id: "ctx-1" }));
+    expect(chatStore.folderContexts["conv-test-1"] ?? []).not.toContainEqual(
+      expect.objectContaining({ id: "ctx-1" }),
+    );
   });
 });
 
@@ -1172,7 +1172,8 @@ describe("ChatInput — isCloudName + selectModel (cloud branch)", () => {
           thinking_levels: [],
         });
       if (cmd === "get_model_defaults") return Promise.resolve(null);
-      if (cmd === "update_conversation_model") return Promise.resolve(undefined);
+      if (cmd === "update_conversation_model")
+        return Promise.resolve(undefined);
       return Promise.resolve(undefined);
     });
   });
@@ -1244,8 +1245,7 @@ describe("ChatInput — handleCompact", () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "get_model_capabilities")
         return Promise.reject(new Error("mock"));
-      if (cmd === "compact_conversation")
-        return Promise.resolve("new-conv-id");
+      if (cmd === "compact_conversation") return Promise.resolve("new-conv-id");
       if (cmd === "load_messages") return Promise.resolve([]);
       return Promise.resolve(undefined);
     });

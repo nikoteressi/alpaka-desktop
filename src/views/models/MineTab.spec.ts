@@ -118,7 +118,11 @@ describe("MineTab — rendering", () => {
   it("shows active push progress when pushing is non-empty", () => {
     const modelStore = useModelStore();
     modelStore.pushing = {
-      "alice/llama3:8b": { model: "alice/llama3:8b", status: "Uploading...", percent: 45 },
+      "alice/llama3:8b": {
+        model: "alice/llama3:8b",
+        status: "Uploading...",
+        percent: 45,
+      },
     };
 
     const wrapper = mountMineTab();
@@ -129,7 +133,7 @@ describe("MineTab — rendering", () => {
 
   it("pull button is disabled when user is not authenticated", () => {
     const wrapper = mountMineTab();
-    const pullBtn = wrapper.find('button[disabled]');
+    const pullBtn = wrapper.find("button[disabled]");
     expect(pullBtn.exists()).toBe(true);
   });
 
@@ -141,7 +145,7 @@ describe("MineTab — rendering", () => {
     const input = wrapper.find('input[placeholder="username/modelname:tag"]');
     await input.setValue("alice/mymodel:latest");
 
-    const pullBtn = wrapper.find('button.bg-\\[var\\(--accent\\)\\]');
+    const pullBtn = wrapper.find("button.bg-\\[var\\(--accent\\)\\]");
     expect(pullBtn.attributes("disabled")).toBeUndefined();
   });
 });
@@ -258,7 +262,9 @@ describe("MineTab — doPullPrivateModel", () => {
     authStore.user = { id: "u1", username: "alice" };
 
     const modelStore = useModelStore();
-    vi.spyOn(modelStore, "pullModel").mockRejectedValue(new Error("Network error"));
+    vi.spyOn(modelStore, "pullModel").mockRejectedValue(
+      new Error("Network error"),
+    );
 
     const wrapper = mountMineTab();
     const vm = wrapper.vm as unknown as {
@@ -331,7 +337,10 @@ describe("MineTab — tag editor", () => {
     vm.tagInputValue = "fast,  small,  ";
     await vm.saveTagsFor("alice/llama3:8b");
 
-    expect(setTagsSpy).toHaveBeenCalledWith("alice/llama3:8b", ["fast", "small"]);
+    expect(setTagsSpy).toHaveBeenCalledWith("alice/llama3:8b", [
+      "fast",
+      "small",
+    ]);
     expect(vm.editingTagsFor).toBeNull();
     expect(vm.tagInputValue).toBe("");
   });
@@ -434,7 +443,11 @@ describe("MineTab — getActiveCaps", () => {
       getActiveCaps: (name: string) => string[];
     };
 
-    expect(vm.getActiveCaps("alice/full:7b")).toEqual(["vision", "tools", "thinking"]);
+    expect(vm.getActiveCaps("alice/full:7b")).toEqual([
+      "vision",
+      "tools",
+      "thinking",
+    ]);
   });
 });
 
@@ -501,7 +514,13 @@ describe("MineTab — myModels computed", () => {
       name: "llama3:8b" as ModelName,
       size: 0,
       digest: "",
-      details: { parameter_size: "", quantization_level: "", format: "", family: "", families: [] },
+      details: {
+        parameter_size: "",
+        quantization_level: "",
+        format: "",
+        family: "",
+        families: [],
+      },
       modified_at: "",
     } as any);
 
@@ -526,9 +545,19 @@ describe("MineTab — ModelCard inline callback props", () => {
       <button class="edit-tags-btn" @click="onEditTags && onEditTags()">Tags</button>
     </div>`,
     props: [
-      "name", "tags", "fileSize", "date", "quant", "isInstalled",
-      "isFavorite", "onFavorite", "userTags", "onClick", "onDelete",
-      "onEditTags", "actionLabel",
+      "name",
+      "tags",
+      "fileSize",
+      "date",
+      "quant",
+      "isInstalled",
+      "isFavorite",
+      "onFavorite",
+      "userTags",
+      "onClick",
+      "onDelete",
+      "onEditTags",
+      "actionLabel",
     ],
   };
 
@@ -544,7 +573,11 @@ describe("MineTab — ModelCard inline callback props", () => {
       global: {
         stubs: {
           ModelCard: CallbackModelCardStub,
-          CustomTooltip: { name: "CustomTooltip", template: "<slot />", props: ["text", "wrapperClass"] },
+          CustomTooltip: {
+            name: "CustomTooltip",
+            template: "<slot />",
+            props: ["text", "wrapperClass"],
+          },
         },
       },
     });
@@ -574,7 +607,9 @@ describe("MineTab — ModelCard inline callback props", () => {
 
   it("on-favorite prop calls modelStore.toggleFavorite", async () => {
     const modelStore = useModelStore();
-    const toggleSpy = vi.spyOn(modelStore, "toggleFavorite").mockResolvedValue(undefined);
+    const toggleSpy = vi
+      .spyOn(modelStore, "toggleFavorite")
+      .mockResolvedValue(undefined);
 
     const wrapper = mountWithCallbackStub();
     await wrapper.vm.$nextTick();

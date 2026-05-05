@@ -227,7 +227,12 @@ describe("StatsBlock stat display", () => {
       // The time badge contains a clock SVG (circle+polyline) — detect via text ending in "s" pattern
       // but NOT "tokens/s" or "output" or "input"
       const txt = b.text();
-      return txt.endsWith("s") && !txt.includes("tokens") && !txt.includes("output") && !txt.includes("input");
+      return (
+        txt.endsWith("s") &&
+        !txt.includes("tokens") &&
+        !txt.includes("output") &&
+        !txt.includes("input")
+      );
     });
     expect(hasClock).toBe(false);
   });

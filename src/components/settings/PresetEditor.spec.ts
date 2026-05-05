@@ -124,7 +124,9 @@ describe("PresetEditor — selectPreviewPreset", () => {
     await wrapper.vm.$nextTick();
 
     expect(vm.previewPresetId).toBe("precise");
-    expect(vm.localOptions.temperature).toBe(precisePreset!.options.temperature);
+    expect(vm.localOptions.temperature).toBe(
+      precisePreset!.options.temperature,
+    );
   });
 });
 
@@ -198,7 +200,9 @@ describe("PresetEditor — save preset flow", () => {
     await wrapper.vm.$nextTick();
 
     expect(vm.savingPreset).toBe(true);
-    expect(wrapper.find('input[placeholder="Preset name"]').exists()).toBe(true);
+    expect(wrapper.find('input[placeholder="Preset name"]').exists()).toBe(
+      true,
+    );
   });
 
   it("cancelSavePreset hides the name input form", async () => {
@@ -268,9 +272,7 @@ describe("PresetEditor — save preset flow", () => {
     await vm.startSavingPreset();
     await wrapper.vm.$nextTick();
 
-    const saveBtn = wrapper
-      .findAll("button")
-      .find((b) => b.text() === "Save");
+    const saveBtn = wrapper.findAll("button").find((b) => b.text() === "Save");
     expect(saveBtn!.attributes("disabled")).toBeDefined();
   });
 });
@@ -311,7 +313,9 @@ describe("PresetEditor — delete preset flow", () => {
         repeat_last_n: 64,
       },
     });
-    const deleteSpy = vi.spyOn(settingsStore, "deletePreset").mockResolvedValue();
+    const deleteSpy = vi
+      .spyOn(settingsStore, "deletePreset")
+      .mockResolvedValue();
 
     const wrapper = mountEditor();
     const vm = wrapper.vm as unknown as {
