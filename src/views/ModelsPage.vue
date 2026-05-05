@@ -533,27 +533,65 @@
                   >
                     Pull a private model
                   </p>
-                  <p
-                    v-if="!authStore.user"
-                    class="text-[11px] text-[var(--text-dim)] mb-2 px-1"
-                  >
-                    Sign in to your Ollama account to pull private models.
-                  </p>
                   <div class="flex gap-2">
                     <input
                       v-model="privateModelName"
                       type="text"
                       placeholder="username/modelname:tag"
-                      class="flex-1 bg-[var(--bg-input)] border border-[var(--border)] focus:border-[var(--accent)] rounded-xl px-3 py-2 text-[13px] text-[var(--text)] placeholder-[var(--text-dim)] outline-none transition-colors"
+                      :disabled="!authStore.user || isPrivatePulling"
+                      class="flex-1 bg-[var(--bg-input)] border border-[var(--border)] focus:border-[var(--accent)] rounded-xl px-3 py-2 text-[13px] text-[var(--text)] placeholder-[var(--text-dim)] outline-none transition-colors disabled:opacity-40"
                       @keydown.enter="doPullPrivateModel"
                     />
-                    <button
-                      :disabled="!privateModelName.trim()"
-                      @click="doPullPrivateModel"
-                      class="px-4 py-2 text-[12px] font-semibold text-white bg-[var(--accent)] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                    <CustomTooltip
+                      :text="
+                        !authStore.user
+                          ? 'Sign in to your Ollama account'
+                          : isPrivatePulling
+                            ? 'Downloading…'
+                            : 'Pull model'
+                      "
+                      wrapper-class="inline-flex"
                     >
-                      Pull
-                    </button>
+                      <button
+                        :disabled="
+                          !authStore.user ||
+                          isPrivatePulling ||
+                          !privateModelName.trim()
+                        "
+                        @click="doPullPrivateModel"
+                        class="flex items-center justify-center gap-1.5 px-4 py-2 text-[12px] font-semibold text-white bg-[var(--accent)] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <svg
+                          v-if="!isPrivatePulling"
+                          class="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          stroke-width="2.5"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          />
+                        </svg>
+                        <svg
+                          v-else
+                          class="w-3.5 h-3.5 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          stroke-width="2.5"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 100 10h-2a8 8 0 01-8-8z"
+                          />
+                        </svg>
+                        {{ isPrivatePulling ? "Pulling…" : "Pull" }}
+                      </button>
+                    </CustomTooltip>
                   </div>
                 </div>
               </div>
@@ -881,13 +919,20 @@ const myModels = computed(() =>
   modelStore.models.filter((m) => m.name.includes("/")),
 );
 const privateModelName = ref("");
+const pullingPrivateName = ref("");
+const isPrivatePulling = computed(
+  () =>
+    !!pullingPrivateName.value &&
+    !!modelStore.pulling[pullingPrivateName.value],
+);
 
 async function doPullPrivateModel() {
   const name = privateModelName.value.trim();
-  if (!name) return;
+  if (!name || !authStore.user || isPrivatePulling.value) return;
+  pullingPrivateName.value = name;
   privateModelName.value = "";
   await modelStore.pullModel(name as ModelName);
-  activeTab.value = "local";
+  pullingPrivateName.value = "";
 }
 
 const activeTagFilter = ref<string | null>(null);
