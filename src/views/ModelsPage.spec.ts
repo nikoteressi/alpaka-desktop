@@ -1345,6 +1345,11 @@ describe("ModelsPage", () => {
       { CloudTagSelector: cloudTagSelectorStub },
     );
 
+    // Navigate to cloud tab so CloudTagSelector (inside CloudTab) is rendered
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "cloud");
+    await nextTick();
+
     await wrapper
       .findComponent({ name: "CloudTagSelector" })
       .find("button")
