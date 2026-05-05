@@ -24,6 +24,8 @@
         />
       </template>
     </SettingsRow>
+
+    <ProxySettings />
   </div>
 </template>
 
@@ -31,6 +33,7 @@
 import ToggleSwitch from "../../components/shared/ToggleSwitch.vue";
 import SettingsRow from "../../components/settings/SettingsRow.vue";
 import HostSettings from "../../components/settings/HostSettings.vue";
+import ProxySettings from "../../components/settings/ProxySettings.vue";
 import { useSettingsStore } from "../../stores/settings";
 
 const settingsStore = useSettingsStore();

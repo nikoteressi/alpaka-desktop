@@ -90,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import ModelCard from "../../components/models/ModelCard.vue";
 import { useModelStore } from "../../stores/models";
 import { useModelLibrary } from "../../composables/useModelLibrary";
@@ -103,7 +103,11 @@ const emit = defineEmits<{
 }>();
 
 const modelStore = useModelStore();
-const { hardware } = useModelLibrary();
+const { hardware, detectHardware } = useModelLibrary();
+
+onMounted(() => {
+  detectHardware();
+});
 
 function calcAvailGb(hw: typeof hardware.value): number {
   if (hw?.vram_mb) return (hw.vram_mb / 1024) * 0.9;

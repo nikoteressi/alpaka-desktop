@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import ModelCard from "../../components/models/ModelCard.vue";
 import CloudTagSelector from "../../components/models/CloudTagSelector.vue";
@@ -103,7 +103,12 @@ import type { ModelName } from "../../types/models";
 const modelStore = useModelStore();
 const orchestration = useAppOrchestration();
 const router = useRouter();
-const { dynamicCloudModels, isCloudLoading } = useModelLibrary();
+const { dynamicCloudModels, isCloudLoading, fetchCloudModels } =
+  useModelLibrary();
+
+onMounted(() => {
+  if (dynamicCloudModels.value.length === 0) fetchCloudModels();
+});
 
 const isTagFetching = ref(false);
 const tagSelector = ref({
