@@ -281,26 +281,30 @@
                     >
                       {{ modelStore.models.length }} Installed Models
                     </p>
-                    <button
-                      @click="modelStore.triggerUpdateCheck()"
-                      class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
-                      title="Check for model updates"
+                    <CustomTooltip
+                      text="Check for model updates"
+                      wrapper-class="inline-flex"
                     >
-                      <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
+                      <button
+                        @click="modelStore.triggerUpdateCheck()"
+                        class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
                       >
-                        <polyline points="23 4 23 10 17 10" />
-                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                      </svg>
-                      Check for updates
-                    </button>
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2.5"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <polyline points="23 4 23 10 17 10" />
+                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                        </svg>
+                        Check for updates
+                      </button>
+                    </CustomTooltip>
                   </div>
                   <!-- Tag filter bar — always visible when models exist -->
                   <div class="flex flex-wrap gap-1.5 mb-3 items-center">

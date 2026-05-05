@@ -359,6 +359,10 @@ tauri::generate_handler![
     commands::service::stop_ollama,
     commands::service::ollama_service_status,
 
+    // ── Model Updates ─────────────────────────────────────────────────────
+    commands::model_updates::get_models_with_updates, // returns cached outdated model names
+    commands::model_updates::check_model_updates,     // triggers an immediate background digest check
+
     // ── System ────────────────────────────────────────────────────────────
     commands::system_info::detect_hardware,  // reads /proc/meminfo + DRM sysfs
     commands::system::report_active_view,    // tracks current page for tray
@@ -398,6 +402,15 @@ pub struct AppState {
 
     /// ID of the conversation currently visible (used by tray notifications).
     pub active_conversation_id: Mutex<Option<String>>,
+
+    /// Cached list of model names that have a newer digest on ollama.com/library.
+    pub models_with_updates: RwLock<Vec<String>>,
+
+    /// Guards against concurrent runs of do_update_check (manual + background loop).
+    pub update_check_running: AtomicBool,
+
+    /// Shutdown signal for the model-update background loop task.
+    pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 ```
 

@@ -1,3 +1,4 @@
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use tauri::{Emitter, Manager, Runtime};
@@ -7,8 +8,6 @@ use crate::ollama::client::OllamaClient;
 use crate::services::library;
 use crate::state::AppState;
 
-// Parses `"slug:tag"` or `"slug"` (→ `"latest"` tag).
-// Returns `None` for cloud models (`:cloud` suffix), private models (`/` in name), empty input, or empty slug.
 pub(crate) fn parse_model_name(name: &str) -> Option<(String, String)> {
     if name.is_empty() || name.contains('/') {
         return None;
@@ -26,8 +25,6 @@ pub(crate) fn parse_model_name(name: &str) -> Option<(String, String)> {
     Some((slug, tag))
 }
 
-// Returns true when `local_digest` (sha256:hex64) does NOT start with `lib_hash` (short 7-12 hex).
-// A mismatch means a newer version is available.
 pub(crate) fn digest_has_update(local_digest: &str, lib_hash: &str) -> bool {
     if lib_hash.is_empty() {
         return false;
@@ -62,6 +59,24 @@ async fn check_single_model_update(http: &reqwest::Client, model: &Model) -> boo
 
 pub(crate) async fn do_update_check<R: Runtime>(app: &tauri::AppHandle<R>) {
     let state = app.state::<AppState>();
+
+    // Only one scan at a time — the manual IPC trigger must not race the background loop.
+    if state
+        .update_check_running
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+    // Reset the flag on every exit path, including early returns.
+    struct Guard<'a>(&'a std::sync::atomic::AtomicBool);
+    impl Drop for Guard<'_> {
+        fn drop(&mut self) {
+            self.0.store(false, Ordering::SeqCst);
+        }
+    }
+    let _guard = Guard(&state.update_check_running);
+
     let http = state
         .http_client
         .read()
