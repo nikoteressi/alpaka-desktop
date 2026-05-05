@@ -210,6 +210,7 @@ alpaka-desktop/
 │   │   ├── settings/
 │   │   │   ├── AccountSettings.vue   # OAuth signin + API key panel
 │   │   │   ├── ApiKeyPanel.vue
+│   │   │   ├── GpuLayersSettings.vue # num_gpu input + detect_hardware summary (Settings → Engine)
 │   │   │   ├── HostSettings.vue      # Host CRUD lives here, not in HostManager.vue
 │   │   │   ├── ProxySettings.vue     # HTTP/SOCKS5 proxy config (URL, username, keyring password)
 │   │   │   ├── ModelPathSettings.vue
