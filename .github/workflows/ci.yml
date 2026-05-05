@@ -374,7 +374,7 @@ jobs:
 
       - name: Upload TypeScript coverage report
         if: needs.changes.outputs.frontend == 'true'
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: vitest-coverage
           path: coverage/
@@ -382,7 +382,7 @@ jobs:
 
       - name: Upload Rust coverage report
         if: needs.changes.outputs.rust == 'true'
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cargo-coverage
           path: src-tauri/coverage-rust/html/
@@ -459,7 +459,7 @@ jobs:
 
       - name: Upload smoke test artifacts
         if: failure()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: smoke-artifacts
           path: e2e-desktop/.artifacts/
@@ -549,7 +549,7 @@ jobs:
 
       - name: Upload integration test artifacts
         if: failure()
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: integration-artifacts
           path: e2e-desktop/.artifacts/
