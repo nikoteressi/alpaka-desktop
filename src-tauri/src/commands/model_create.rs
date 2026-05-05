@@ -335,6 +335,73 @@ pub async fn cancel_model_create(state: State<'_, AppState>, name: String) -> Re
     Ok(())
 }
 
+fn generate_modelfile_from_presets(
+    source_name: &str,
+    presets: &crate::ollama::types::ChatOptions,
+) -> String {
+    let mut lines = vec![format!("FROM {}", source_name)];
+    if let Some(v) = presets.temperature {
+        lines.push(format!("PARAMETER temperature {}", v));
+    }
+    if let Some(v) = presets.top_p {
+        lines.push(format!("PARAMETER top_p {}", v));
+    }
+    if let Some(v) = presets.top_k {
+        lines.push(format!("PARAMETER top_k {}", v));
+    }
+    if let Some(v) = presets.num_predict {
+        lines.push(format!("PARAMETER num_predict {}", v));
+    }
+    if let Some(v) = presets.num_ctx {
+        lines.push(format!("PARAMETER num_ctx {}", v));
+    }
+    if let Some(v) = presets.repeat_penalty {
+        lines.push(format!("PARAMETER repeat_penalty {}", v));
+    }
+    if let Some(v) = presets.repeat_last_n {
+        lines.push(format!("PARAMETER repeat_last_n {}", v));
+    }
+    if let Some(v) = presets.seed {
+        lines.push(format!("PARAMETER seed {}", v));
+    }
+    if let Some(v) = presets.mirostat {
+        lines.push(format!("PARAMETER mirostat {}", v));
+    }
+    if let Some(v) = presets.mirostat_tau {
+        lines.push(format!("PARAMETER mirostat_tau {}", v));
+    }
+    if let Some(v) = presets.mirostat_eta {
+        lines.push(format!("PARAMETER mirostat_eta {}", v));
+    }
+    if let Some(stops) = &presets.stop {
+        for s in stops {
+            lines.push(format!("PARAMETER stop {:?}", s));
+        }
+    }
+    lines.join("\n")
+}
+
+#[tauri::command]
+pub async fn bake_model_presets<R: Runtime>(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle<R>,
+    source_name: String,
+    cloud_name: String,
+) -> Result<(), AppError> {
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
+    let presets = crate::db::model_settings::get_async(state.db.clone(), source_name.clone())
+        .await?
+        .unwrap_or_default();
+    let modelfile = generate_modelfile_from_presets(&source_name, &presets);
+    let (_cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    core_create_model(&client, &app, &cloud_name, &modelfile, cancel_rx).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,6 +604,41 @@ mod tests {
             result.is_ok(),
             "cancelled returns Ok(()) — cancel path emits model:create-error instead"
         );
+    }
+
+    #[test]
+    fn test_generate_modelfile_from_presets_basic() {
+        use crate::ollama::types::ChatOptions;
+        let presets = ChatOptions {
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            ..Default::default()
+        };
+        let mf = generate_modelfile_from_presets("llama3:latest", &presets);
+        assert!(mf.starts_with("FROM llama3:latest"));
+        assert!(mf.contains("PARAMETER temperature 0.7"));
+        assert!(mf.contains("PARAMETER num_ctx 4096"));
+        assert!(!mf.contains("PARAMETER top_p"));
+    }
+
+    #[test]
+    fn test_generate_modelfile_from_presets_stop_tokens() {
+        use crate::ollama::types::ChatOptions;
+        let presets = ChatOptions {
+            stop: Some(vec!["<|im_end|>".to_string(), "<|eot_id|>".to_string()]),
+            ..Default::default()
+        };
+        let mf = generate_modelfile_from_presets("llama3:latest", &presets);
+        assert!(mf.contains("PARAMETER stop \"<|im_end|>\""));
+        assert!(mf.contains("PARAMETER stop \"<|eot_id|>\""));
+    }
+
+    #[test]
+    fn test_generate_modelfile_from_presets_empty_options() {
+        use crate::ollama::types::ChatOptions;
+        let presets = ChatOptions::default();
+        let mf = generate_modelfile_from_presets("mymodel:latest", &presets);
+        assert_eq!(mf, "FROM mymodel:latest");
     }
 
     #[test]

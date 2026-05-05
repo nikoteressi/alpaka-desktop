@@ -324,19 +324,21 @@ pub async fn core_push_model<R: tauri::Runtime>(
     cloud_name: &str,
     app: &tauri::AppHandle<R>,
 ) -> Result<(), AppError> {
-    // Copy the local model to the cloud name so /api/push can find it.
-    let copy_resp = client
-        .post("/api/copy")
-        .json(&serde_json::json!({ "source": local_name, "destination": cloud_name }))
-        .send()
-        .await?;
-    if !copy_resp.status().is_success() {
-        let err_msg = format!("Failed to copy model: {}", copy_resp.status());
-        let _ = app.emit(
-            "model:push-error",
-            serde_json::json!({ "model": cloud_name, "error": err_msg }),
-        );
-        return Err(AppError::Http(err_msg));
+    // Only copy if pushing under a different name (skip for bake flow where names are equal)
+    if local_name != cloud_name {
+        let copy_resp = client
+            .post("/api/copy")
+            .json(&serde_json::json!({ "source": local_name, "destination": cloud_name }))
+            .send()
+            .await?;
+        if !copy_resp.status().is_success() {
+            let err_msg = format!("Failed to copy model: {}", copy_resp.status());
+            let _ = app.emit(
+                "model:push-error",
+                serde_json::json!({ "model": cloud_name, "error": err_msg }),
+            );
+            return Err(AppError::Http(err_msg));
+        }
     }
 
     let name = cloud_name;
@@ -425,6 +427,48 @@ pub async fn push_model<R: tauri::Runtime>(
         .clone();
     let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_push_model(&client, &local_name, &cloud_name, &app).await
+}
+
+#[derive(Debug, Serialize)]
+pub struct PushReadiness {
+    pub has_custom_modelfile: bool,
+    pub has_local_presets: bool,
+}
+
+fn is_custom_modelfile(modelfile: &str) -> bool {
+    for line in modelfile.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') || trimmed.is_empty() {
+            continue;
+        }
+        let upper = trimmed.to_uppercase();
+        if upper.starts_with("SYSTEM") || upper.starts_with("TEMPLATE") {
+            return true;
+        }
+    }
+    false
+}
+
+#[tauri::command]
+pub async fn get_model_push_readiness(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<PushReadiness, AppError> {
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
+    let modelfile = crate::commands::model_create::core_get_modelfile(&client, &name).await?;
+    let has_custom_modelfile = is_custom_modelfile(&modelfile);
+    let has_local_presets = crate::db::model_settings::get_async(state.db.clone(), name)
+        .await?
+        .is_some();
+    Ok(PushReadiness {
+        has_custom_modelfile,
+        has_local_presets,
+    })
 }
 
 #[cfg(test)]
@@ -639,6 +683,61 @@ not json at all
             "llama.context_length": "not-a-number"
         });
         assert_eq!(extract_context_length_from_info(&model_info), None);
+    }
+
+    #[test]
+    fn test_is_custom_modelfile_system_line() {
+        assert!(is_custom_modelfile(
+            "FROM llama3\nSYSTEM \"You are helpful.\"\n"
+        ));
+    }
+
+    #[test]
+    fn test_is_custom_modelfile_template_line() {
+        assert!(is_custom_modelfile(
+            "FROM llama3\nTEMPLATE \"{{ .Prompt }}\"\n"
+        ));
+    }
+
+    #[test]
+    fn test_is_custom_modelfile_plain_returns_false() {
+        assert!(!is_custom_modelfile(
+            "FROM llama3\nPARAMETER temperature 0.7\n"
+        ));
+    }
+
+    #[test]
+    fn test_is_custom_modelfile_empty_returns_false() {
+        assert!(!is_custom_modelfile(""));
+    }
+
+    #[test]
+    fn test_is_custom_modelfile_comments_only() {
+        assert!(!is_custom_modelfile("# just a comment\n\n"));
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_skips_copy_when_names_equal() {
+        let mut server = Server::new_async().await;
+        // No copy mock registered — if /api/copy is called, the test will fail with unexpected request
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body("{\"status\":\"pushed\"}\n")
+            .create_async()
+            .await;
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let app = tauri::test::mock_app();
+        let result = core_push_model(
+            &client,
+            "user/mymodel:latest",
+            "user/mymodel:latest",
+            app.handle(),
+        )
+        .await;
+        mock.assert_async().await;
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
