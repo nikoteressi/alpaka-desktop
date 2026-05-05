@@ -124,8 +124,8 @@ importers:
         specifier: ^8
         version: 8.43.0
       '@wdio/types':
-        specifier: ^8
-        version: 8.41.0
+        specifier: ^9
+        version: 9.27.1
       eslint:
         specifier: ^9.0.0
         version: 9.39.4(jiti@2.6.1)
@@ -1475,6 +1475,9 @@ packages:
   '@types/mocha@10.0.10':
     resolution: {integrity: sha512-xPyYSz1cMPnJQhl0CLMH68j3gprKZaTjG3s5Vi+fDgx+uhG9NOXwbVt52eFS8ECyXhyKcjDLCBEqBExKuiZb7Q==}
 
+  '@types/node@20.19.39':
+    resolution: {integrity: sha512-orrrD74MBUyK8jOAD/r0+lfa1I2MO6I+vAkmAWzMYbCcgrN4lCrmK52gRFQq/JRxfYPfonkr4b0jcY7Olqdqbw==}
+
   '@types/node@22.19.17':
     resolution: {integrity: sha512-wGdMcf+vPYM6jikpS/qhg6WiqSV/OhG+jeeHT/KlVqxYfD40iYJf9/AE1uQxVWFvU7MipKRkRv8NSHiCGgPr8Q==}
 
@@ -1806,6 +1809,10 @@ packages:
   '@wdio/types@8.41.0':
     resolution: {integrity: sha512-t4NaNTvJZci3Xv/yUZPH4eTL0hxrVTf5wdwNnYIBrzMnlRDbNefjQ0P7FM7ZjQCLaH92AEH6t/XanUId7Webug==}
     engines: {node: ^16.13 || >=18}
+
+  '@wdio/types@9.27.1':
+    resolution: {integrity: sha512-EHBNCvLmvpYerln4mb/OBxzKtnavL2wdenjhwuYjzkZMOWHgm/uLXH6sLThM0y6DIbCU72Asth16fo1eDcsofA==}
+    engines: {node: '>=18.20.0'}
 
   '@wdio/utils@8.46.0':
     resolution: {integrity: sha512-C94kJjZhEfPUNbOA69BQr1SgziQYgjNXK8S1GJXQKuwxN/24PQkYCzeBqXstfxyTXyOwoQCcEZAQ/qJccboufQ==}
@@ -6228,6 +6235,10 @@ snapshots:
 
   '@types/mocha@10.0.10': {}
 
+  '@types/node@20.19.39':
+    dependencies:
+      undici-types: 6.21.0
+
   '@types/node@22.19.17':
     dependencies:
       undici-types: 6.21.0
@@ -6743,6 +6754,10 @@ snapshots:
   '@wdio/types@8.41.0':
     dependencies:
       '@types/node': 22.19.17
+
+  '@wdio/types@9.27.1':
+    dependencies:
+      '@types/node': 20.19.39
 
   '@wdio/utils@8.46.0':
     dependencies:
