@@ -447,6 +447,7 @@
                 class="flex flex-col gap-4"
                 role="tabpanel"
               >
+                <MyModelsSection v-if="isOllamaSignedIn" />
                 <div
                   class="bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl p-[14px_18px]"
                 >
@@ -699,6 +700,7 @@ import LocalModelDetails from "../components/models/LocalModelDetails.vue";
 import LibraryBrowser from "../components/models/LibraryBrowser.vue";
 import CloudTagSelector from "../components/models/CloudTagSelector.vue";
 import CreateModelPage from "../components/models/CreateModelPage.vue";
+import MyModelsSection from "../components/models/MyModelsSection.vue";
 import { useModelStore, modelMatchesTag } from "../stores/models";
 import { useSettingsStore } from "../stores/settings";
 import { invoke } from "@tauri-apps/api/core";
@@ -720,6 +722,7 @@ const { selectedModel } = storeToRefs(modelStore);
 const settingsStore = useSettingsStore();
 
 const selectedLocalModel = ref<Model | null>(null);
+const isOllamaSignedIn = ref(false);
 
 const checkDoneMessage = ref<string | null>(null);
 let checkDoneTimer: ReturnType<typeof setTimeout> | null = null;
@@ -977,6 +980,12 @@ onMounted(async () => {
   await modelStore.fetchModels();
   modelStore.initListeners();
   await detectHardware();
+  try {
+    isOllamaSignedIn.value = await invoke<boolean>("check_ollama_signed_in");
+  } catch {
+    isOllamaSignedIn.value = false;
+  }
+  await modelStore.fetchPrivateModels();
 });
 
 onUnmounted(() => {
