@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- CL-04: Private model push/pull sync — "Push to Cloud" button on local models (requires `ollama signin`); streaming push progress; private cloud model names persisted under `private_cloud_models` settings key; "My Models" section in the cloud tab lists saved private models with Pull/Remove/Add actions (`MyModelsSection.vue`, `commands/models.rs:push_model`)
 - MO-09: Model update notifications — background digest check every 6 h detects newer versions on ollama.com/library; Models nav item shows an update count badge; each outdated model shows an amber "Update" badge and a one-click re-pull button
 - G-05: GPU layer offloading configuration — Settings → Engine tab now has a "GPU Layers" input (`num_gpu`). Set to `-1` for auto (all layers), `0` for CPU-only, or any positive integer for partial offloading. Current GPU/VRAM is shown as a guide. The G-01 hardware display on the Models page reflects the configured offloading mode.
 - HTTP/SOCKS5 proxy support — configure a proxy URL, optional username, and password (stored in the system keyring) in Settings → Connection; a "Test proxy" button verifies end-to-end connectivity
