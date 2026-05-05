@@ -19,9 +19,10 @@
           <span class="text-[13px] text-[var(--text)] font-medium truncate">{{
             modelName
           }}</span>
-          <span class="text-[12px] text-[var(--text-muted)] ml-2 flex-shrink-0">{{
-            prog.status
-          }}</span>
+          <span
+            class="text-[12px] text-[var(--text-muted)] ml-2 flex-shrink-0"
+            >{{ prog.status }}</span
+          >
         </div>
         <div
           class="h-1 bg-[var(--bg-base)] rounded-sm overflow-hidden border border-white/5"
@@ -63,7 +64,9 @@
       v-else-if="Object.keys(modelStore.pushing).length === 0"
       class="flex flex-col items-center justify-center py-12 text-center gap-3"
     >
-      <p class="text-[13px] text-[var(--text-muted)] max-w-[280px] leading-relaxed">
+      <p
+        class="text-[13px] text-[var(--text-muted)] max-w-[280px] leading-relaxed"
+      >
         No private models yet. Create one with a
         <code
           class="text-[var(--accent)] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded"
@@ -120,7 +123,9 @@
           wrapper-class="inline-flex"
         >
           <button
-            :disabled="!authStore.user || isPrivatePulling || !privateModelName.trim()"
+            :disabled="
+              !authStore.user || isPrivatePulling || !privateModelName.trim()
+            "
             @click="doPullPrivateModel"
             class="flex items-center justify-center gap-1.5 px-4 py-2 text-[12px] font-semibold text-white bg-[var(--accent)] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -186,7 +191,8 @@ const privateModelName = ref("");
 const pullingPrivateName = ref("");
 const isPrivatePulling = computed(
   () =>
-    !!pullingPrivateName.value && !!modelStore.pulling[pullingPrivateName.value],
+    !!pullingPrivateName.value &&
+    !!modelStore.pulling[pullingPrivateName.value],
 );
 
 const editingTagsFor = ref<string | null>(null);
