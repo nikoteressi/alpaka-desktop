@@ -65,8 +65,19 @@ function onNumGpuChange(e: Event) {
 onMounted(async () => {
   try {
     hardware.value = await invoke<HardwareInfo>("detect_hardware");
-  } catch {
-    // non-fatal: hardware detection is best-effort
+  } catch (e) {
+    console.warn("Hardware detection failed:", e);
   }
 });
 </script>
+
+<style scoped>
+.settings-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+}
+</style>
