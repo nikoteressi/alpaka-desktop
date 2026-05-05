@@ -217,18 +217,17 @@ describe("useStreamingEvents", () => {
       seed: 42,
     });
 
-    expect(spy).toHaveBeenCalledWith(
-      "conv-1",
-      100,
-      30,
-      25.5,
-      1000,
-      1200,
-      50,
-      200,
-      750,
-      42,
-    );
+    expect(spy).toHaveBeenCalledWith("conv-1", {
+      totalTokens: 100,
+      promptTokens: 30,
+      tokensPerSec: 25.5,
+      generationTimeMs: 1000,
+      totalDurationMs: 1200,
+      loadDurationMs: 50,
+      promptEvalDurationMs: 200,
+      evalDurationMs: 750,
+      seed: 42,
+    });
   });
 
   it("onDone sets isStreaming to false", () => {

@@ -2,7 +2,9 @@ import { computed, type Ref } from "vue";
 import { useChatStore } from "../stores/chat";
 import { useStreaming } from "./useStreaming";
 
-let _streamingCleanup: (() => void) | null = null;
+// Singleton: intentionally module-scoped to survive composable re-instantiation
+// and allow cleanup of previous Tauri listeners on re-init (e.g. after logout).
+const _streaming = { cleanup: null as (() => void) | null };
 
 export function useStreamingEvents() {
   const chatStore = useChatStore();
@@ -11,9 +13,9 @@ export function useStreamingEvents() {
     if (chatStore._listenersInitialized) return;
 
     // Tear down any previous listener set before registering a new one.
-    if (_streamingCleanup) {
-      _streamingCleanup();
-      _streamingCleanup = null;
+    if (_streaming.cleanup) {
+      _streaming.cleanup();
+      _streaming.cleanup = null;
     }
 
     const conversationIdValue = computed(
@@ -73,18 +75,17 @@ export function useStreamingEvents() {
         chatStore.streaming.thinkTime = null;
       },
       onDone: (payload) => {
-        chatStore.finalizeStreamedMessage(
-          payload.conversation_id,
-          payload.total_tokens,
-          payload.prompt_tokens,
-          payload.tokens_per_sec,
-          payload.duration_ms,
-          payload.total_duration_ms,
-          payload.load_duration_ms,
-          payload.prompt_eval_duration_ms,
-          payload.eval_duration_ms,
-          payload.seed,
-        );
+        chatStore.finalizeStreamedMessage(payload.conversation_id, {
+          totalTokens: payload.total_tokens,
+          promptTokens: payload.prompt_tokens,
+          tokensPerSec: payload.tokens_per_sec,
+          generationTimeMs: payload.duration_ms,
+          totalDurationMs: payload.total_duration_ms,
+          loadDurationMs: payload.load_duration_ms,
+          promptEvalDurationMs: payload.prompt_eval_duration_ms,
+          evalDurationMs: payload.eval_duration_ms,
+          seed: payload.seed,
+        });
         chatStore.streaming.isStreaming = false;
         chatStore.streaming.tokensPerSec = payload.tokens_per_sec;
       },
@@ -129,10 +130,10 @@ export function useStreamingEvents() {
 
     try {
       await listenersReady;
-      _streamingCleanup = cleanup;
+      _streaming.cleanup = cleanup;
       chatStore._listenersInitialized = true;
     } catch (e) {
-      _streamingCleanup = null;
+      _streaming.cleanup = null;
       cleanup();
       throw e;
     }
