@@ -309,6 +309,103 @@ pub async fn get_model_capabilities(
 // pull_model will need more than just client and base_url because it emits events.
 // We can pass an `app: &AppHandle` to the core function.
 
+#[derive(Debug, Deserialize)]
+struct PushProgress {
+    #[serde(default)]
+    status: String,
+    completed: Option<u64>,
+    total: Option<u64>,
+    error: Option<String>,
+}
+
+pub async fn core_push_model<R: tauri::Runtime>(
+    client: &OllamaClient,
+    name: &str,
+    app: &tauri::AppHandle<R>,
+) -> Result<(), AppError> {
+    let payload = serde_json::json!({ "model": name });
+    let resp = client.post("/api/push").json(&payload).send().await?;
+
+    if !resp.status().is_success() {
+        let err_msg = format!("Failed to push model: {}", resp.status());
+        let _ = app.emit(
+            "model:push-error",
+            serde_json::json!({ "model": name, "error": err_msg }),
+        );
+        return Err(AppError::Http(err_msg));
+    }
+
+    let mut stream = resp.bytes_stream();
+
+    while let Some(chunk_res) = stream.next().await {
+        match chunk_res {
+            Ok(bytes) => {
+                let text = String::from_utf8_lossy(&bytes);
+                for line in text.lines() {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    if let Ok(progress) = serde_json::from_str::<PushProgress>(line) {
+                        if let Some(err) = progress.error {
+                            let _ = app.emit(
+                                "model:push-error",
+                                serde_json::json!({ "model": name, "error": err }),
+                            );
+                            return Err(AppError::Http(format!("Push error: {}", err)));
+                        }
+                        let percent =
+                            if let (Some(c), Some(t)) = (progress.completed, progress.total) {
+                                if t > 0 {
+                                    (c as f64 / t as f64) * 100.0
+                                } else {
+                                    0.0
+                                }
+                            } else {
+                                0.0
+                            };
+                        let _ = app.emit(
+                            "model:push-progress",
+                            serde_json::json!({
+                                "model": name,
+                                "status": progress.status,
+                                "completed": progress.completed,
+                                "total": progress.total,
+                                "percent": percent,
+                            }),
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                let _ = app.emit(
+                    "model:push-error",
+                    serde_json::json!({ "model": name, "error": err_msg }),
+                );
+                return Err(AppError::Http(err_msg));
+            }
+        }
+    }
+
+    let _ = app.emit("model:push-done", serde_json::json!({ "model": name }));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn push_model<R: tauri::Runtime>(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle<R>,
+    name: String,
+) -> Result<(), AppError> {
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
+    core_push_model(&client, &name, &app).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,5 +618,59 @@ not json at all
             "llama.context_length": "not-a-number"
         });
         assert_eq!(extract_context_length_from_info(&model_info), None);
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_success() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body(
+                "{\"status\":\"preparing manifest\"}\n\
+                 {\"status\":\"pushing layer\",\"completed\":50,\"total\":100}\n\
+                 {\"status\":\"pushed\"}\n",
+            )
+            .create_async()
+            .await;
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_http_error() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(403)
+            .create_async()
+            .await;
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_error_in_stream() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body("{\"error\":\"unauthorized\"}\n")
+            .create_async()
+            .await;
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "user/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+        assert!(result.is_err());
     }
 }

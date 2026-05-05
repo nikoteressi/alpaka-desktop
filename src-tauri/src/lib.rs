@@ -23,6 +23,7 @@ pub fn run() {
             commands::models::list_models,
             commands::models::delete_model,
             commands::models::pull_model,
+            commands::models::push_model,
             commands::models::get_model_capabilities,
             commands::model_create::get_modelfile,
             commands::model_create::create_model,
