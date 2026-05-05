@@ -374,6 +374,13 @@ export const useModelStore = defineStore("models", {
               this.fetchModels();
               this.fetchCapabilities(payload.model);
             }),
+            listen<{ model: string; error: string }>(
+              "model:pull-error",
+              (event) => {
+                const { model } = event.payload;
+                delete this.pulling[model];
+              },
+            ),
             listen<CreateProgressPayload>("model:create-progress", (event) => {
               const { model, status } = event.payload;
               if (this.creating[model]) {

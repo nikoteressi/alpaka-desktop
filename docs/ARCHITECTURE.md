@@ -516,6 +516,7 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |
 | `model:pull-progress` | Rust → Vue | `{ model, status, completed?, total?, percent? }` | Download progress chunk |
 | `model:pull-done` | Rust → Vue | `{ model }` | Model download complete |
+| `model:pull-error` | Rust → Vue | `{ model, error }` | Model pull failed (stream-embedded error) |
 | `model:push-progress` | Rust → Vue | `{ model, status, completed?, total?, percent }` | Upload progress chunk |
 | `model:push-done` | Rust → Vue | `{ model }` | Model push to Cloud complete |
 | `model:push-error` | Rust → Vue | `{ model, error }` | Model push failed (HTTP error or stream error) |
