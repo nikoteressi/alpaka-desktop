@@ -488,7 +488,7 @@
                   <ModelCard
                     v-for="model in myModels"
                     :key="model.name"
-                    :name="modelBaseName(model.name as string)"
+                    :name="model.name as string"
                     :tags="[
                       model.details.parameter_size,
                       ...getActiveCaps(model.name as string),
