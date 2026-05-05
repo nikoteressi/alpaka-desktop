@@ -101,7 +101,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | CL-01 | **User authentication** | P0 | ✅ | `ollama signin` OAuth flow with polling-based status check (`AccountSettings.vue`, `auth/oauth.rs`) |
 | CL-02 | **Cloud model access** | P0 | ✅ | Run models hosted on Ollama Cloud |
 | CL-03 | **API key management** | P0 | ✅ | UI panel with input, visibility toggle, validate, delete; key stored via Secret Service (`ApiKeyPanel.vue`, `auth/api_key.rs`) |
-| CL-04 | **Private model sync** | P1 | 🔲 Backlog | Push/pull private models |
+| CL-04 | **Private model sync** | P1 | ✅ | Push `username/`-namespaced local models to Ollama Cloud (`push_model` command, `model:push-*` events); "Mine" tab in ModelsPage filters local private models and provides pull-by-name input; "Push to Cloud" button in `LocalModelDetails.vue`; namespace naming hint in `CreateModelPage.vue` |
 | CL-05 | **Usage dashboard** | P1 | 🔲 Backlog | Cloud compute usage, cost tracking |
 | CL-06 | **Web search integration** | P0 | ✅ | Agentic tool-call loop via Ollama Web Search API; up to 5 iterations, forces `temperature=0.2`, `top_p=0.1` (`services/chat/orchestrator.rs:89`) |
 
