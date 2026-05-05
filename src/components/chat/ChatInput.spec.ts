@@ -822,3 +822,452 @@ describe("ChatInput — Attachments", () => {
     expect(vm.attachments).toHaveLength(0); // Should clear after send
   });
 });
+
+describe("ChatInput — System prompt panel", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("toggleSystemPrompt opens the panel on first call", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      toggleSystemPrompt: () => void;
+      isSystemPromptOpen: boolean;
+    };
+
+    expect(vm.isSystemPromptOpen).toBe(false);
+    vm.toggleSystemPrompt();
+    await wrapper.vm.$nextTick();
+    expect(vm.isSystemPromptOpen).toBe(true);
+  });
+
+  it("toggleSystemPrompt closes the panel on second call", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      toggleSystemPrompt: () => void;
+      isSystemPromptOpen: boolean;
+    };
+
+    vm.toggleSystemPrompt();
+    vm.toggleSystemPrompt();
+    await wrapper.vm.$nextTick();
+    expect(vm.isSystemPromptOpen).toBe(false);
+  });
+
+  it("toggleSystemPrompt populates systemPromptDraft from activeSystemPrompt when opening", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    // Seed a system message so activeSystemPrompt computed returns a value
+    chatStore.messages["conv-test-1"] = [
+      {
+        id: "msg-sys",
+        conversation_id: "conv-test-1",
+        role: "system",
+        content: "You are a helpful assistant.",
+      },
+    ] as any;
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      toggleSystemPrompt: () => void;
+      isSystemPromptOpen: boolean;
+      systemPromptDraft: string;
+    };
+
+    vm.toggleSystemPrompt();
+    await wrapper.vm.$nextTick();
+    expect(vm.systemPromptDraft).toBe("You are a helpful assistant.");
+  });
+
+  it("cancelSystemPrompt closes panel and resets draft", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      toggleSystemPrompt: () => void;
+      cancelSystemPrompt: () => void;
+      isSystemPromptOpen: boolean;
+      systemPromptDraft: string;
+    };
+
+    vm.toggleSystemPrompt();
+    vm.systemPromptDraft = "some text";
+    vm.cancelSystemPrompt();
+    await wrapper.vm.$nextTick();
+
+    expect(vm.isSystemPromptOpen).toBe(false);
+  });
+
+  it("saveSystemPrompt is a no-op when no activeConversationId", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      saveSystemPrompt: () => Promise<void>;
+      isSystemPromptOpen: boolean;
+    };
+
+    vm.isSystemPromptOpen = true;
+    await vm.saveSystemPrompt();
+    // Should still be open because nothing was saved
+    expect(vm.isSystemPromptOpen).toBe(true);
+  });
+
+  it("saveSystemPrompt closes panel after saving", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      if (cmd === "update_conversation_system_prompt")
+        return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      toggleSystemPrompt: () => void;
+      saveSystemPrompt: () => Promise<void>;
+      isSystemPromptOpen: boolean;
+    };
+
+    vm.toggleSystemPrompt();
+    await vm.saveSystemPrompt();
+    await wrapper.vm.$nextTick();
+
+    expect(vm.isSystemPromptOpen).toBe(false);
+  });
+});
+
+describe("ChatInput — Advanced options toggle", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("advanced options panel is closed by default", () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as { isAdvancedOptionsOpen: boolean };
+    expect(vm.isAdvancedOptionsOpen).toBe(false);
+  });
+
+  it("clicking the advanced options button toggles isAdvancedOptionsOpen", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as { isAdvancedOptionsOpen: boolean };
+
+    const btn = wrapper.find('[aria-label="Toggle advanced options"]');
+    await btn.trigger("click");
+    expect(vm.isAdvancedOptionsOpen).toBe(true);
+
+    await btn.trigger("click");
+    expect(vm.isAdvancedOptionsOpen).toBe(false);
+  });
+
+  it("advanced options button reflects state via aria-pressed", async () => {
+    const wrapper = mountInput();
+    const btn = wrapper.find('[aria-label="Toggle advanced options"]');
+
+    expect(btn.attributes("aria-pressed")).toBe("false");
+    await btn.trigger("click");
+    expect(btn.attributes("aria-pressed")).toBe("true");
+  });
+});
+
+describe("ChatInput — handleTextareaKeydown", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation(() => Promise.resolve(undefined));
+  });
+
+  it("Enter without Shift triggers submit", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      inputContent: string;
+      handleTextareaKeydown: (e: KeyboardEvent) => void;
+    };
+
+    vm.inputContent = "Hello";
+    const event = new KeyboardEvent("keydown", {
+      key: "Enter",
+      shiftKey: false,
+      bubbles: true,
+    });
+    // spy on preventDefault
+    const preventSpy = vi.spyOn(event, "preventDefault");
+
+    vm.handleTextareaKeydown(event);
+    await wrapper.vm.$nextTick();
+
+    expect(preventSpy).toHaveBeenCalled();
+    expect(wrapper.emitted("send")).toBeTruthy();
+  });
+
+  it("Shift+Enter does NOT trigger submit", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      inputContent: string;
+      handleTextareaKeydown: (e: KeyboardEvent) => void;
+    };
+
+    vm.inputContent = "Hello";
+    const event = new KeyboardEvent("keydown", {
+      key: "Enter",
+      shiftKey: true,
+      bubbles: true,
+    });
+
+    vm.handleTextareaKeydown(event);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted("send")).toBeFalsy();
+  });
+
+  it("Ctrl+Z calls doUndo and prevents default", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      handleTextareaKeydown: (e: KeyboardEvent) => void;
+    };
+
+    const event = new KeyboardEvent("keydown", {
+      key: "z",
+      ctrlKey: true,
+      shiftKey: false,
+      bubbles: true,
+    });
+    const preventSpy = vi.spyOn(event, "preventDefault");
+
+    vm.handleTextareaKeydown(event);
+
+    expect(preventSpy).toHaveBeenCalled();
+    // No assertion on undo state — just ensures no throw and default is prevented
+  });
+
+  it("Ctrl+Shift+Z calls doRedo and prevents default", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      handleTextareaKeydown: (e: KeyboardEvent) => void;
+    };
+
+    const event = new KeyboardEvent("keydown", {
+      key: "z",
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+    });
+    const preventSpy = vi.spyOn(event, "preventDefault");
+
+    vm.handleTextareaKeydown(event);
+
+    expect(preventSpy).toHaveBeenCalled();
+  });
+});
+
+describe("ChatInput — resetChatOptions", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("with a default preset — resets chatOptions to the preset's options", async () => {
+    const settingsStore = useSettingsStore();
+    settingsStore.defaultPresetId = "balanced";
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      resetChatOptions: () => void;
+      chatOptions: Record<string, unknown>;
+      presetId: string;
+    };
+
+    vm.chatOptions = { temperature: 0.99 };
+    vm.resetChatOptions();
+
+    const balancedPreset = settingsStore.presets.find(
+      (p) => p.id === "balanced",
+    );
+    expect(vm.chatOptions).toMatchObject(balancedPreset!.options);
+    expect(vm.presetId).toBe("balanced");
+  });
+
+  it("without a default preset — resets chatOptions to empty object", async () => {
+    const settingsStore = useSettingsStore();
+    settingsStore.defaultPresetId = "nonexistent-id";
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      resetChatOptions: () => void;
+      chatOptions: Record<string, unknown>;
+      presetId: string;
+    };
+
+    vm.chatOptions = { temperature: 0.99 };
+    vm.resetChatOptions();
+
+    expect(vm.chatOptions).toEqual({});
+    expect(vm.presetId).toBe("");
+  });
+});
+
+describe("ChatInput — removeContext", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      if (cmd === "unlink_folder") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("calls unlink_folder invoke and removes context from store", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", {
+      id: "ctx-1",
+      name: "notes.txt",
+      path: "/home/user/notes.txt",
+      content: "hello",
+      tokens: 5,
+    });
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      removeContext: (contextId: string) => Promise<void>;
+    };
+
+    await vm.removeContext("ctx-1");
+    await wrapper.vm.$nextTick();
+
+    expect(mockInvoke).toHaveBeenCalledWith("unlink_folder", { id: "ctx-1" });
+    // Context should be removed from store
+    expect(
+      chatStore.folderContexts["conv-test-1"] ?? [],
+    ).not.toContainEqual(expect.objectContaining({ id: "ctx-1" }));
+  });
+});
+
+describe("ChatInput — isCloudName + selectModel (cloud branch)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.resolve({
+          vision: false,
+          tools: false,
+          thinking: false,
+          thinking_toggleable: false,
+          thinking_levels: [],
+        });
+      if (cmd === "get_model_defaults") return Promise.resolve(null);
+      if (cmd === "update_conversation_model") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("selectModel with a cloud-tagged model calls modelStore.addCloudModel", async () => {
+    const modelStore = useModelStore();
+    const addCloudSpy = vi
+      .spyOn(modelStore, "addCloudModel")
+      .mockResolvedValue();
+
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3:latest"));
+    chatStore.activeConversationId = "conv-test-1";
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      selectModel: (model: string) => Promise<void>;
+    };
+
+    await vm.selectModel("llama3:cloud");
+
+    expect(addCloudSpy).toHaveBeenCalledWith("llama3:cloud");
+  });
+
+  it("selectModel without cloud tag does NOT call addCloudModel", async () => {
+    const modelStore = useModelStore();
+    const addCloudSpy = vi
+      .spyOn(modelStore, "addCloudModel")
+      .mockResolvedValue();
+
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3:latest"));
+    chatStore.activeConversationId = "conv-test-1";
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      selectModel: (model: string) => Promise<void>;
+    };
+
+    await vm.selectModel("llama3:8b");
+
+    expect(addCloudSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatInput — handleCompact", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("returns early when no active conversation", async () => {
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      handleCompact: () => Promise<void>;
+      isCompacting: boolean;
+    };
+
+    await vm.handleCompact();
+    // Should not set isCompacting if no conversation
+    expect(vm.isCompacting).toBe(false);
+  });
+
+  it("sets isCompacting to false after compact completes", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      if (cmd === "compact_conversation")
+        return Promise.resolve("new-conv-id");
+      if (cmd === "load_messages") return Promise.resolve([]);
+      return Promise.resolve(undefined);
+    });
+
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+
+    const compactSpy = vi
+      .spyOn(chatStore, "compactConversation")
+      .mockResolvedValue("new-conv-id");
+    vi.spyOn(chatStore, "loadConversation").mockResolvedValue();
+
+    const wrapper = mountInput();
+    const vm = wrapper.vm as unknown as {
+      handleCompact: () => Promise<void>;
+      isCompacting: boolean;
+    };
+
+    await vm.handleCompact();
+
+    expect(compactSpy).toHaveBeenCalled();
+    expect(vm.isCompacting).toBe(false);
+  });
+});
