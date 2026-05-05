@@ -313,6 +313,19 @@
                         }}
                       </button>
                     </CustomTooltip>
+                    <Transition name="fade-in">
+                      <span
+                        v-if="checkDoneMessage"
+                        class="text-[11px] ml-2"
+                        :class="
+                          modelStore.updatesAvailableCount > 0
+                            ? 'text-amber-400'
+                            : 'text-[var(--text-dim)]'
+                        "
+                      >
+                        {{ checkDoneMessage }}
+                      </span>
+                    </Transition>
                   </div>
                   <!-- Tag filter bar — always visible when models exist -->
                   <div class="flex flex-wrap gap-1.5 mb-3 items-center">
@@ -705,6 +718,21 @@ const settingsStore = useSettingsStore();
 
 const selectedLocalModel = ref<Model | null>(null);
 
+const checkDoneMessage = ref<string | null>(null);
+let checkDoneTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+  () => modelStore.isCheckingUpdates,
+  (checking) => {
+    if (checking) return;
+    if (checkDoneTimer) clearTimeout(checkDoneTimer);
+    checkDoneMessage.value =
+      modelStore.updatesAvailableCount > 0
+        ? `${modelStore.updatesAvailableCount} update${modelStore.updatesAvailableCount > 1 ? "s" : ""} available`
+        : "All models up to date";
+    checkDoneTimer = setTimeout(() => (checkDoneMessage.value = null), 4000);
+  },
+);
+
 const createModelMode = ref<{
   name: string;
   modelfile: string;
@@ -977,6 +1005,14 @@ onUnmounted(() => {
 .fade-subpage-leave-to {
   opacity: 0;
   transform: scale(1.02) translateY(-10px);
+}
+.fade-in-enter-active,
+.fade-in-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-in-enter-from,
+.fade-in-leave-to {
+  opacity: 0;
 }
 
 @keyframes spin {
