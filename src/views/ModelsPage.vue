@@ -287,7 +287,8 @@
                     >
                       <button
                         @click="modelStore.triggerUpdateCheck()"
-                        class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
+                        :disabled="modelStore.isCheckingUpdates"
+                        class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg
                           width="11"
@@ -298,11 +299,18 @@
                           stroke-width="2.5"
                           stroke-linecap="round"
                           stroke-linejoin="round"
+                          :class="{
+                            'animate-spin': modelStore.isCheckingUpdates,
+                          }"
                         >
                           <polyline points="23 4 23 10 17 10" />
                           <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                         </svg>
-                        Check for updates
+                        {{
+                          modelStore.isCheckingUpdates
+                            ? "Checking..."
+                            : "Check for updates"
+                        }}
                       </button>
                     </CustomTooltip>
                   </div>

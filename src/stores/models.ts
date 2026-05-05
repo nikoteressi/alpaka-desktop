@@ -65,6 +65,7 @@ export const useModelStore = defineStore("models", {
     _searchTimer: null as ReturnType<typeof setTimeout> | null,
     _searchVersion: 0,
     modelsWithUpdates: new Set<string>(),
+    isCheckingUpdates: false,
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],
@@ -336,10 +337,13 @@ export const useModelStore = defineStore("models", {
     },
 
     async triggerUpdateCheck(): Promise<void> {
+      if (this.isCheckingUpdates) return;
+      this.isCheckingUpdates = true;
       try {
         await invoke("check_model_updates");
       } catch (e) {
         console.error("[models] triggerUpdateCheck failed:", e);
+        this.isCheckingUpdates = false;
       }
     },
     async initListeners() {
@@ -390,6 +394,7 @@ export const useModelStore = defineStore("models", {
               "model:updates-checked",
               (event) => {
                 this.modelsWithUpdates = new Set(event.payload.outdated);
+                this.isCheckingUpdates = false;
               },
             ),
           ])),
