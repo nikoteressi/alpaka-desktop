@@ -34,10 +34,13 @@ vi.mock("../../composables/useAppOrchestration", () => ({
   }),
 }));
 
+const mockSendMessage = vi.fn().mockResolvedValue(undefined);
+const mockStopGeneration = vi.fn().mockResolvedValue(undefined);
+
 vi.mock("../../composables/useSendMessage", () => ({
   useSendMessage: () => ({
-    sendMessage: vi.fn().mockResolvedValue(undefined),
-    stopGeneration: vi.fn().mockResolvedValue(undefined),
+    sendMessage: mockSendMessage,
+    stopGeneration: mockStopGeneration,
   }),
 }));
 
@@ -106,7 +109,7 @@ function makeConversation(id = "conv-1", model = "llama3") {
 }
 
 function makeMessage(
-  id: number,
+  id: string,
   role: "user" | "assistant" | "system",
   content: string,
   extra: object = {},
@@ -117,8 +120,8 @@ function makeMessage(
     role,
     content,
     tokens: 10,
-    tokens_per_sec: null,
-    prompt_tokens: null,
+    tokens_per_sec: undefined,
+    prompt_tokens: undefined,
     generation_time_ms: 0,
     total_duration_ms: 0,
     load_duration_ms: 0,
@@ -217,7 +220,7 @@ describe("ChatView.vue", () => {
   });
 
   it("hides empty-state when non-system messages exist", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hello")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hello")];
     const wrapper = mountChatView();
     await flushPromises();
     const img = wrapper.find("img[alt='Ollama']");
@@ -226,7 +229,7 @@ describe("ChatView.vue", () => {
 
   it("does not show empty-state when only a system message is present (nonSystemMessages is empty)", async () => {
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "system", "You are a helpful assistant"),
+      makeMessage("msg-s", "system", "You are a helpful assistant"),
     ];
     const wrapper = mountChatView();
     await flushPromises();
@@ -237,8 +240,8 @@ describe("ChatView.vue", () => {
 
   it("renders MessageBubble stubs for each non-system message", async () => {
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "user", "Hello"),
-      makeMessage(2, "assistant", "World"),
+      makeMessage("msg-u", "user", "Hello"),
+      makeMessage("msg-a", "assistant", "World"),
     ];
     const wrapper = mountChatView();
     await flushPromises();
@@ -258,7 +261,7 @@ describe("ChatView.vue", () => {
 
   it("shows system-prompt header when activeSystemPrompt is non-empty", async () => {
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "system", "Be concise."),
+      makeMessage("msg-s", "system", "Be concise."),
     ];
     const wrapper = mountChatView();
     await flushPromises();
@@ -267,7 +270,7 @@ describe("ChatView.vue", () => {
 
   it("starts with system-prompt panel collapsed (isSystemPromptExpanded = false)", async () => {
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "system", "Be concise."),
+      makeMessage("msg-s", "system", "Be concise."),
     ];
     const wrapper = mountChatView();
     await flushPromises();
@@ -278,7 +281,7 @@ describe("ChatView.vue", () => {
 
   it("expands system-prompt panel when the header button is clicked", async () => {
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "system", "Be concise."),
+      makeMessage("msg-s", "system", "Be concise."),
     ];
     const wrapper = mountChatView();
     await flushPromises();
@@ -293,7 +296,7 @@ describe("ChatView.vue", () => {
 
   it("collapses system-prompt panel on a second click", async () => {
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "system", "Be concise."),
+      makeMessage("msg-s", "system", "Be concise."),
     ];
     const wrapper = mountChatView();
     await flushPromises();
@@ -311,7 +314,7 @@ describe("ChatView.vue", () => {
   // ------------------------------------------------------------------ streaming item injection
 
   it("injects streaming item into the scroller while streaming for active conversation", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hi")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hi")];
     chatStore.streaming = {
       isStreaming: true,
       currentConversationId: "conv-1",
@@ -335,7 +338,7 @@ describe("ChatView.vue", () => {
   });
 
   it("does not inject streaming item when streaming is for a different conversation", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hi")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hi")];
     chatStore.streaming = {
       isStreaming: true,
       currentConversationId: "conv-other",
@@ -397,7 +400,7 @@ describe("ChatView.vue", () => {
   // ------------------------------------------------------------------ scroll-to-bottom button
 
   it("hides the jump-to-bottom button when isAutoScrollEnabled is true (default)", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hello")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hello")];
     const wrapper = mountChatView();
     await flushPromises();
 
@@ -406,7 +409,7 @@ describe("ChatView.vue", () => {
   });
 
   it("shows jump-to-bottom button when user scrolls up (isAutoScrollEnabled = false)", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hello")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hello")];
     const wrapper = mountChatView();
     await flushPromises();
 
@@ -442,7 +445,7 @@ describe("ChatView.vue", () => {
   });
 
   it("restores isAutoScrollEnabled when user is near bottom", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hello")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hello")];
     const wrapper = mountChatView();
     await flushPromises();
 
@@ -482,7 +485,7 @@ describe("ChatView.vue", () => {
   // ------------------------------------------------------------------ watchers
 
   it("resets isSystemPromptExpanded when activeConversationId changes", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "system", "Be concise.")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-s", "system", "Be concise.")];
     const wrapper = mountChatView();
     await flushPromises();
 
@@ -513,7 +516,7 @@ describe("ChatView.vue", () => {
 
     // Add a new message — this triggers the itemsForScroller watcher (flush: 'post').
     // The watcher calls scrollToBottom('auto'), which uses nextTick + rAF (no timer).
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hello")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hello")];
     await nextTick();
     await flushPromises();
     await nextTick();
@@ -531,9 +534,9 @@ describe("ChatView.vue", () => {
     settingsStore.chatOptions = { ...settingsStore.chatOptions, num_ctx: 10 };
 
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "user", "First", { tokens: 8 }),
-      makeMessage(2, "assistant", "Second", { tokens: 8 }),
-      makeMessage(3, "user", "Third", { tokens: 8 }),
+      makeMessage("msg-u", "user", "First", { tokens: 8 }),
+      makeMessage("msg-a", "assistant", "Second", { tokens: 8 }),
+      makeMessage("msg-u", "user", "Third", { tokens: 8 }),
     ];
 
     const wrapper = mountChatView();
@@ -550,9 +553,9 @@ describe("ChatView.vue", () => {
     settingsStore.chatOptions = { ...settingsStore.chatOptions, num_ctx: 10 };
 
     chatStore.messages["conv-1"] = [
-      makeMessage(1, "user", "First", { tokens: 8 }),
-      makeMessage(2, "assistant", "Second", { tokens: 8 }),
-      makeMessage(3, "user", "Third", { tokens: 8 }),
+      makeMessage("msg-u", "user", "First", { tokens: 8 }),
+      makeMessage("msg-a", "assistant", "Second", { tokens: 8 }),
+      makeMessage("msg-u", "user", "Third", { tokens: 8 }),
     ];
 
     const wrapper = mountChatView();
@@ -567,7 +570,7 @@ describe("ChatView.vue", () => {
   // ------------------------------------------------------------------ scrollToBottom button click
 
   it("clicking the jump-to-bottom button calls scrollTo and hides the button", async () => {
-    chatStore.messages["conv-1"] = [makeMessage(1, "user", "Hello")];
+    chatStore.messages["conv-1"] = [makeMessage("msg-u", "user", "Hello")];
     const wrapper = mountChatView();
     await flushPromises();
 
@@ -615,5 +618,33 @@ describe("ChatView.vue", () => {
     );
     // isAutoScrollEnabled is true (set synchronously on click), so button is hidden.
     expect(wrapper.find("button.absolute.bottom-28").exists()).toBe(false);
+  });
+
+  // ------------------------------------------------------------------ onSend / onStop
+
+  it("onSend: ChatInput send event calls sendMessage with the supplied text", async () => {
+    mockSendMessage.mockClear();
+
+    const wrapper = mountChatView();
+    await flushPromises();
+
+    const chatInput = wrapper.findComponent({ name: "ChatInput" });
+    await chatInput.vm.$emit("send", "Hello world", undefined, false, undefined, undefined);
+    await flushPromises();
+
+    expect(mockSendMessage).toHaveBeenCalledWith("Hello world", undefined, false, undefined, undefined);
+  });
+
+  it("onStop: ChatInput stop event calls stopGeneration", async () => {
+    mockStopGeneration.mockClear();
+
+    const wrapper = mountChatView();
+    await flushPromises();
+
+    const chatInput = wrapper.findComponent({ name: "ChatInput" });
+    await chatInput.vm.$emit("stop");
+    await flushPromises();
+
+    expect(mockStopGeneration).toHaveBeenCalled();
   });
 });

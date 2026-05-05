@@ -36,4 +36,21 @@ describe("BaseModal", () => {
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("close")).toBeTruthy();
   });
+
+  it("emits close when Escape key is pressed and show is true", async () => {
+    const wrapper = mkWrapper(true);
+    // handleEsc is registered on globalThis in onMounted
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+    globalThis.dispatchEvent(event);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("close")).toBeTruthy();
+  });
+
+  it("does not emit close on Escape when show is false", async () => {
+    const wrapper = mkWrapper(false);
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+    globalThis.dispatchEvent(event);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted("close")).toBeFalsy();
+  });
 });

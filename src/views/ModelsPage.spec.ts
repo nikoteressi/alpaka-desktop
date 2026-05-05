@@ -1488,4 +1488,100 @@ describe("ModelsPage", () => {
 
     expect(modelLibraryState.cancelSearch).toHaveBeenCalled();
   });
+
+  // ── openEditModelfile ─────────────────────────────────────────────────────
+
+  it("edit-modelfile event from LocalModelDetails opens CreateModelPage with fetched modelfile", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_modelfile") return "FROM llama3\nSYSTEM Hello";
+      return null;
+    });
+
+    const clickStub = {
+      name: "ModelCard",
+      template:
+        '<div class="stub-model-card"><button class="open-btn" @click="onClick && onClick()">Open</button></div>',
+      props: modelCardAllProps,
+    };
+
+    const localDetailsStub = {
+      name: "LocalModelDetails",
+      template:
+        '<div class="stub-local-details"><button class="edit-btn" @click="$emit(\'edit-modelfile\', \'llama3:8b\')">Edit</button></div>',
+      props: ["model"],
+      emits: ["back", "edit-modelfile"],
+    };
+
+    const createPageStub = {
+      name: "CreateModelPage",
+      template: '<div class="stub-create-page" />',
+      props: ["initialName", "initialModelfile"],
+      emits: ["back", "view-model"],
+    };
+
+    const { wrapper } = await mountPage(
+      (store) => {
+        store.isLoading = false;
+        store.error = null;
+        store.models = [makeModel("llama3:8b")];
+      },
+      {
+        ModelCard: clickStub,
+        LocalModelDetails: localDetailsStub,
+        CreateModelPage: createPageStub,
+      },
+    );
+
+    // Open local model details
+    await wrapper.find(".open-btn").trigger("click");
+    await nextTick();
+    expect(wrapper.find(".stub-local-details").exists()).toBe(true);
+
+    // Emit edit-modelfile
+    await wrapper.find(".edit-btn").trigger("click");
+    await flushPromises();
+
+    // Should transition to CreateModelPage sub-page
+    expect(wrapper.find(".stub-create-page").exists()).toBe(true);
+    // LocalModelDetails should be gone
+    expect(wrapper.find(".stub-local-details").exists()).toBe(false);
+  });
+
+  // ── openLibraryDetailsByName via EngineTab emit ───────────────────────────
+
+  it("open-library-details event from EngineTab calls openLibraryDetailsByName", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockImplementation(async (cmd: string) => {
+      if (cmd === "get_library_model_readme") return { readme: "", launch_apps: [] };
+      if (cmd === "get_library_tags") return [];
+      return null;
+    });
+
+    const engineTabStub = {
+      name: "EngineTab",
+      template:
+        '<div class="stub-engine"><button class="details-btn" @click="$emit(\'open-library-details\', \'llama3:8b\')">Details</button></div>',
+      emits: ["pull-model", "open-library-details"],
+    };
+
+    const { wrapper, modelStore } = await mountPage(
+      (store) => {
+        store.isLoading = false;
+        store.models = [];
+      },
+      { EngineTab: engineTabStub },
+    );
+
+    const appTabs = wrapper.findComponent({ name: "AppTabs" });
+    await appTabs.vm.$emit("update:modelValue", "engine");
+    await nextTick();
+
+    await wrapper.find(".details-btn").trigger("click");
+    await flushPromises();
+
+    // openLibraryDetailsByName strips the ":8b" suffix → slug = "llama3"
+    expect(modelStore.selectedModel).not.toBeNull();
+    expect(modelStore.selectedModel?.slug).toBe("llama3");
+  });
 });

@@ -351,6 +351,29 @@ describe("MineTab — tag editor", () => {
 
     expect(setTagsSpy).toHaveBeenCalledWith("alice/llama3:8b", []);
   });
+
+  it("Escape keydown on tag input clears editingTagsFor", async () => {
+    const wrapper = mountMineTab();
+    const vm = wrapper.vm as unknown as {
+      editingTagsFor: string | null;
+      tagInputValue: string;
+      openTagEditor: (name: string) => void;
+    };
+
+    // Open the editor so the input is rendered
+    vm.openTagEditor("alice/llama3:8b");
+    await wrapper.vm.$nextTick();
+
+    expect(vm.editingTagsFor).toBe("alice/llama3:8b");
+
+    const input = wrapper.find("input[placeholder='tag1, tag2']");
+    expect(input.exists()).toBe(true);
+
+    await input.trigger("keydown.escape");
+    await wrapper.vm.$nextTick();
+
+    expect(vm.editingTagsFor).toBeNull();
+  });
 });
 
 describe("MineTab — getActiveCaps", () => {
@@ -370,6 +393,7 @@ describe("MineTab — getActiveCaps", () => {
   it("returns only the enabled capabilities", () => {
     const modelStore = useModelStore();
     modelStore.capabilities["alice/llava:7b"] = {
+      name: "alice/llava:7b",
       vision: true,
       tools: false,
       thinking: true,
@@ -394,6 +418,7 @@ describe("MineTab — getActiveCaps", () => {
   it("returns all three when all caps are enabled", () => {
     const modelStore = useModelStore();
     modelStore.capabilities["alice/full:7b"] = {
+      name: "alice/full:7b" as import("../../types/models").ModelName,
       vision: true,
       tools: true,
       thinking: true,
@@ -487,5 +512,87 @@ describe("MineTab — myModels computed", () => {
 
     expect(vm.myModels).toHaveLength(1);
     expect(vm.myModels[0].name).toBe("alice/llama3:8b");
+  });
+});
+
+describe("MineTab — ModelCard inline callback props", () => {
+  // Use a stub that immediately invokes the callback props so inline arrow functions get covered
+  const CallbackModelCardStub = {
+    name: "ModelCard",
+    template: `<div data-testid="model-card">
+      <button class="click-btn" @click="onClick && onClick()">Open</button>
+      <button class="delete-btn" @click="onDelete && onDelete()">Delete</button>
+      <button class="favorite-btn" @click="onFavorite && onFavorite()">Fav</button>
+      <button class="edit-tags-btn" @click="onEditTags && onEditTags()">Tags</button>
+    </div>`,
+    props: [
+      "name", "tags", "fileSize", "date", "quant", "isInstalled",
+      "isFavorite", "onFavorite", "userTags", "onClick", "onDelete",
+      "onEditTags", "actionLabel",
+    ],
+  };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockResolvedValue(undefined);
+  });
+
+  function mountWithCallbackStub() {
+    const modelStore = useModelStore();
+    modelStore.models.push(makeNamespacedModel("alice/llama3:8b") as any);
+    return mount(MineTab, {
+      global: {
+        stubs: {
+          ModelCard: CallbackModelCardStub,
+          CustomTooltip: { name: "CustomTooltip", template: "<slot />", props: ["text", "wrapperClass"] },
+        },
+      },
+    });
+  }
+
+  it("on-click prop emits 'open-model' with the model name", async () => {
+    const wrapper = mountWithCallbackStub();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".click-btn").trigger("click");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted("open-model")).toBeTruthy();
+    expect(wrapper.emitted("open-model")![0]).toEqual(["alice/llama3:8b"]);
+  });
+
+  it("on-delete prop emits 'delete-model' with the model name", async () => {
+    const wrapper = mountWithCallbackStub();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".delete-btn").trigger("click");
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted("delete-model")).toBeTruthy();
+    expect(wrapper.emitted("delete-model")![0]).toEqual(["alice/llama3:8b"]);
+  });
+
+  it("on-favorite prop calls modelStore.toggleFavorite", async () => {
+    const modelStore = useModelStore();
+    const toggleSpy = vi.spyOn(modelStore, "toggleFavorite").mockResolvedValue(undefined);
+
+    const wrapper = mountWithCallbackStub();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".favorite-btn").trigger("click");
+    await wrapper.vm.$nextTick();
+
+    expect(toggleSpy).toHaveBeenCalledWith("alice/llama3:8b");
+  });
+
+  it("on-edit-tags prop opens the tag editor", async () => {
+    const wrapper = mountWithCallbackStub();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find(".edit-tags-btn").trigger("click");
+    await wrapper.vm.$nextTick();
+
+    const vm = wrapper.vm as unknown as { editingTagsFor: string | null };
+    expect(vm.editingTagsFor).toBe("alice/llama3:8b");
   });
 });
