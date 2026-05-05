@@ -69,6 +69,7 @@ export const useModelStore = defineStore("models", {
     modelsWithUpdates: new Set<string>(),
     isCheckingUpdates: false,
     pushing: {} as Record<string, PushState>,
+    pushedModels: [] as string[], // cloud names of successfully pushed models (persisted in settings)
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],
@@ -330,6 +331,17 @@ export const useModelStore = defineStore("models", {
       this.isSearching = false;
       if (this._searchTimer) clearTimeout(this._searchTimer);
     },
+    async fetchPushedModels(): Promise<void> {
+      try {
+        const val = await invoke<string | null>("get_setting", {
+          key: "pushed_models",
+        });
+        this.pushedModels = val ? (JSON.parse(val) as string[]) : [];
+      } catch {
+        this.pushedModels = [];
+      }
+    },
+
     async fetchInitialUpdateStatus(): Promise<void> {
       try {
         const outdated = await invoke<string[]>("get_models_with_updates");
@@ -412,6 +424,13 @@ export const useModelStore = defineStore("models", {
               if (this.pushing[model]) {
                 this.pushing[model].phase = "done";
                 this.pushing[model].percent = 100;
+              }
+              if (!this.pushedModels.includes(model)) {
+                this.pushedModels = [...this.pushedModels, model];
+                invoke("set_setting", {
+                  key: "pushed_models",
+                  value: JSON.stringify(this.pushedModels),
+                }).catch(() => {});
               }
             }),
             listen<{ model: string; error: string }>(

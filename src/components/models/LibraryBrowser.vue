@@ -1,8 +1,8 @@
 <template>
   <div class="flex-1 flex flex-col gap-6">
-    <!-- My Models section (only when signed in to ollama.com) -->
+    <!-- My Models section (only when at least one model has been pushed) -->
     <div
-      v-if="ollamaUsername"
+      v-if="pushedModels.length > 0"
       class="bg-[var(--bg-surface)]/50 backdrop-blur-xl border border-[var(--border)] rounded-2xl p-5 shadow-2xl"
     >
       <div class="flex items-center gap-3 mb-4 px-1">
@@ -26,43 +26,20 @@
         <div>
           <h2 class="text-[15px] font-bold text-[var(--text)]">My Models</h2>
           <p class="text-[11px] text-[var(--text-muted)] font-medium">
-            Models published under
-            <span class="text-[var(--accent)]">{{ ollamaUsername }}</span> on
-            ollama.com
+            Models you have pushed to ollama.com
           </p>
         </div>
       </div>
 
-      <div
-        v-if="isLoadingUserModels"
-        class="text-[13px] text-[var(--text-dim)] py-2 px-1"
-      >
-        Loading…
-      </div>
-      <div
-        v-else-if="userModels.length === 0"
-        class="text-[13px] text-[var(--text-dim)] py-2 px-1"
-      >
-        No published models found.
-      </div>
-      <div v-else class="flex flex-col gap-2">
+      <div class="flex flex-col gap-2">
         <div
-          v-for="model in userModels"
-          :key="model.slug"
-          class="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] transition-colors cursor-pointer group"
-          @click="emit('select', model)"
+          v-for="name in pushedModels"
+          :key="name"
+          class="flex items-center px-3 py-2.5 rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
         >
-          <div class="min-w-0">
-            <p class="text-[13px] font-semibold text-[var(--text)] truncate">
-              {{ model.name }}
-            </p>
-            <p
-              v-if="model.description"
-              class="text-[11px] text-[var(--text-muted)] truncate mt-0.5"
-            >
-              {{ model.description }}
-            </p>
-          </div>
+          <p class="text-[13px] font-semibold text-[var(--text)] truncate">
+            {{ name }}
+          </p>
         </div>
       </div>
     </div>
@@ -240,7 +217,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { invoke } from "@tauri-apps/api/core";
 import { useModelStore } from "../../stores/models";
 import { storeToRefs } from "pinia";
 import ModelCard from "./ModelCard.vue";
@@ -255,6 +231,7 @@ const {
   libraryResults: results,
   isSearching,
   searchQuery,
+  pushedModels,
 } = storeToRefs(modelStore);
 
 const activeTagFilter = ref<string | null>(null);
@@ -280,27 +257,8 @@ function onSearchInput() {
   modelStore.searchLibrary(searchQuery.value);
 }
 
-const ollamaUsername = ref("");
-const userModels = ref<LibraryModel[]>([]);
-const isLoadingUserModels = ref(false);
-
-async function loadUserModels() {
-  try {
-    ollamaUsername.value = await invoke<string>("get_ollama_username");
-    if (!ollamaUsername.value) return;
-    isLoadingUserModels.value = true;
-    userModels.value = await invoke<LibraryModel[]>("get_user_models", {
-      username: ollamaUsername.value,
-    });
-  } catch {
-    // silent — user may not be signed in
-  } finally {
-    isLoadingUserModels.value = false;
-  }
-}
-
 onMounted(() => {
-  loadUserModels();
+  modelStore.fetchPushedModels();
 });
 </script>
 
