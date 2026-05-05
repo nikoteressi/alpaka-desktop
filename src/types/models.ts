@@ -117,3 +117,20 @@ export interface CreateState {
 export interface ModelUpdatesCheckedPayload {
   outdated: string[];
 }
+
+export interface PushProgressPayload {
+  model: string;
+  status: string;
+  completed?: number;
+  total?: number;
+  percent: number;
+}
+
+export interface PushState {
+  name: string;
+  cloudName: string;
+  status: string;
+  percent: number;
+  phase: "running" | "done" | "error";
+  error?: string;
+}
