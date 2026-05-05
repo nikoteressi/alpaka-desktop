@@ -90,6 +90,8 @@ pub fn run() {
             commands::system_info::detect_hardware,
             commands::system::report_active_view,
             commands::system::open_browser,
+            commands::model_updates::get_models_with_updates,
+            commands::model_updates::check_model_updates,
             commands::attachments::read_image_file,
         ])
         .setup(|app| {
@@ -159,6 +161,26 @@ pub fn run() {
                 let health_handle =
                     commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
                 *app.state::<AppState>().health_loop_handle.lock().unwrap() = Some(health_handle);
+            }
+
+            // ── Model update check loop ────────────────────────────────────────
+            #[cfg(not(feature = "test-mode"))]
+            {
+                let (upd_shutdown_tx, upd_shutdown_rx) = tokio::sync::oneshot::channel();
+                *app.state::<AppState>()
+                    .update_check_loop_shutdown
+                    .lock()
+                    .unwrap() = Some(upd_shutdown_tx);
+                let upd_handle = tauri::async_runtime::spawn(
+                    crate::services::model_updates::run_update_check_loop(
+                        app.handle().clone(),
+                        upd_shutdown_rx,
+                    ),
+                );
+                *app.state::<AppState>()
+                    .update_check_loop_handle
+                    .lock()
+                    .unwrap() = Some(upd_handle);
             }
 
             Ok(())
