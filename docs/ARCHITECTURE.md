@@ -157,7 +157,7 @@ alpaka-desktop/
 │   │   ├── auth.ts               # Auth state, signin flow
 │   │   ├── chat.ts               # Conversations, messages, streaming state
 │   │   ├── hosts.ts              # Host list, active host, health status
-│   │   ├── models.ts             # Model list, pull progress
+│   │   ├── models.ts             # Model list, pull progress; tracks `pushing` (cloud push progress per cloud model name) and `privateModels` (persisted via settings key `private_cloud_models`). New component: `MyModelsSection.vue` renders private models in the cloud tab
 │   │   ├── settings.ts           # User preferences
 │   │   └── ui.ts                 # Sidebar, theme, compact mode
 │   │
@@ -305,6 +305,7 @@ tauri::generate_handler![
     commands::models::list_models,
     commands::models::delete_model,
     commands::models::pull_model,          // streams model:pull-progress events
+    commands::models::push_model,          // Push a local model to Ollama Cloud via /api/push; streams model:push-* progress events
     commands::models::get_model_capabilities,
     commands::models::get_modelfile,       // fetches Modelfile for existing model via /api/show
     commands::models::create_model,        // streams model:create-* events via /api/create
@@ -515,6 +516,9 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |
 | `model:pull-progress` | Rust → Vue | `{ model, status, completed?, total?, percent? }` | Download progress chunk |
 | `model:pull-done` | Rust → Vue | `{ model }` | Model download complete |
+| `model:push-progress` | Rust → Vue | `{ model, status, completed?, total?, percent }` | Push progress chunk |
+| `model:push-done` | Rust → Vue | `{ model }` | Push complete; auto-adds model to private list |
+| `model:push-error` | Rust → Vue | `{ model, error }` | Push failed or stream error |
 | `model:updates-checked` | Rust → Vue | `{ outdated: string[] }` | Background update check result; names of locally installed models with newer versions on ollama.com |
 | `model:create-progress` | Rust → Vue | `{ model: string, status: string }` | Model creation progress status line |
 | `model:create-done` | Rust → Vue | `{ model: string }` | Model creation complete |
