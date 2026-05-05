@@ -518,6 +518,21 @@
                             : "No VRAM detected"
                         }}
                       </p>
+                      <p
+                        v-if="settingsStore.chatOptions.num_gpu === 0"
+                        class="text-[10px] text-[var(--text-dim)] mt-1"
+                      >
+                        Offloading: CPU only
+                      </p>
+                      <p
+                        v-else-if="
+                          (settingsStore.chatOptions.num_gpu ?? -1) > 0
+                        "
+                        class="text-[10px] text-[var(--text-dim)] mt-1"
+                      >
+                        Offloading:
+                        {{ settingsStore.chatOptions.num_gpu }} layers
+                      </p>
                     </div>
                     <div
                       class="bg-[var(--bg-base)] p-3 rounded-lg border border-[var(--border-subtle)]"
@@ -620,6 +635,7 @@ import LibraryBrowser from "../components/models/LibraryBrowser.vue";
 import CloudTagSelector from "../components/models/CloudTagSelector.vue";
 import CreateModelPage from "../components/models/CreateModelPage.vue";
 import { useModelStore, modelMatchesTag } from "../stores/models";
+import { useSettingsStore } from "../stores/settings";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppOrchestration } from "../composables/useAppOrchestration";
 import { useConfirmationModal } from "../composables/useConfirmationModal";
@@ -636,6 +652,7 @@ import {
 
 const modelStore = useModelStore();
 const { selectedModel } = storeToRefs(modelStore);
+const settingsStore = useSettingsStore();
 
 const selectedLocalModel = ref<Model | null>(null);
 

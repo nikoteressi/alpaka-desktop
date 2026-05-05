@@ -206,6 +206,8 @@
           >
             <ModelPathSettings />
 
+            <GpuLayersSettings />
+
             <SettingsRow icon="layout">
               <template #label>Context length</template>
               <template #subtitle
@@ -479,6 +481,7 @@ import AccountSettings from "../components/settings/AccountSettings.vue";
 import HostSettings from "../components/settings/HostSettings.vue";
 import ProxySettings from "../components/settings/ProxySettings.vue";
 import ModelPathSettings from "../components/settings/ModelPathSettings.vue";
+import GpuLayersSettings from "../components/settings/GpuLayersSettings.vue";
 import PresetEditor from "../components/settings/PresetEditor.vue";
 import AppTabs from "../components/shared/AppTabs.vue";
 import StopSequencesInput from "../components/settings/StopSequencesInput.vue";

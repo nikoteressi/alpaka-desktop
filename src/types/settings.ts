@@ -12,6 +12,7 @@ export interface ChatOptions {
   mirostat?: 0 | 1 | 2;
   mirostat_tau?: number;
   mirostat_eta?: number;
+  num_gpu?: number;
 }
 
 export type PresetOptions = Required<

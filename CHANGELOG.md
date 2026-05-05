@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- G-05: GPU layer offloading configuration — Settings → Engine tab now has a "GPU Layers" input (`num_gpu`). Set to `-1` for auto (all layers), `0` for CPU-only, or any positive integer for partial offloading. Current GPU/VRAM is shown as a guide. The G-01 hardware display on the Models page reflects the configured offloading mode.
 - HTTP/SOCKS5 proxy support — configure a proxy URL, optional username, and password (stored in the system keyring) in Settings → Connection; a "Test proxy" button verifies end-to-end connectivity
 
 ### Fixed

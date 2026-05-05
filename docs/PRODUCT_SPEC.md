@@ -133,7 +133,7 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 | G-02 | **Multi-GPU support** | P0 | ✅ | Inherited from Ollama's multi-GPU scheduling; no app-level work required |
 | G-03 | **CPU fallback indicator** | P0 | ❌ | No dedicated "running on CPU" indicator in the UI |
 | G-04 | **Per-message performance metrics** | P1 | ✅ | Tokens/sec, TTFT, total / load / prompt-eval / eval duration, seed, prompt_tokens — stored per message and rendered in `StatsBlock.vue` |
-| G-05 | **GPU layer configuration** | P1 | 🔲 Backlog | `num_gpu` layers for partial offloading |
+| G-05 | **GPU layer configuration** | P1 | ✅ | `num_gpu` layers for partial offloading. Settings → Engine tab (`GpuLayersSettings.vue`): numeric input (-1 = auto, 0 = CPU only, N = partial). VRAM shown as guide via `detect_hardware`. G-01 GPU card in Models → Engine tab shows offloading badge when `num_gpu` ≠ -1. Validated server-side in `validate_chat_options`. |
 
 ### 2.7 Networking, Hosts & Sharing
 

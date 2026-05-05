@@ -78,6 +78,13 @@ pub(crate) fn validate_chat_options(opts: &ChatOptions) -> Result<(), AppError> 
             ));
         }
     }
+    if let Some(ng) = opts.num_gpu {
+        if ng != -1 && !(0..=999).contains(&ng) {
+            return Err(AppError::Validation(
+                "num_gpu must be -1 (auto) or in range [0, 999]".into(),
+            ));
+        }
+    }
     if let Some(ref stops) = opts.stop {
         if stops.len() > 4 {
             return Err(AppError::Validation(
@@ -91,4 +98,61 @@ pub(crate) fn validate_chat_options(opts: &ChatOptions) -> Result<(), AppError> 
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ollama::types::ChatOptions;
+
+    #[test]
+    fn test_validate_num_gpu_auto_sentinel_accepted() {
+        let opts = ChatOptions {
+            num_gpu: Some(-1),
+            ..Default::default()
+        };
+        assert!(validate_chat_options(&opts).is_ok());
+    }
+
+    #[test]
+    fn test_validate_num_gpu_zero_cpu_only_accepted() {
+        let opts = ChatOptions {
+            num_gpu: Some(0),
+            ..Default::default()
+        };
+        assert!(validate_chat_options(&opts).is_ok());
+    }
+
+    #[test]
+    fn test_validate_num_gpu_valid_range_accepted() {
+        let opts = ChatOptions {
+            num_gpu: Some(999),
+            ..Default::default()
+        };
+        assert!(validate_chat_options(&opts).is_ok());
+    }
+
+    #[test]
+    fn test_validate_num_gpu_out_of_range_rejected() {
+        let opts = ChatOptions {
+            num_gpu: Some(1000),
+            ..Default::default()
+        };
+        assert!(validate_chat_options(&opts).is_err());
+    }
+
+    #[test]
+    fn test_validate_num_gpu_negative_non_sentinel_rejected() {
+        let opts = ChatOptions {
+            num_gpu: Some(-2),
+            ..Default::default()
+        };
+        assert!(validate_chat_options(&opts).is_err());
+    }
+
+    #[test]
+    fn test_validate_num_gpu_none_accepted() {
+        let opts = ChatOptions::default();
+        assert!(validate_chat_options(&opts).is_ok());
+    }
 }
