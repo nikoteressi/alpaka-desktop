@@ -7,7 +7,9 @@
       <template #control>
         <input
           v-model="settingsStore.serverUrl"
-          @change="settingsStore.updateSetting('serverUrl', settingsStore.serverUrl)"
+          @change="
+            settingsStore.updateSetting('serverUrl', settingsStore.serverUrl)
+          "
           class="custom-input w-52 font-mono"
         />
       </template>

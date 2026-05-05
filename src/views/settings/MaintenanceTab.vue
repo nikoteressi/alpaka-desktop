@@ -19,8 +19,8 @@
     <SettingsRow icon="database">
       <template #label>Restore Database</template>
       <template #subtitle
-        >Restore history and settings from a backup file. Your current data
-        will be overwritten.</template
+        >Restore history and settings from a backup file. Your current data will
+        be overwritten.</template
       >
       <template #control>
         <button

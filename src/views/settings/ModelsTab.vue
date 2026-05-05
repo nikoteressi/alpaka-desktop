@@ -7,7 +7,10 @@
     <SettingsRow icon="layout">
       <template #label>Context length</template>
       <template #subtitle
-        >{{ settingsStore.chatOptions.num_ctx.toLocaleString() }} tokens</template
+        >{{
+          settingsStore.chatOptions.num_ctx.toLocaleString()
+        }}
+        tokens</template
       >
       <template #control>
         <div class="w-40">

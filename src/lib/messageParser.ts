@@ -19,7 +19,9 @@ function parseThink(matchText: string): MessagePart {
   const contentMatch = matchText.match(/^<think[^>]*>(.*)<\/think>$/is);
   return {
     type: "think",
-    content: contentMatch ? contentMatch[1].trim() : matchText.replace(/^<think[^>]*>/i, "").trim(),
+    content: contentMatch
+      ? contentMatch[1].trim()
+      : matchText.replace(/^<think[^>]*>/i, "").trim(),
     language: timeMatch ? timeMatch[1] : undefined,
   };
 }
@@ -54,13 +56,19 @@ function pushMarkdown(
   renderMarkdown: (s: string) => string,
 ) {
   if (!text.trim()) return;
-  parts.push({ type: "markdown", content: text, rendered: renderMarkdown(text) });
+  parts.push({
+    type: "markdown",
+    content: text,
+    rendered: renderMarkdown(text),
+  });
 }
 
 export function parseBlockMatch(match: RegExpExecArray): MessagePart | null {
   const matchText = match[0];
-  if (matchText.toLowerCase().startsWith("<think")) return parseThink(matchText);
-  if (matchText.toLowerCase().startsWith("<tool_call")) return parseToolCall(matchText);
+  if (matchText.toLowerCase().startsWith("<think"))
+    return parseThink(matchText);
+  if (matchText.toLowerCase().startsWith("<tool_call"))
+    return parseToolCall(matchText);
   if (matchText.startsWith("```")) return parseCode(match);
   return null;
 }
@@ -86,7 +94,11 @@ export function parseMessageParts(
 
   while ((match = regex.exec(content)) !== null) {
     if (match.index > lastIndex) {
-      pushMarkdown(parts, content.slice(lastIndex, match.index), opts.renderMarkdown);
+      pushMarkdown(
+        parts,
+        content.slice(lastIndex, match.index),
+        opts.renderMarkdown,
+      );
     }
     const part = parseBlockMatch(match);
     if (part) parts.push(part);

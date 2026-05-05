@@ -73,9 +73,7 @@
       >
         Recommended for Your Machine
       </p>
-      <div
-        class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4"
-      >
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
         <ModelCard
           v-for="rec in recommendedModels"
           :key="'rec-' + rec.name"

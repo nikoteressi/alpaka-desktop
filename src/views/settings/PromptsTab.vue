@@ -35,7 +35,9 @@
         </p>
         <ToggleSwitch
           :value="settingsStore.systemFormattingEnabled"
-          @change="settingsStore.updateSetting('systemFormattingEnabled', $event)"
+          @change="
+            settingsStore.updateSetting('systemFormattingEnabled', $event)
+          "
         />
       </div>
       <textarea

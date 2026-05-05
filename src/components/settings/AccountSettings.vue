@@ -222,7 +222,11 @@ async function openOllamaAccount() {
   try {
     await openUrl("https://ollama.com/settings");
   } catch {
-    globalThis.open("https://ollama.com/settings", "_blank", "noopener,noreferrer");
+    globalThis.open(
+      "https://ollama.com/settings",
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
 }
 
@@ -230,7 +234,11 @@ async function openUpgrade() {
   try {
     await openUrl("https://ollama.com/upgrade");
   } catch {
-    globalThis.open("https://ollama.com/upgrade", "_blank", "noopener,noreferrer");
+    globalThis.open(
+      "https://ollama.com/upgrade",
+      "_blank",
+      "noopener,noreferrer",
+    );
   }
 }
 

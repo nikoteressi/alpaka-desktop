@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import ChatInputComposer from "./ChatInputComposer.vue";
 
-function mkWrapper(overrides: Partial<InstanceType<typeof ChatInputComposer>["$props"]> = {}) {
+function mkWrapper(
+  overrides: Partial<InstanceType<typeof ChatInputComposer>["$props"]> = {},
+) {
   return mount(ChatInputComposer, {
     props: {
       modelValue: "",
@@ -69,13 +71,21 @@ describe("ChatInputComposer", () => {
   });
 
   it("send button is disabled when no content and no attachments and not streaming", () => {
-    const wrapper = mkWrapper({ modelValue: "", hasAttachments: false, isStreaming: false });
+    const wrapper = mkWrapper({
+      modelValue: "",
+      hasAttachments: false,
+      isStreaming: false,
+    });
     const btn = wrapper.find("[data-testid='send-btn']");
     expect(btn.attributes("disabled")).toBeDefined();
   });
 
   it("send button is enabled when hasAttachments is true", () => {
-    const wrapper = mkWrapper({ modelValue: "", hasAttachments: true, isStreaming: false });
+    const wrapper = mkWrapper({
+      modelValue: "",
+      hasAttachments: true,
+      isStreaming: false,
+    });
     const btn = wrapper.find("[data-testid='send-btn']");
     expect(btn.attributes("disabled")).toBeUndefined();
   });

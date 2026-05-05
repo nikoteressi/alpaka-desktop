@@ -2,12 +2,15 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import ConfirmationModal from "./ConfirmationModal.vue";
 
-function mkWrapper(
-  overrides: Record<string, unknown> = {},
-) {
+function mkWrapper(overrides: Record<string, unknown> = {}) {
   return mount(ConfirmationModal, {
     props: { show: true, ...overrides },
-    global: { stubs: { Teleport: true, Transition: { template: "<div><slot /></div>" } } },
+    global: {
+      stubs: {
+        Teleport: true,
+        Transition: { template: "<div><slot /></div>" },
+      },
+    },
   });
 }
 

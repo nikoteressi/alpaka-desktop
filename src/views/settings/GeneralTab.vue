@@ -23,11 +23,15 @@
 
     <SettingsRow icon="activity">
       <template #label>Performance statistics</template>
-      <template #subtitle>Show speed and token counts for every response.</template>
+      <template #subtitle
+        >Show speed and token counts for every response.</template
+      >
       <template #control>
         <ToggleSwitch
           :value="settingsStore.showPerformanceMetrics"
-          @change="settingsStore.updateSetting('showPerformanceMetrics', $event)"
+          @change="
+            settingsStore.updateSetting('showPerformanceMetrics', $event)
+          "
         />
       </template>
     </SettingsRow>
@@ -112,7 +116,9 @@
       class="mt-8 flex items-center justify-between px-4 py-3.5 bg-[var(--danger-muted)] border border-[var(--danger)]/20 rounded-xl gap-3"
     >
       <div>
-        <p class="text-[13px] font-bold text-[var(--text)]">Reset to defaults</p>
+        <p class="text-[13px] font-bold text-[var(--text)]">
+          Reset to defaults
+        </p>
         <p class="text-[11px] mt-0.5 text-[var(--text-dim)]">
           This will reset all your settings to their original values.
         </p>

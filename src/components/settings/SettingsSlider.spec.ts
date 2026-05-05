@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import SettingsSlider from "./SettingsSlider.vue";
 
-function mkWrapper(overrides: Partial<InstanceType<typeof SettingsSlider>["$props"]> = {}) {
+function mkWrapper(
+  overrides: Partial<InstanceType<typeof SettingsSlider>["$props"]> = {},
+) {
   return mount(SettingsSlider, {
     props: {
       label: "Temperature",
@@ -35,14 +37,21 @@ describe("SettingsSlider", () => {
   });
 
   it("uses formatValue prop when provided", () => {
-    const wrapper = mkWrapper({ modelValue: 5, step: 1, formatValue: (v) => `${v}x` });
+    const wrapper = mkWrapper({
+      modelValue: 5,
+      step: 1,
+      formatValue: (v) => `${v}x`,
+    });
     expect(wrapper.text()).toContain("5x");
   });
 
   it("emits update:modelValue as integer when step is integral", async () => {
     const wrapper = mkWrapper({ modelValue: 3, min: 0, max: 10, step: 1 });
     const input = wrapper.find("input[type='range']");
-    Object.defineProperty(input.element, "value", { value: "7", configurable: true });
+    Object.defineProperty(input.element, "value", {
+      value: "7",
+      configurable: true,
+    });
     await input.trigger("input");
     const emitted = wrapper.emitted("update:modelValue");
     expect(emitted).toBeTruthy();
@@ -53,7 +62,10 @@ describe("SettingsSlider", () => {
   it("emits update:modelValue as float when step is fractional", async () => {
     const wrapper = mkWrapper({ modelValue: 0.3, min: 0, max: 1, step: 0.1 });
     const input = wrapper.find("input[type='range']");
-    Object.defineProperty(input.element, "value", { value: "0.8", configurable: true });
+    Object.defineProperty(input.element, "value", {
+      value: "0.8",
+      configurable: true,
+    });
     await input.trigger("input");
     const emitted = wrapper.emitted("update:modelValue");
     expect(emitted).toBeTruthy();

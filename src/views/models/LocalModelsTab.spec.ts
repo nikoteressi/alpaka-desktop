@@ -36,9 +36,21 @@ const globalStubs = {
     ModelCard: {
       name: "ModelCard",
       template: '<div data-testid="model-card">{{ name }}</div>',
-      props: ["name", "tags", "fileSize", "date", "quant", "isInstalled",
-              "isFavorite", "onFavorite", "userTags", "onClick", "onDelete",
-              "onEditTags", "actionLabel"],
+      props: [
+        "name",
+        "tags",
+        "fileSize",
+        "date",
+        "quant",
+        "isInstalled",
+        "isFavorite",
+        "onFavorite",
+        "userTags",
+        "onClick",
+        "onDelete",
+        "onEditTags",
+        "actionLabel",
+      ],
     },
     CustomTooltip: { template: "<div><slot /></div>" },
   },
@@ -61,7 +73,9 @@ describe("LocalModelsTab", () => {
   });
 
   it("renders a loading spinner when isLoading is true", async () => {
-    const { wrapper } = await mountTab((s) => { s.isLoading = true; });
+    const { wrapper } = await mountTab((s) => {
+      s.isLoading = true;
+    });
     expect(wrapper.text()).toContain("Loading installed models");
   });
 

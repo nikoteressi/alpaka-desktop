@@ -63,7 +63,9 @@ const SHORTCUTS: Shortcut[] = [
     key: ",",
     shift: false,
     ignoreWhenInputFocused: true,
-    run: ({ router }) => { router.push("/settings"); },
+    run: ({ router }) => {
+      router.push("/settings");
+    },
   },
   {
     key: "h",
@@ -91,7 +93,8 @@ const SHORTCUTS: Shortcut[] = [
     key: "m",
     shift: false,
     ignoreWhenInputFocused: true,
-    run: () => appEvents.dispatchEvent(new Event(APP_EVENT.OPEN_MODEL_SWITCHER)),
+    run: () =>
+      appEvents.dispatchEvent(new Event(APP_EVENT.OPEN_MODEL_SWITCHER)),
   },
   {
     key: "arrowdown",

@@ -33,7 +33,9 @@ describe("AppTabs", () => {
   it("active tab has the app-tab--active class", () => {
     const wrapper = mount(AppTabs, { props: { modelValue: "b", tabs } });
     const buttons = wrapper.findAll("button.app-tab");
-    const activeBtn = buttons.find((b) => b.classes().includes("app-tab--active"));
+    const activeBtn = buttons.find((b) =>
+      b.classes().includes("app-tab--active"),
+    );
     expect(activeBtn?.text()).toBe("Beta");
   });
 });

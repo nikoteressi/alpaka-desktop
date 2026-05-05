@@ -2,7 +2,9 @@
   <textarea
     data-testid="chat-input"
     :value="modelValue"
-    @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+    @input="
+      $emit('update:modelValue', ($event.target as HTMLInputElement).value)
+    "
     @keydown="$emit('keydown', $event)"
     placeholder="Type a message…"
     class="w-full bg-transparent focus:outline-none resize-none overflow-hidden text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
@@ -11,7 +13,11 @@
   />
 
   <div class="flex items-end justify-end mt-2">
-    <div v-if="isStreaming" data-testid="streaming-indicator" style="display: none" />
+    <div
+      v-if="isStreaming"
+      data-testid="streaming-indicator"
+      style="display: none"
+    />
     <button
       data-testid="send-btn"
       @click="$emit('submit')"

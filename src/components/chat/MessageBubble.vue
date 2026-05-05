@@ -98,7 +98,10 @@ const { pause, resume, isActive } = useRafFn(
     const volatileContent = content.slice(lastStableIndex);
     streamingParts.value = [
       ...stableParts.value,
-      ...parseMessageParts(volatileContent, { renderMarkdown, allowOpenFence: true }),
+      ...parseMessageParts(volatileContent, {
+        renderMarkdown,
+        allowOpenFence: true,
+      }),
     ];
   },
   { immediate: false },

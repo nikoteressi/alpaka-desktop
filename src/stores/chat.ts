@@ -175,7 +175,8 @@ export const useChatStore = defineStore("chat", {
         content: this.streaming.buffer,
         tokens: stats.totalTokens ?? this.streaming.evalTokens,
         prompt_tokens: stats.promptTokens ?? this.streaming.promptTokens,
-        tokens_per_sec: stats.tokensPerSec ?? (this.streaming.tokensPerSec || 0),
+        tokens_per_sec:
+          stats.tokensPerSec ?? (this.streaming.tokensPerSec || 0),
         generation_time_ms: stats.generationTimeMs ?? 0,
         total_duration_ms: stats.totalDurationMs ?? 0,
         load_duration_ms: stats.loadDurationMs ?? 0,
