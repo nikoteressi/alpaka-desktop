@@ -109,7 +109,7 @@
           Edit Modelfile
         </button>
         <button
-          v-if="ollamaUsername"
+          v-if="isSignedIn"
           @click="openPushDialog"
           :disabled="activePushState?.phase === 'running'"
           class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[var(--text-muted)] border border-[var(--border)] rounded-lg hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -382,6 +382,7 @@ const { startNewChat } = useAppOrchestration();
 const { applyModelDefaults, saveAsModelDefault, resetModelDefaults } =
   useModelDefaults();
 
+const isSignedIn = ref(false);
 const ollamaUsername = ref("");
 const showPushDialog = ref(false);
 const pushCloudName = ref("");
@@ -457,9 +458,16 @@ async function saveTags() {
 
 onMounted(async () => {
   try {
-    ollamaUsername.value = await invoke<string>("get_ollama_username");
+    isSignedIn.value = await invoke<boolean>("check_ollama_signed_in");
   } catch {
-    ollamaUsername.value = "";
+    isSignedIn.value = false;
+  }
+  if (isSignedIn.value) {
+    try {
+      ollamaUsername.value = await invoke<string>("get_ollama_username");
+    } catch {
+      ollamaUsername.value = "";
+    }
   }
   try {
     const stored = await applyModelDefaults(props.model.name);
