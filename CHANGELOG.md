@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- E2E tests (`wdio run`) were crashing with `Failed to match capabilities` after Dependabot bumped `@wdio/local-runner`, `@wdio/mocha-framework`, `@wdio/types`, and `webdriverio` to v9 while `@wdio/cli` and `@wdio/spec-reporter` remained on v8; all wdio packages are now uniformly on v9.27.1
+
 ---
 
 ## [1.2.1] - 2026-05-04
