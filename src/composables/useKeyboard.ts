@@ -125,10 +125,10 @@ export function useKeyboard() {
   }
 
   function cleanup() {
-    window.removeEventListener("keydown", handler, { capture: true });
+    globalThis.removeEventListener("keydown", handler, { capture: true });
   }
 
-  window.addEventListener("keydown", handler, { capture: true });
+  globalThis.addEventListener("keydown", handler, { capture: true });
 
   return { cleanup };
 }

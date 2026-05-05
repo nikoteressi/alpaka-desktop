@@ -122,6 +122,12 @@
       <div class="stats-accordion__inner">
         <div class="full-stats-container">
           <table class="full-stats-table">
+            <thead class="sr-only">
+              <tr>
+                <th scope="col">Metric</th>
+                <th scope="col">Value</th>
+              </tr>
+            </thead>
             <tbody>
               <tr>
                 <td>Total Duration</td>

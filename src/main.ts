@@ -15,7 +15,7 @@ app.config.errorHandler = (err, _instance, info) => {
   console.error("[Vue Error]", info, err);
 };
 
-window.addEventListener("unhandledrejection", (event) => {
+globalThis.addEventListener("unhandledrejection", (event) => {
   console.error("[Unhandled Promise Rejection]", event.reason);
   event.preventDefault();
 });

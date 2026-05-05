@@ -44,8 +44,7 @@ export function useAttachments(options: AttachmentsOptions = {}) {
   const isDragging = ref(false);
 
   async function handleFiles(files: FileList | File[]) {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (const file of Array.from(files)) {
       if (file.type.startsWith("image/")) {
         const previewUrl = URL.createObjectURL(file);
         const data = new Uint8Array(await file.arrayBuffer());

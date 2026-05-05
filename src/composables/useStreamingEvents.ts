@@ -94,10 +94,10 @@ export function useStreamingEvents() {
       },
       onError: (_convId, error) => {
         console.error("Chat stream error:", error);
-        if (!chatStore.streaming.buffer.trim()) {
-          chatStore.streaming.buffer = `⚠️ **Error**: ${error}`;
-        } else {
+        if (chatStore.streaming.buffer.trim()) {
           chatStore.streaming.buffer += `\n\n⚠️ **Error**: ${error}`;
+        } else {
+          chatStore.streaming.buffer = `⚠️ **Error**: ${error}`;
         }
         chatStore.finalizeStreamedMessage(_convId);
         chatStore.streaming.isStreaming = false;

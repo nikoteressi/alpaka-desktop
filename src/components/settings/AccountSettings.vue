@@ -8,6 +8,7 @@
           <div class="w-14 h-14 flex items-center justify-center flex-shrink-0">
             <img
               src="../../assets/llama-main.png"
+              alt="Alpaka logo"
               class="w-full h-full object-contain themed-logo"
             />
           </div>
@@ -16,7 +17,7 @@
               {{ authStore.user.username }}
             </p>
             <p class="text-[12px] text-[var(--accent)]">
-              {{ authStore.user.email ?? "nikoteressi@gmail.com" }}
+              {{ authStore.user.email ?? "—" }}
             </p>
           </div>
         </div>
@@ -137,7 +138,7 @@ const showSignInForm = ref(false);
 const signInError = ref("");
 const isSigningIn = ref(false);
 const isAwaitingConfirmation = ref(false);
-let pollTimer: number | null = null;
+let pollTimer: ReturnType<typeof globalThis.setInterval> | null = null;
 
 async function submitSignIn() {
   isSigningIn.value = true;
@@ -154,7 +155,7 @@ async function submitSignIn() {
       try {
         await openUrl(connectUrl);
       } catch {
-        window.open(connectUrl, "_blank", "noopener,noreferrer");
+        globalThis.open(connectUrl, "_blank", "noopener,noreferrer");
       }
 
       // Transition to awaiting state and start polling
@@ -178,7 +179,7 @@ async function submitSignIn() {
 
 function startPolling() {
   stopPolling();
-  pollTimer = window.setInterval(async () => {
+  pollTimer = globalThis.setInterval(async () => {
     const hostId = hostStore.activeHostId || "default";
     const isSignedIn = await authStore.checkAuthStatus(hostId);
     if (isSignedIn) {
@@ -221,7 +222,7 @@ async function openOllamaAccount() {
   try {
     await openUrl("https://ollama.com/settings");
   } catch {
-    window.open("https://ollama.com/settings", "_blank", "noopener,noreferrer");
+    globalThis.open("https://ollama.com/settings", "_blank", "noopener,noreferrer");
   }
 }
 
@@ -229,7 +230,7 @@ async function openUpgrade() {
   try {
     await openUrl("https://ollama.com/upgrade");
   } catch {
-    window.open("https://ollama.com/upgrade", "_blank", "noopener,noreferrer");
+    globalThis.open("https://ollama.com/upgrade", "_blank", "noopener,noreferrer");
   }
 }
 

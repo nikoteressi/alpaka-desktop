@@ -265,9 +265,8 @@ const settingsStore = useSettingsStore();
 
 <template>
   <!-- User message: right-aligned bubble -->
-  <div
+  <article
     v-if="isUser"
-    role="article"
     aria-label="Your message"
     class="user-message"
     data-role="user"
@@ -297,17 +296,17 @@ const settingsStore = useSettingsStore();
           v-for="(img, idx) in message.images"
           :key="idx"
           :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
+          alt="Attached image"
           class="max-h-64 max-w-full rounded-lg object-contain border border-[var(--border-strong)]"
         />
       </div>
       {{ message.content }}
     </div>
-  </div>
+  </article>
 
   <!-- Assistant message: plain text area, no bubble -->
-  <div
+  <article
     v-else
-    role="article"
     aria-label="Assistant response"
     aria-live="polite"
     aria-atomic="false"
@@ -432,7 +431,7 @@ const settingsStore = useSettingsStore();
       :message-key="messageId"
       :seed="message.seed"
     />
-  </div>
+  </article>
 </template>
 
 <style scoped>
@@ -629,7 +628,7 @@ const settingsStore = useSettingsStore();
 /* ── Copy button ──────────────────────────────────────── */
 .copy-btn {
   background: none;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-dim);
   cursor: pointer;
   padding: 6px 10px;
@@ -642,7 +641,6 @@ const settingsStore = useSettingsStore();
   font-size: 11px;
   font-family: var(--sans);
   font-weight: 500;
-  border: 1px solid transparent;
 }
 
 .copy-btn:hover {

@@ -39,9 +39,9 @@ export function useContextWindow(opts: ContextWindowOptions) {
     const hasAssistantReply = chatStore.activeMessages.some(
       (m) => m.role === "assistant",
     );
-    const systemPromptTokens = !hasAssistantReply
-      ? Math.ceil(opts.globalSystemPrompt.value.length / 4)
-      : 0;
+    const systemPromptTokens = hasAssistantReply
+      ? 0
+      : Math.ceil(opts.globalSystemPrompt.value.length / 4);
 
     return (
       chatStore.totalActiveTokens +
