@@ -281,42 +281,11 @@
                     >
                       {{ modelStore.models.length }} Installed Models
                     </p>
-                    <CustomTooltip
-                      text="Check for model updates"
-                      wrapper-class="inline-flex"
-                    >
-                      <button
-                        @click="modelStore.triggerUpdateCheck()"
-                        :disabled="modelStore.isCheckingUpdates"
-                        class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2.5"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          :class="{
-                            'animate-spin': modelStore.isCheckingUpdates,
-                          }"
-                        >
-                          <polyline points="23 4 23 10 17 10" />
-                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                        </svg>
-                        {{
-                          modelStore.isCheckingUpdates
-                            ? "Checking..."
-                            : "Check for updates"
-                        }}
-                      </button>
-                    </CustomTooltip>
-                    <Transition name="fade-in">
+                    <Transition name="fade-in" mode="out-in">
                       <span
                         v-if="checkDoneMessage"
-                        class="text-[11px] ml-2"
+                        key="result"
+                        class="text-[11px]"
                         :class="
                           modelStore.updatesAvailableCount > 0
                             ? 'text-amber-400'
@@ -325,6 +294,40 @@
                       >
                         {{ checkDoneMessage }}
                       </span>
+                      <CustomTooltip
+                        v-else
+                        key="btn"
+                        text="Check for model updates"
+                        wrapper-class="inline-flex"
+                      >
+                        <button
+                          @click="modelStore.triggerUpdateCheck()"
+                          :disabled="modelStore.isCheckingUpdates"
+                          class="flex items-center gap-1 text-[11px] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <svg
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            :class="{
+                              'animate-spin': modelStore.isCheckingUpdates,
+                            }"
+                          >
+                            <polyline points="23 4 23 10 17 10" />
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                          </svg>
+                          {{
+                            modelStore.isCheckingUpdates
+                              ? "Checking..."
+                              : "Check for updates"
+                          }}
+                        </button>
+                      </CustomTooltip>
                     </Transition>
                   </div>
                   <!-- Tag filter bar — always visible when models exist -->
