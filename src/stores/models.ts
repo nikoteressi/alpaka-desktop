@@ -29,7 +29,7 @@ export function modelMatchesTag(
 }
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { extractErrorMessage } from "../lib/tauri";
+import { extractErrorMessage, extractTauriError } from "../lib/tauri";
 import type {
   Model,
   PullProgressPayload,
@@ -137,19 +137,7 @@ export const useModelStore = defineStore("models", {
             console.error("Failed to fetch capabilities for some models:", err),
         );
       } catch (e: unknown) {
-        // Tauri AppError serializes as a tagged object e.g. {"Http":"connection refused"}.
-        // Check instanceof Error first since Error properties are non-enumerable.
-        if (e instanceof Error) {
-          this.error = e.message;
-        } else if (e && typeof e === "object" && !Array.isArray(e)) {
-          const entries = Object.entries(e as Record<string, unknown>);
-          this.error =
-            entries.length > 0
-              ? entries.map(([k, v]) => `${k}: ${v}`).join("; ")
-              : JSON.stringify(e);
-        } else {
-          this.error = String(e);
-        }
+        this.error = extractTauriError(e);
         console.error("[models] fetchModels failed:", e);
       } finally {
         this.isLoading = false;

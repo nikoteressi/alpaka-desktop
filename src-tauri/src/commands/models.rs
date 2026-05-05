@@ -91,12 +91,18 @@ pub async fn delete_model(state: State<'_, AppState>, name: String) -> Result<()
     core_delete_model(&client, &name).await
 }
 
+fn compute_percent(completed: Option<u64>, total: Option<u64>) -> f64 {
+    match (completed, total) {
+        (Some(c), Some(t)) if t > 0 => c as f64 / t as f64 * 100.0,
+        _ => 0.0,
+    }
+}
+
 pub async fn core_pull_model<R: tauri::Runtime>(
     client: &OllamaClient,
     name: &str,
     app: &tauri::AppHandle<R>,
 ) -> Result<(), AppError> {
-    // Record start of pull in DB
     let payload = serde_json::json!({ "name": name, "stream": true });
 
     let resp = client.post("/api/pull").json(&payload).send().await?;
@@ -129,16 +135,6 @@ pub async fn core_pull_model<R: tauri::Runtime>(
                         return Err(AppError::Http(e.error));
                     }
                     if let Ok(progress) = serde_json::from_str::<PullProgress>(line) {
-                        let percent =
-                            if let (Some(c), Some(t)) = (progress.completed, progress.total) {
-                                if t > 0 {
-                                    (c as f64 / t as f64) * 100.0
-                                } else {
-                                    0.0
-                                }
-                            } else {
-                                0.0
-                            };
                         let _ = app.emit(
                             "model:pull-progress",
                             serde_json::json!({
@@ -146,7 +142,7 @@ pub async fn core_pull_model<R: tauri::Runtime>(
                                 "status": progress.status,
                                 "completed": progress.completed,
                                 "total": progress.total,
-                                "percent": percent,
+                                "percent": compute_percent(progress.completed, progress.total),
                             }),
                         );
                     }
@@ -221,16 +217,6 @@ pub async fn core_push_model<R: tauri::Runtime>(
                         return Err(AppError::Http(e.error));
                     }
                     if let Ok(progress) = serde_json::from_str::<PullProgress>(line) {
-                        let percent =
-                            if let (Some(c), Some(t)) = (progress.completed, progress.total) {
-                                if t > 0 {
-                                    (c as f64 / t as f64) * 100.0
-                                } else {
-                                    0.0
-                                }
-                            } else {
-                                0.0
-                            };
                         let _ = app.emit(
                             "model:push-progress",
                             serde_json::json!({
@@ -238,7 +224,7 @@ pub async fn core_push_model<R: tauri::Runtime>(
                                 "status": progress.status,
                                 "completed": progress.completed,
                                 "total": progress.total,
-                                "percent": percent,
+                                "percent": compute_percent(progress.completed, progress.total),
                             }),
                         );
                     }
