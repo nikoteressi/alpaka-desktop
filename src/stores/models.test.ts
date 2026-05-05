@@ -140,7 +140,7 @@ describe("useModelStore", () => {
     await store.initListeners();
     await store.initListeners();
 
-    expect(mockListen).toHaveBeenCalledTimes(5); // once for each event, not 10
+    expect(mockListen).toHaveBeenCalledTimes(6); // once for each event, not 12
   });
 
   it("fetchModels sets error from tagged-enum object { Http: 'connection refused' }", async () => {

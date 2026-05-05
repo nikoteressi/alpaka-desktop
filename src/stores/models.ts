@@ -42,6 +42,7 @@ import type {
   CreateProgressPayload,
   CreateDonePayload,
   CreateErrorPayload,
+  ModelUpdatesCheckedPayload,
 } from "../types/models";
 
 export type { ModelCapabilities };
@@ -63,6 +64,7 @@ export const useModelStore = defineStore("models", {
     isSearching: false,
     _searchTimer: null as ReturnType<typeof setTimeout> | null,
     _searchVersion: 0,
+    modelsWithUpdates: new Set<string>() as Set<string>,
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],
@@ -113,6 +115,9 @@ export const useModelStore = defineStore("models", {
       });
       return [...tagSet].sort((a, b) => a.localeCompare(b));
     },
+    hasUpdate: (state) => (name: string) =>
+      state.modelsWithUpdates.has(name),
+    updatesAvailableCount: (state) => state.modelsWithUpdates.size,
   },
   actions: {
     async fetchModels() {
@@ -322,6 +327,22 @@ export const useModelStore = defineStore("models", {
       this.isSearching = false;
       if (this._searchTimer) clearTimeout(this._searchTimer);
     },
+    async fetchInitialUpdateStatus(): Promise<void> {
+      try {
+        const outdated = await invoke<string[]>("get_models_with_updates");
+        this.modelsWithUpdates = new Set(outdated);
+      } catch (e) {
+        console.error("[models] fetchInitialUpdateStatus failed:", e);
+      }
+    },
+
+    async triggerUpdateCheck(): Promise<void> {
+      try {
+        await invoke("check_model_updates");
+      } catch (e) {
+        console.error("[models] triggerUpdateCheck failed:", e);
+      }
+    },
     async initListeners() {
       if (this.listenersInitialized) return;
       const unlistens: Array<() => void> = [];
@@ -335,6 +356,7 @@ export const useModelStore = defineStore("models", {
             listen<{ model: string }>("model:pull-done", (event) => {
               const payload = event.payload;
               delete this.pulling[payload.model];
+              this.modelsWithUpdates.delete(payload.model);
               this.fetchModels();
               this.fetchCapabilities(payload.model);
             }),
@@ -365,6 +387,12 @@ export const useModelStore = defineStore("models", {
                 }
               }
             }),
+            listen<ModelUpdatesCheckedPayload>(
+              "model:updates-checked",
+              (event) => {
+                this.modelsWithUpdates = new Set(event.payload.outdated);
+              },
+            ),
           ])),
         );
         this._unlisten = unlistens;
