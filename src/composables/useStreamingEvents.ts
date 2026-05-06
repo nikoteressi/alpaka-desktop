@@ -84,7 +84,7 @@ export function useStreamingEvents() {
           loadDurationMs: payload.load_duration_ms,
           promptEvalDurationMs: payload.prompt_eval_duration_ms,
           evalDurationMs: payload.eval_duration_ms,
-          seed: payload.seed,
+          seed: payload.seed ?? undefined,
         });
         chatStore.streaming.isStreaming = false;
         chatStore.streaming.tokensPerSec = payload.tokens_per_sec;

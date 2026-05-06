@@ -57,9 +57,9 @@ describe("useSendMessage", () => {
     store.messages["conv-1"] = [];
     store.conversations = [makeConv("conv-1")];
 
-    let resolveInvoke!: () => void;
+    let resolveInvoke!: (value: void | PromiseLike<void>) => void;
     vi.mocked(invoke).mockReturnValue(
-      new Promise((r) => {
+      new Promise<void>((r) => {
         resolveInvoke = r;
       }),
     );

@@ -33,7 +33,7 @@ import { useSettingsStore } from "../stores/settings";
 import { appEvents, APP_EVENT } from "../lib/appEvents";
 
 function fire(key: string, opts: KeyboardEventInit = {}) {
-  window.dispatchEvent(
+  globalThis.dispatchEvent(
     new KeyboardEvent("keydown", { key, bubbles: true, ...opts }),
   );
 }
