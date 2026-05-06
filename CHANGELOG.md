@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.3.0] - 2026-05-06
+
 ### Added
 - CL-04: Private model push/pull sync — "Mine" tab in Models page lists local `username/`-namespaced models; "Push to Cloud" button in model details streams upload progress via `model:push-*` events; "Pull a private model" input lets users pull by name; namespace naming hint in Create Model page guides naming for cloud push
 - MO-09: Model update notifications — background digest check every 6 h detects newer versions on ollama.com/library; Models nav item shows an update count badge; each outdated model shows an amber "Update" badge and a one-click re-pull button
@@ -123,7 +127,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.1...v1.3.0
 [1.2.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.0.1...v1.1.0
