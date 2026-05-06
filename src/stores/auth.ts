@@ -19,7 +19,10 @@ export const useAuthStore = defineStore("auth", {
         });
         this.authenticatedHosts[hostId] = isAuthenticated;
         if (isAuthenticated) {
-          this.user = { id: hostId, username: "Local Device" };
+          if (!this.user) {
+            this.user = { id: hostId, username: "" };
+          }
+          this.fetchOllamaUserProfile().catch(() => {});
         } else if (Object.values(this.authenticatedHosts).every((v) => !v)) {
           this.user = null;
         }
@@ -29,6 +32,28 @@ export const useAuthStore = defineStore("auth", {
         return false;
       } finally {
         this.isCheckingStatus = false;
+      }
+    },
+
+    async fetchOllamaUserProfile(): Promise<void> {
+      try {
+        const profile = await invoke<{
+          name: string;
+          email?: string;
+          plan?: string;
+        }>("get_ollama_user_profile");
+        if (this.user) {
+          this.user.username = profile.name;
+          this.user.email = profile.email;
+        } else {
+          this.user = {
+            id: "ollama-cloud",
+            username: profile.name,
+            email: profile.email,
+          };
+        }
+      } catch (err) {
+        console.warn("Could not fetch Ollama user profile:", err);
       }
     },
 
@@ -44,9 +69,6 @@ export const useAuthStore = defineStore("auth", {
       try {
         await invoke("login", { hostId, token });
         await this.checkAuthStatus(hostId);
-        if (this.authenticatedHosts[hostId]) {
-          this.user = { id: "local-user", username: "Ollama User" };
-        }
       } catch (error) {
         console.error(`Login failed for host ${hostId}:`, error);
         throw error;

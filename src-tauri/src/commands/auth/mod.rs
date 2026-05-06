@@ -1,8 +1,10 @@
 mod api_key;
 mod oauth;
+mod profile;
 
 pub use api_key::*;
 pub use oauth::*;
+pub use profile::*;
 
 use crate::db::DbConn;
 use crate::error::AppError;
