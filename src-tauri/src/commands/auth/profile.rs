@@ -57,10 +57,7 @@ pub async fn get_ollama_user_profile(
         .await
         .map_err(|e| AppError::Internal(format!("Failed to parse profile response: {e}")))?;
 
-    let name = body["name"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
+    let name = body["name"].as_str().unwrap_or("").to_string();
 
     if name.is_empty() {
         return Err(AppError::Auth(
