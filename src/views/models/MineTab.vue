@@ -43,7 +43,7 @@
         :name="model.name as string"
         :tags="[
           model.details.parameter_size,
-          ...getActiveCaps(model.name as string),
+          ...getActiveCapTags(modelStore.capabilities[model.name as string]),
         ]"
         :file-size="formatSize(model.size)"
         :date="formatDateShort(model.modified_at)"
@@ -174,6 +174,11 @@ import { useAuthStore } from "../../stores/auth";
 import type { ModelName } from "../../types/models";
 import ModelCard from "../../components/models/ModelCard.vue";
 import CustomTooltip from "../../components/shared/CustomTooltip.vue";
+import {
+  formatSize,
+  formatDateShort,
+  getActiveCapTags,
+} from "../../lib/modelFormatters";
 
 const emit = defineEmits<{
   "open-model": [name: string];
@@ -223,29 +228,5 @@ async function saveTagsFor(name: string) {
   await modelStore.setModelTags(name, tags);
   editingTagsFor.value = null;
   tagInputValue.value = "";
-}
-
-function getActiveCaps(name: string) {
-  const caps = modelStore.capabilities[name];
-  if (!caps) return [];
-  const tags: string[] = [];
-  if (caps.vision) tags.push("vision");
-  if (caps.tools) tags.push("tools");
-  if (caps.thinking) tags.push("thinking");
-  return tags;
-}
-
-function formatSize(bytes: number) {
-  if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + " GB";
-  if (bytes >= 1e6) return (bytes / 1e6).toFixed(0) + " MB";
-  return bytes + " B";
-}
-
-function formatDateShort(dateStr: string) {
-  if (!dateStr) return "Unknown";
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
 }
 </script>

@@ -5,6 +5,11 @@ import MineTab from "./MineTab.vue";
 import { useModelStore } from "../../stores/models";
 import { useAuthStore } from "../../stores/auth";
 import type { ModelName } from "../../types/models";
+import {
+  formatSize,
+  formatDateShort,
+  getActiveCapTags,
+} from "../../lib/modelFormatters";
 
 // --- Module-level mocks ---
 
@@ -385,117 +390,63 @@ describe("MineTab — tag editor", () => {
   });
 });
 
-describe("MineTab — getActiveCaps", () => {
-  beforeEach(() => {
-    setActivePinia(createPinia());
-    mockInvoke.mockResolvedValue(undefined);
-  });
-
-  it("returns empty array when capabilities not set for model", () => {
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as {
-      getActiveCaps: (name: string) => string[];
-    };
-    expect(vm.getActiveCaps("alice/unknown:latest")).toEqual([]);
+describe("modelFormatters — getActiveCapTags", () => {
+  it("returns empty array when capabilities undefined", () => {
+    expect(getActiveCapTags(undefined)).toEqual([]);
   });
 
   it("returns only the enabled capabilities", () => {
-    const modelStore = useModelStore();
-    modelStore.capabilities["alice/llava:7b"] = {
-      name: "alice/llava:7b",
+    const caps = {
+      name: "alice/llava:7b" as ModelName,
       vision: true,
       tools: false,
       thinking: true,
       thinking_toggleable: false,
-      thinking_levels: [],
+      thinking_levels: [] as string[],
       embedding: false,
       audio: false,
       cloud: false,
     };
-
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as {
-      getActiveCaps: (name: string) => string[];
-    };
-
-    const caps = vm.getActiveCaps("alice/llava:7b");
-    expect(caps).toContain("vision");
-    expect(caps).toContain("thinking");
-    expect(caps).not.toContain("tools");
+    const tags = getActiveCapTags(caps);
+    expect(tags).toContain("vision");
+    expect(tags).toContain("thinking");
+    expect(tags).not.toContain("tools");
   });
 
-  it("returns all three when all caps are enabled", () => {
-    const modelStore = useModelStore();
-    modelStore.capabilities["alice/full:7b"] = {
-      name: "alice/full:7b" as import("../../types/models").ModelName,
+  it("returns all three when all caps enabled", () => {
+    const caps = {
+      name: "alice/full:7b" as ModelName,
       vision: true,
       tools: true,
       thinking: true,
       thinking_toggleable: true,
-      thinking_levels: [],
+      thinking_levels: [] as string[],
       embedding: false,
       audio: false,
       cloud: false,
     };
-
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as {
-      getActiveCaps: (name: string) => string[];
-    };
-
-    expect(vm.getActiveCaps("alice/full:7b")).toEqual([
-      "vision",
-      "tools",
-      "thinking",
-    ]);
+    expect(getActiveCapTags(caps)).toEqual(["vision", "tools", "thinking"]);
   });
 });
 
-describe("MineTab — formatSize", () => {
-  beforeEach(() => {
-    setActivePinia(createPinia());
-    mockInvoke.mockResolvedValue(undefined);
-  });
-
+describe("modelFormatters — formatSize", () => {
   it("formats bytes >= 1e9 as GB", () => {
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as { formatSize: (b: number) => string };
-    expect(vm.formatSize(4_200_000_000)).toBe("4.2 GB");
+    expect(formatSize(4_200_000_000)).toBe("4.2 GB");
   });
-
   it("formats bytes >= 1e6 as MB", () => {
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as { formatSize: (b: number) => string };
-    expect(vm.formatSize(500_000_000)).toBe("500 MB");
+    expect(formatSize(500_000_000)).toBe("500 MB");
   });
-
   it("formats small bytes as raw bytes", () => {
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as { formatSize: (b: number) => string };
-    expect(vm.formatSize(1024)).toBe("1024 B");
+    expect(formatSize(1024)).toBe("1024 B");
   });
 });
 
-describe("MineTab — formatDateShort", () => {
-  beforeEach(() => {
-    setActivePinia(createPinia());
-    mockInvoke.mockResolvedValue(undefined);
-  });
-
+describe("modelFormatters — formatDateShort", () => {
   it('returns "Unknown" for an empty string', () => {
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as {
-      formatDateShort: (s: string) => string;
-    };
-    expect(vm.formatDateShort("")).toBe("Unknown");
+    expect(formatDateShort("")).toBe("Unknown");
   });
-
   it("returns a formatted date string for a valid ISO date", () => {
-    const wrapper = mountMineTab();
-    const vm = wrapper.vm as unknown as {
-      formatDateShort: (s: string) => string;
-    };
-    const result = vm.formatDateShort("2026-01-15T12:00:00Z");
+    const result = formatDateShort("2026-01-15T12:00:00Z");
     expect(result).toBeTruthy();
     expect(result).not.toBe("Unknown");
   });

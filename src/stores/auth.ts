@@ -20,7 +20,7 @@ export const useAuthStore = defineStore("auth", {
         this.authenticatedHosts[hostId] = isAuthenticated;
         if (isAuthenticated) {
           if (!this.user) {
-            this.user = { id: hostId, username: "" };
+            this.user = { id: hostId, username: "Local Device" };
           }
           this.fetchOllamaUserProfile().catch(() => {});
         } else if (Object.values(this.authenticatedHosts).every((v) => !v)) {
