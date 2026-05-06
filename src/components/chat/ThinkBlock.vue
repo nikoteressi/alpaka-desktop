@@ -89,7 +89,7 @@ const contentEl = ref<HTMLElement | null>(null);
 const label = computed(() => {
   if (props.isThinking) return "Thinking...";
   const t = props.thinkTime;
-  if (t !== null && t !== undefined && !isNaN(t)) {
+  if (t !== null && t !== undefined && !Number.isNaN(t)) {
     return `Thought for ${t.toFixed(1)} seconds`;
   }
   return "Thoughts";

@@ -13,9 +13,10 @@ pub fn setup(app: &AppHandle) -> Result<tauri::tray::TrayIcon, Box<dyn std::erro
 
     let menu = Menu::with_items(app, &[&show_i, &hide_i, &quit_i])?;
 
-    // Embed both light and dark icons
-    let icon_white: &[u8] = include_bytes!("../../icons/32x32_dark.png");
-    let icon_dark: &[u8] = include_bytes!("../../icons/32x32.png");
+    // tray_white.png = white icon (visible on dark panels/dark theme)
+    // tray_dark.png  = black icon (visible on light panels/light theme)
+    let icon_white: &[u8] = include_bytes!("../../icons/tray_white.png");
+    let icon_dark: &[u8] = include_bytes!("../../icons/tray_dark.png");
 
     // Get theme from the first available window
     let window_theme = app
@@ -77,11 +78,9 @@ pub fn update_icon(
     tray: &tauri::tray::TrayIcon,
     theme: tauri::Theme,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let icon_white: &[u8] = include_bytes!("../../icons/32x32_dark.png");
-    let icon_dark: &[u8] = include_bytes!("../../icons/32x32.png");
+    let icon_white: &[u8] = include_bytes!("../../icons/tray_white.png");
+    let icon_dark: &[u8] = include_bytes!("../../icons/tray_dark.png");
 
-    // Theme::Light -> needs Dark icon
-    // Theme::Dark -> needs White icon
     let icon_bytes = if theme == tauri::Theme::Light {
         icon_dark
     } else {

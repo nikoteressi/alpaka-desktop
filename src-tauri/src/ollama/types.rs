@@ -94,6 +94,8 @@ pub struct ChatOptions {
     pub mirostat_tau: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mirostat_eta: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub num_gpu: Option<i32>,
 }
 
 impl ChatOptions {
@@ -111,6 +113,7 @@ impl ChatOptions {
             mirostat: self.mirostat.or(fallback.mirostat),
             mirostat_tau: self.mirostat_tau.or(fallback.mirostat_tau),
             mirostat_eta: self.mirostat_eta.or(fallback.mirostat_eta),
+            num_gpu: self.num_gpu.or(fallback.num_gpu),
         }
     }
 }
@@ -287,5 +290,57 @@ mod tests {
         }"#;
         let resp: StreamResponse = serde_json::from_str(json).unwrap();
         assert!(resp.message.thinking.is_none());
+    }
+
+    #[test]
+    fn test_num_gpu_serialized_when_set() {
+        let opts = ChatOptions {
+            num_gpu: Some(20),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&opts).unwrap();
+        assert_eq!(val["num_gpu"], 20);
+    }
+
+    #[test]
+    fn test_num_gpu_omitted_when_none() {
+        let opts = ChatOptions::default();
+        let val = serde_json::to_value(&opts).unwrap();
+        assert!(val.get("num_gpu").is_none());
+    }
+
+    #[test]
+    fn test_num_gpu_merge_primary_wins() {
+        let primary = ChatOptions {
+            num_gpu: Some(10),
+            ..Default::default()
+        };
+        let fallback = ChatOptions {
+            num_gpu: Some(30),
+            ..Default::default()
+        };
+        let merged = primary.merge_with_fallback(&fallback);
+        assert_eq!(merged.num_gpu, Some(10));
+    }
+
+    #[test]
+    fn test_num_gpu_merge_fallback_fills() {
+        let primary = ChatOptions::default();
+        let fallback = ChatOptions {
+            num_gpu: Some(20),
+            ..Default::default()
+        };
+        let merged = primary.merge_with_fallback(&fallback);
+        assert_eq!(merged.num_gpu, Some(20));
+    }
+
+    #[test]
+    fn test_num_gpu_negative_one_serialized() {
+        let opts = ChatOptions {
+            num_gpu: Some(-1),
+            ..Default::default()
+        };
+        let val = serde_json::to_value(&opts).unwrap();
+        assert_eq!(val["num_gpu"], -1);
     }
 }

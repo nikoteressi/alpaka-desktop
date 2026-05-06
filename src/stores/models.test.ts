@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useModelStore, modelMatchesTag } from "./models";
+import type { ModelName } from "../types/models";
 
 const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -15,20 +16,34 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 const MOCK_MODELS = [
   {
-    name: "llama3:latest",
+    name: "llama3:latest" as ModelName,
     model: "llama3:latest",
     modified_at: "",
     size: 1000,
     digest: "abc",
-    details: {},
+    details: {
+      parent_model: "",
+      format: "gguf",
+      family: "llama",
+      families: null,
+      parameter_size: "8B",
+      quantization_level: "Q4_0",
+    },
   },
   {
-    name: "mistral:latest",
+    name: "mistral:latest" as ModelName,
     model: "mistral:latest",
     modified_at: "",
     size: 2000,
     digest: "def",
-    details: {},
+    details: {
+      parent_model: "",
+      format: "gguf",
+      family: "llama",
+      families: null,
+      parameter_size: "8B",
+      quantization_level: "Q4_0",
+    },
   },
 ];
 
@@ -131,6 +146,7 @@ describe("useModelStore", () => {
     const registeredEvents = mockListen.mock.calls.map(([event]) => event);
     expect(registeredEvents).toContain("model:pull-progress");
     expect(registeredEvents).toContain("model:pull-done");
+    expect(registeredEvents).toContain("model:pull-error");
     expect(store.listenersInitialized).toBe(true);
   });
 
@@ -140,7 +156,7 @@ describe("useModelStore", () => {
     await store.initListeners();
     await store.initListeners();
 
-    expect(mockListen).toHaveBeenCalledTimes(5); // once for each event, not 10
+    expect(mockListen).toHaveBeenCalledTimes(10); // once for each event, not 20
   });
 
   it("fetchModels sets error from tagged-enum object { Http: 'connection refused' }", async () => {
@@ -310,20 +326,34 @@ describe("useModelStore", () => {
         const store = useModelStore();
         store.models = [
           {
-            name: "gemma2:9b",
+            name: "gemma2:9b" as ModelName,
             model: "gemma2:9b",
             modified_at: "",
             size: 0,
             digest: "",
-            details: {},
+            details: {
+              parent_model: "",
+              format: "gguf",
+              family: "llama",
+              families: null,
+              parameter_size: "8B",
+              quantization_level: "Q4_0",
+            },
           },
           {
-            name: "llama3:8b",
+            name: "llama3:8b" as ModelName,
             model: "llama3:8b",
             modified_at: "",
             size: 0,
             digest: "",
-            details: {},
+            details: {
+              parent_model: "",
+              format: "gguf",
+              family: "llama",
+              families: null,
+              parameter_size: "8B",
+              quantization_level: "Q4_0",
+            },
           },
         ];
         store.modelUserData["llama3:8b"] = {
@@ -394,9 +424,12 @@ describe("useModelStore", () => {
           "llama3:8b": { name: "llama3:8b", isFavorite: false, tags: ["fast"] },
         };
         store.capabilities["llama3:8b"] = {
+          name: "llama3:8b" as ModelName,
           vision: true,
           tools: false,
           thinking: false,
+          thinking_toggleable: false,
+          thinking_levels: [],
           embedding: false,
           cloud: false,
           audio: false,
@@ -410,9 +443,12 @@ describe("useModelStore", () => {
       it("includes all capability tag types when present", () => {
         const store = useModelStore();
         store.capabilities["model:latest"] = {
+          name: "model:latest" as ModelName,
           vision: true,
           tools: true,
           thinking: true,
+          thinking_toggleable: false,
+          thinking_levels: [],
           embedding: true,
           cloud: true,
           audio: true,
@@ -500,13 +536,24 @@ describe("useModelStore", () => {
       modified_at: "",
       size: 0,
       digest: "",
-      details: {},
+      details: {
+        parent_model: "",
+        format: "gguf",
+        family: "llama",
+        families: null,
+        parameter_size: "8B",
+        quantization_level: "Q4_0",
+      },
     };
 
     it("returns true for exact name match", () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest", model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
       expect(store.isInstalled("llama3:latest")).toBe(true);
     });
@@ -514,7 +561,11 @@ describe("useModelStore", () => {
     it("returns true when model name starts with prefix + ':'", () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest", model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
       expect(store.isInstalled("llama3")).toBe(true);
     });
@@ -522,7 +573,11 @@ describe("useModelStore", () => {
     it("returns false when model is not installed", () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest", model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
       expect(store.isInstalled("mistral")).toBe(false);
     });
@@ -533,20 +588,34 @@ describe("useModelStore", () => {
       const store = useModelStore();
       store.models = [
         {
-          name: "model-a",
+          name: "model-a" as ModelName,
           model: "model-a",
           modified_at: "",
           size: 0,
           digest: "",
-          details: {},
+          details: {
+            parent_model: "",
+            format: "gguf",
+            family: "llama",
+            families: null,
+            parameter_size: "8B",
+            quantization_level: "Q4_0",
+          },
         },
         {
-          name: "model-b",
+          name: "model-b" as ModelName,
           model: "model-b",
           modified_at: "",
           size: 0,
           digest: "",
-          details: {},
+          details: {
+            parent_model: "",
+            format: "gguf",
+            family: "llama",
+            families: null,
+            parameter_size: "8B",
+            quantization_level: "Q4_0",
+          },
         },
       ];
       const sorted = store.sortedModels;
@@ -559,13 +628,15 @@ describe("useModelStore", () => {
     it("returns cached capabilities without invoking again", async () => {
       const store = useModelStore();
       store.capabilities["llama3:latest"] = {
+        name: "llama3:latest" as ModelName,
         vision: false,
         tools: false,
         thinking: false,
+        thinking_toggleable: false,
+        thinking_levels: [],
         embedding: false,
         cloud: false,
         audio: false,
-        name: "llama3:latest",
       };
       const result = await store.fetchCapabilities("llama3:latest");
       expect(mockInvoke).not.toHaveBeenCalled();
@@ -640,13 +711,24 @@ describe("useModelStore", () => {
       modified_at: "",
       size: 0,
       digest: "",
-      details: {},
+      details: {
+        parent_model: "",
+        format: "gguf",
+        family: "llama",
+        families: null,
+        parameter_size: "8B",
+        quantization_level: "Q4_0",
+      },
     };
 
     it("does not pull when model is already installed", async () => {
       const store = useModelStore();
       store.models = [
-        { name: "llama3:latest", model: "llama3:latest", ...baseModel },
+        {
+          name: "llama3:latest" as ModelName,
+          model: "llama3:latest",
+          ...baseModel,
+        },
       ];
 
       await store.addCloudModel("llama3:latest");

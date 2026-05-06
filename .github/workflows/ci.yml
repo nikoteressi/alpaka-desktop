@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main, develop, release/*, hotfix/*]
+    tags: ['v*']
   pull_request:
     branches: [main, develop, release/*, hotfix/*]
 
@@ -229,7 +230,7 @@ jobs:
 
       - name: Cargo clippy
         if: needs.changes.outputs.rust == 'true'
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
         working-directory: src-tauri
 
       - name: Setup pnpm
@@ -297,7 +298,7 @@ jobs:
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -338,7 +339,7 @@ jobs:
         if: needs.changes.outputs.rust == 'true'
         run: |
           mkdir -p coverage-rust
-          cargo llvm-cov nextest --no-report --workspace --locked
+          cargo llvm-cov nextest --no-report --workspace --locked --features test-mode
           cargo llvm-cov report --lcov --output-path coverage-rust/lcov.info
           cargo llvm-cov report --html --output-dir coverage-rust/html
         working-directory: src-tauri
@@ -499,7 +500,8 @@ jobs:
             libssl-dev \
             pkg-config \
             webkit2gtk-driver \
-            xvfb
+            xvfb \
+            zstd
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
@@ -531,7 +533,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Ollama
-        run: curl -fsSL https://ollama.com/install.sh | sh
+        env:
+          OLLAMA_VERSION: "0.23.0"
+        run: |
+          curl -fsSL "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst" \
+            | zstd -d | tar -xf - -C /usr/local bin/ollama
+          chmod +x /usr/local/bin/ollama
 
       - name: Start Ollama and pull test model
         run: |

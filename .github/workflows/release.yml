@@ -100,6 +100,25 @@ jobs:
           fetch-depth: 0
 
       # ------------------------------------------------------------------ #
+      # 1b. Version consistency preflight                                   #
+      # ------------------------------------------------------------------ #
+      - name: Verify version consistency
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(jq -r '.version' package.json)
+          CARGO_VERSION=$(grep '^version = ' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          TAURI_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          CHANGELOG_MATCH=$(grep "^## \[${TAG}\]" CHANGELOG.md || echo "")
+          FAIL=0
+          [ "$PKG_VERSION"   != "$TAG" ] && echo "ERROR: package.json version (${PKG_VERSION}) != tag (${TAG})"       && FAIL=1
+          [ "$CARGO_VERSION" != "$TAG" ] && echo "ERROR: Cargo.toml version (${CARGO_VERSION}) != tag (${TAG})"       && FAIL=1
+          [ "$TAURI_VERSION" != "$TAG" ] && echo "ERROR: tauri.conf.json version (${TAURI_VERSION}) != tag (${TAG})"  && FAIL=1
+          [ -z "$CHANGELOG_MATCH"      ] && echo "ERROR: CHANGELOG.md has no entry for [${TAG}]"                      && FAIL=1
+          [ $FAIL -eq 0 ] && echo "All version sources match tag ${TAG}."
+          exit $FAIL
+
+      # ------------------------------------------------------------------ #
       # 2. Rust stable with Swatinem cache                                  #
       # ------------------------------------------------------------------ #
       - name: Install Rust stable
@@ -276,6 +295,8 @@ jobs:
 
       - name: Generate .SRCINFO via Arch Linux container
         if: steps.guard.outputs.run == 'true'
+        # TODO: pin archlinux/archlinux:base-devel by digest for reproducible builds
+        # e.g. archlinux/archlinux@sha256:<digest>  (run: docker pull archlinux/archlinux:base-devel && docker inspect --format='{{index .RepoDigests 0}}')
         run: |
           docker run --rm \
             -v "$(pwd)/packaging/aur:/pkg" \

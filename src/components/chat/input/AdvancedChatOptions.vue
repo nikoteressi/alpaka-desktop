@@ -294,7 +294,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from "vue";
+import {
+  ref,
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  onBeforeUnmount,
+} from "vue";
 import { useSettingsStore } from "../../../stores/settings";
 import type { ChatOptions, PresetOptions } from "../../../types/settings";
 import SettingsSlider from "../../settings/SettingsSlider.vue";
@@ -413,6 +420,14 @@ async function commitSave() {
   saveName.value = "";
 }
 
+let savedTimer: ReturnType<typeof setTimeout> | null = null;
+let errorTimer: ReturnType<typeof setTimeout> | null = null;
+
+onBeforeUnmount(() => {
+  if (savedTimer) clearTimeout(savedTimer);
+  if (errorTimer) clearTimeout(errorTimer);
+});
+
 async function handleSaveAsModelDefault() {
   if (!props.model || savingDefault.value) return;
   const effective = resolveCurrentOptions();
@@ -422,13 +437,13 @@ async function handleSaveAsModelDefault() {
   try {
     await saveAsModelDefault(props.model, effective);
     savedAsDefault.value = true;
-    setTimeout(() => {
+    savedTimer = setTimeout(() => {
       savedAsDefault.value = false;
     }, 2000);
   } catch (e) {
     console.error("[AdvancedChatOptions] set_model_defaults failed:", e);
     saveDefaultError.value = true;
-    setTimeout(() => {
+    errorTimer = setTimeout(() => {
       saveDefaultError.value = false;
     }, 3000);
   } finally {

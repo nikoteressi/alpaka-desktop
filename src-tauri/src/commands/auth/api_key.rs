@@ -152,7 +152,12 @@ pub async fn validate_api_key(
     state: tauri::State<'_, crate::state::AppState>,
     host_id: String,
 ) -> Result<bool, AppError> {
-    perform_validate_api_key(&state.http_client, state.db.clone(), host_id).await
+    let client = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    perform_validate_api_key(&client, state.db.clone(), host_id).await
 }
 
 #[cfg(test)]

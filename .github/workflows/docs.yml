@@ -6,6 +6,13 @@ on:
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'
+      - 'package.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+      - 'package.json'
   workflow_dispatch:
 
 permissions:
@@ -45,6 +52,7 @@ jobs:
     name: Deploy to gh-pages
     runs-on: ubuntu-22.04
     needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     concurrency:

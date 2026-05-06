@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 
@@ -56,5 +56,26 @@ describe("CodeBlock — collapse behavior", () => {
     await nextTick();
     // 50 total - 25 shown = 25 hidden
     expect(wrapper.find(".collapse-button").text()).toContain("25");
+  });
+});
+
+describe("CodeBlock — onBeforeUnmount cleanup", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("clears the pending highlight timeout on unmount so it does not fire after teardown", async () => {
+    vi.useFakeTimers();
+
+    const wrapper = mount(CodeBlock, {
+      props: { code: makeCode(5), language: "ts" },
+    });
+    await nextTick();
+
+    // Unmounting before the debounced highlight fires should not throw
+    expect(() => {
+      wrapper.unmount();
+      vi.advanceTimersByTime(500);
+    }).not.toThrow();
   });
 });

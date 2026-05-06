@@ -157,7 +157,12 @@ pub async fn core_ping_host(
 
 #[tauri::command]
 pub async fn ping_host(state: State<'_, AppState>, id: String) -> Result<PingStatus, AppError> {
-    core_ping_host(state.db.clone(), state.http_client.clone(), id).await
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    core_ping_host(state.db.clone(), http, id).await
 }
 
 /// MED-10: Start the host health check loop with a shutdown channel.
@@ -172,15 +177,20 @@ pub fn start_host_health_loop(
             let state = app.state::<AppState>();
             state.db.clone()
         };
-        let client = {
-            let state = app.state::<AppState>();
-            state.http_client.clone()
-        };
 
         // Pin the shutdown receiver so it can be used in select!
         tokio::pin!(shutdown_rx);
 
         loop {
+            // Re-acquire the client on each iteration so proxy changes applied
+            // at runtime (via commands/proxy.rs) are picked up immediately.
+            let client = app
+                .state::<AppState>()
+                .http_client
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+
             let hosts = match tokio::task::spawn_blocking({
                 let db = db.clone();
                 move || {

@@ -45,6 +45,11 @@ pub struct PullProgress {
     pub completed: Option<u64>,
 }
 
+#[derive(Debug, Deserialize)]
+struct StreamError {
+    error: String,
+}
+
 pub async fn core_list_models(client: &OllamaClient) -> Result<Vec<Model>, AppError> {
     let resp = client.get("/api/tags").send().await?;
     let tags_resp: TagsResponse = resp.json().await?;
@@ -53,7 +58,12 @@ pub async fn core_list_models(client: &OllamaClient) -> Result<Vec<Model>, AppEr
 
 #[tauri::command]
 pub async fn list_models(state: State<'_, AppState>) -> Result<Vec<Model>, AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_list_models(&client).await
 }
 
@@ -72,8 +82,20 @@ pub async fn core_delete_model(client: &OllamaClient, name: &str) -> Result<(), 
 
 #[tauri::command]
 pub async fn delete_model(state: State<'_, AppState>, name: String) -> Result<(), AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_delete_model(&client, &name).await
+}
+
+fn compute_percent(completed: Option<u64>, total: Option<u64>) -> f64 {
+    match (completed, total) {
+        (Some(c), Some(t)) if t > 0 => c as f64 / t as f64 * 100.0,
+        _ => 0.0,
+    }
 }
 
 pub async fn core_pull_model<R: tauri::Runtime>(
@@ -81,7 +103,6 @@ pub async fn core_pull_model<R: tauri::Runtime>(
     name: &str,
     app: &tauri::AppHandle<R>,
 ) -> Result<(), AppError> {
-    // Record start of pull in DB
     let payload = serde_json::json!({ "name": name, "stream": true });
 
     let resp = client.post("/api/pull").json(&payload).send().await?;
@@ -92,26 +113,28 @@ pub async fn core_pull_model<R: tauri::Runtime>(
     }
 
     let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
 
     while let Some(chunk_res) = stream.next().await {
         match chunk_res {
             Ok(bytes) => {
-                let text = String::from_utf8_lossy(&bytes);
-                for line in text.lines() {
-                    if line.trim().is_empty() {
+                buf.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = buf.find('\n') {
+                    let line = buf.drain(..=pos).collect::<String>();
+                    let line = line.trim();
+                    if line.is_empty() {
                         continue;
                     }
+                    // Daemon embeds auth/namespace errors as {"error":"..."} lines.
+                    if let Ok(e) = serde_json::from_str::<StreamError>(line) {
+                        let _ = app.emit(
+                            "model:pull-error",
+                            serde_json::json!({ "model": name, "error": e.error }),
+                        );
+                        crate::system::notifications::notify_model_pull_failed(app, name, &e.error);
+                        return Err(AppError::Http(e.error));
+                    }
                     if let Ok(progress) = serde_json::from_str::<PullProgress>(line) {
-                        let percent =
-                            if let (Some(c), Some(t)) = (progress.completed, progress.total) {
-                                if t > 0 {
-                                    (c as f64 / t as f64) * 100.0
-                                } else {
-                                    0.0
-                                }
-                            } else {
-                                0.0
-                            };
                         let _ = app.emit(
                             "model:pull-progress",
                             serde_json::json!({
@@ -119,7 +142,7 @@ pub async fn core_pull_model<R: tauri::Runtime>(
                                 "status": progress.status,
                                 "completed": progress.completed,
                                 "total": progress.total,
-                                "percent": percent,
+                                "percent": compute_percent(progress.completed, progress.total),
                             }),
                         );
                     }
@@ -144,8 +167,99 @@ pub async fn pull_model<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     name: String,
 ) -> Result<(), AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     core_pull_model(&client, &name, &app).await
+}
+
+pub async fn core_push_model<R: tauri::Runtime>(
+    client: &OllamaClient,
+    name: &str,
+    app: &tauri::AppHandle<R>,
+) -> Result<(), AppError> {
+    let payload = serde_json::json!({ "name": name, "stream": true });
+
+    let resp = client.post("/api/push").json(&payload).send().await?;
+    if !resp.status().is_success() {
+        let err_msg = format!("Failed to push model: {}", resp.status());
+        let _ = app.emit(
+            "model:push-error",
+            serde_json::json!({ "model": name, "error": err_msg }),
+        );
+        crate::system::notifications::notify_model_push_failed(app, name, &err_msg);
+        return Err(AppError::Http(err_msg));
+    }
+
+    let mut stream = resp.bytes_stream();
+    let mut buf = String::new();
+
+    while let Some(chunk_res) = stream.next().await {
+        match chunk_res {
+            Ok(bytes) => {
+                buf.push_str(&String::from_utf8_lossy(&bytes));
+                while let Some(pos) = buf.find('\n') {
+                    let line = buf.drain(..=pos).collect::<String>();
+                    let line = line.trim();
+                    if line.is_empty() {
+                        continue;
+                    }
+                    // Daemon embeds auth/namespace errors as {"error":"..."} lines.
+                    if let Ok(e) = serde_json::from_str::<StreamError>(line) {
+                        let _ = app.emit(
+                            "model:push-error",
+                            serde_json::json!({ "model": name, "error": e.error }),
+                        );
+                        crate::system::notifications::notify_model_push_failed(app, name, &e.error);
+                        return Err(AppError::Http(e.error));
+                    }
+                    if let Ok(progress) = serde_json::from_str::<PullProgress>(line) {
+                        let _ = app.emit(
+                            "model:push-progress",
+                            serde_json::json!({
+                                "model": name,
+                                "status": progress.status,
+                                "completed": progress.completed,
+                                "total": progress.total,
+                                "percent": compute_percent(progress.completed, progress.total),
+                            }),
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                let _ = app.emit(
+                    "model:push-error",
+                    serde_json::json!({ "model": name, "error": err_msg }),
+                );
+                crate::system::notifications::notify_model_push_failed(app, name, &err_msg);
+                return Err(AppError::Http(err_msg));
+            }
+        }
+    }
+
+    let _ = app.emit("model:push-done", serde_json::json!({ "model": name }));
+    crate::system::notifications::notify_model_pushed(app, name);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn push_model<R: tauri::Runtime>(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle<R>,
+    name: String,
+) -> Result<(), AppError> {
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
+    core_push_model(&client, &name, &app).await
 }
 
 /// Response from Ollama's /api/show endpoint
@@ -200,7 +314,12 @@ pub async fn get_model_capabilities(
     state: State<'_, AppState>,
     name: String,
 ) -> Result<ModelCapabilities, AppError> {
-    let client = OllamaClient::from_state(state.http_client.clone(), state.db.clone()).await?;
+    let http = state
+        .http_client
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    let client = OllamaClient::from_state(http, state.db.clone()).await?;
     let resp = client
         .post("/api/show")
         .json(&serde_json::json!({ "name": name, "verbose": false }))
@@ -501,5 +620,122 @@ not json at all
             "llama.context_length": "not-a-number"
         });
         assert_eq!(extract_context_length_from_info(&model_info), None);
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_success() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body(
+                r#"{"status":"starting upload","digest":"sha256:abc","total":100,"completed":0}
+{"status":"pushing manifest","completed":80,"total":100}
+{"status":"success"}
+"#,
+            )
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "myuser/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_http_error() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(403)
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "myuser/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_invalid_chunk_skips_line() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body(
+                r#"{"status":"starting upload","completed":0,"total":100}
+not valid json at all
+{"status":"success"}
+"#,
+            )
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "myuser/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_core_pull_model_stream_error_field_returns_err() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/pull")
+            .with_status(200)
+            .with_body(
+                r#"{"status":"pulling manifest"}
+{"error":"unauthorized: access denied"}
+"#,
+            )
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+
+        let app = tauri::test::mock_app();
+        let result = core_pull_model(&client, "myuser/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_core_push_model_stream_error_field_returns_err() {
+        let mut server = Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/push")
+            .with_status(200)
+            .with_body(
+                r#"{"status":"starting upload","completed":0,"total":100}
+{"error":"unauthorized: access denied"}
+"#,
+            )
+            .create_async()
+            .await;
+
+        let req_client = reqwest::Client::new();
+        let client = OllamaClient::new(req_client, server.url(), None);
+
+        let app = tauri::test::mock_app();
+        let result = core_push_model(&client, "myuser/mymodel:latest", app.handle()).await;
+        mock.assert_async().await;
+
+        assert!(result.is_err());
     }
 }

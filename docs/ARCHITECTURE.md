@@ -1,6 +1,6 @@
 # Alpaka Desktop — Architecture Document
 
-> **v1.0.1** — 2026-04-27
+> **v1.3.0-pre** — 2026-05-06
 > Companion to [PRODUCT_SPEC.md](PRODUCT_SPEC.md)
 
 ---
@@ -27,7 +27,7 @@
 │  │                        │    │  ├─────────────────────┤  │ │
 │  │  ┌──────────────────┐  │    │  │  Ollama Client      │  │ │
 │  │  │  Composables     │  │    │  │  (ollama/)          │  │ │
-│  │  │  12 composables  │  │    │  ├─────────────────────┤  │ │
+│  │  │  17 composables  │  │    │  ├─────────────────────┤  │ │
 │  │  └──────────────────┘  │    │  │  SQLite (db/)       │  │ │
 │  └────────────────────────┘    │  ├─────────────────────┤  │ │
 │                                │  │  Auth / Keyring     │  │ │
@@ -87,13 +87,21 @@ alpaka-desktop/
 │       │
 │       ├── commands/             # Tauri IPC handlers — thin adapters only
 │       │   ├── mod.rs
-│       │   ├── auth.rs           # login, logout, signin flow, auth status
-│       │   ├── chat.rs           # Conversations, messages, send, stop, export
+│       │   ├── auth/             # api_key + oauth subcommands
+│       │   │   ├── api_key.rs    # set/get/delete/validate API key (keyring)
+│       │   │   └── oauth.rs      # ollama signin polling, auth status probe
+│       │   ├── chat.rs           # Conversations, messages, send, stop, export, compact
 │       │   ├── chat.tests.rs     # Integration tests for chat commands
 │       │   ├── folders.rs        # Folder context link/unlink/list/tokens
-│       │   ├── hosts.rs          # Host CRUD, ping, health loop
+│       │   ├── hosts.rs          # Host CRUD, ping, 30 s health loop
 │       │   ├── library.rs        # Ollama library search, tags, readme
-│       │   ├── models.rs         # List, pull, delete, capabilities
+│       │   ├── models.rs         # List, pull, delete, capabilities, modelfile
+│       │   ├── model_create.rs   # create_model + cancel_model_create (streaming)
+│       │   ├── model_path.rs     # validate_model_path + apply_model_path (systemd override)
+│       │   ├── model_settings.rs # Per-model default options + ChatOptions validation
+│       │   ├── model_updates.rs  # get_models_with_updates, check_model_updates (MO-09)
+│       │   ├── model_user_data.rs# Favorites, tags
+│       │   ├── proxy.rs          # get_proxy_config, save_proxy, delete_proxy, test_proxy
 │       │   ├── service.rs        # Start/stop ollama systemd service
 │       │   ├── settings.rs       # KV settings get/set/delete
 │       │   ├── system.rs         # report_active_view, open_browser
@@ -101,8 +109,13 @@ alpaka-desktop/
 │       │
 │       ├── services/             # Business logic layer
 │       │   ├── mod.rs
-│       │   ├── chat.rs           # ChatService: full send lifecycle, compact
+│       │   ├── chat/             # ChatService split across files
+│       │   │   ├── mod.rs        # SendParams, send() lifecycle
+│       │   │   ├── compact.rs    # Conversation summarisation flow
+│       │   │   ├── context.rs    # apply_sliding_window (0.85 × num_ctx)
+│       │   │   └── orchestrator.rs # Agent loop (tool calls, max 5 iters)
 │       │   ├── library.rs        # LibraryService: scrape ollama.com/library
+│       │   ├── model_updates.rs  # ModelUpdateService: background 6h loop, digest comparison, do_update_check
 │       │   ├── prompt.rs         # PromptService: context assembly, history
 │       │   └── search.rs         # WebSearchService: tool call execution
 │       │
@@ -148,54 +161,108 @@ alpaka-desktop/
 │   │   ├── settings.ts           # User preferences
 │   │   └── ui.ts                 # Sidebar, theme, compact mode
 │   │
-│   ├── composables/              # Vue 3 composition functions
+│   ├── composables/              # Vue 3 composition functions (17 total)
 │   │   ├── useAppOrchestration.ts   # App-level init and lifecycle coordination
-│   │   ├── useAttachments.ts        # File/image attachment handling
-│   │   ├── useAutoScroll.ts         # Smart scroll-lock behavior
+│   │   ├── useAttachments.ts        # Image picker / drag-drop / file→folder-context bridge
 │   │   ├── useCollapsibleState.ts   # Think-block expand/collapse
 │   │   ├── useConfirmationModal.ts  # Reusable destructive-action dialog
-│   │   ├── useContextWindow.ts      # Context token budget tracking
+│   │   ├── useContextWindow.ts      # Context token budget tracking + ≥70 % flag
 │   │   ├── useConversationLifecycle.ts  # Create/switch/delete conversations
 │   │   ├── useCopyToClipboard.ts    # Clipboard write with feedback
-│   │   ├── useDraftManager.ts       # Persist chat drafts across navigation
+│   │   ├── useDraftManager.ts       # Persist chat drafts via update_chat_draft
+│   │   ├── useDraftSync.ts          # Per-conversation input + options autosave
 │   │   ├── useKeyboard.ts           # Global keyboard shortcuts
-│   │   ├── useModelLibrary.ts       # Ollama library search + model detail
-│   │   ├── useSendMessage.ts        # Message send orchestration
-│   │   ├── useStreamingEvents.ts    # Raw Tauri event listener setup
+│   │   ├── useModelCreate.ts        # Modelfile create flow + streaming events
+│   │   ├── useModelDefaults.ts      # apply / save / reset per-model defaults
+│   │   ├── useModelLibrary.ts       # Ollama library search + hardware ref
+│   │   ├── useSendMessage.ts        # Message send + stop orchestration
 │   │   ├── useStreaming.ts          # Streaming state accumulation
-│   │   └── useTheme.ts              # Dark/light mode management
+│   │   ├── useStreamingEvents.ts    # Raw Tauri event listener setup
+│   │   └── useUndoHistory.ts        # Custom Ctrl+Z / Shift+Z stack for chat input
 │   │
 │   ├── components/
 │   │   ├── chat/
-│   │   │   ├── ChatView.vue
-│   │   │   ├── MessageBubble.vue
+│   │   │   ├── ChatView.vue          # Virtualised message list (vue-virtual-scroller)
+│   │   │   ├── MessageBubble.vue     # Markdown + think + code + tool-call rendering
 │   │   │   ├── ThinkBlock.vue
 │   │   │   ├── CodeBlock.vue
+│   │   │   ├── SearchBlock.vue       # Web search tool-call results
+│   │   │   ├── StatsBlock.vue        # Per-message metrics
 │   │   │   ├── ChatInput.vue
-│   │   │   └── StreamIndicator.vue
+│   │   │   ├── StreamIndicator.vue
+│   │   │   ├── TypingIndicator.vue
+│   │   │   └── input/
+│   │   │       ├── ChatInputComposer.vue  # Textarea + send/stop button + draft autosave
+│   │   │       ├── AdvancedChatOptions.vue
+│   │   │       ├── AttachMenu.vue
+│   │   │       ├── AttachmentList.vue
+│   │   │       ├── ContextBar.vue
+│   │   │       ├── ContextPill.vue
+│   │   │       ├── ModelSelector.vue
+│   │   │       └── SystemPromptPanel.vue
 │   │   ├── hosts/
-│   │   │   └── HostManager.vue
+│   │   │   └── HostManager.vue       # ⚠️ Defined but never imported as of v1.2.0
 │   │   ├── models/
-│   │   │   ├── ModelBrowser.vue
+│   │   │   ├── CloudTagSelector.vue
+│   │   │   ├── CreateModelPage.vue   # Modelfile create / edit page
+│   │   │   ├── LibraryApplications.vue
+│   │   │   ├── LibraryBrowser.vue
+│   │   │   ├── LibraryModelDetails.vue
+│   │   │   ├── LocalModelDetails.vue
 │   │   │   └── ModelCard.vue
 │   │   ├── settings/
-│   │   │   └── SettingsPanel.vue
+│   │   │   ├── AccountSettings.vue   # OAuth signin + API key panel
+│   │   │   ├── ApiKeyPanel.vue
+│   │   │   ├── GpuLayersSettings.vue # num_gpu input + detect_hardware summary (Settings → Engine)
+│   │   │   ├── HostSettings.vue      # Host CRUD lives here, not in HostManager.vue
+│   │   │   ├── ProxySettings.vue     # HTTP/SOCKS5 proxy config (URL, username, keyring password)
+│   │   │   ├── ModelPathSettings.vue
+│   │   │   ├── PresetEditor.vue
+│   │   │   ├── SettingsRow.vue
+│   │   │   ├── SettingsSlider.vue
+│   │   │   └── StopSequencesInput.vue
 │   │   ├── shared/
-│   │   │   ├── TopBar.vue
-│   │   │   └── ErrorScreen.vue
+│   │   │   ├── AppTabs.vue
+│   │   │   ├── BaseModal.vue
+│   │   │   ├── ConfirmationModal.vue
+│   │   │   ├── CustomTooltip.vue
+│   │   │   ├── ErrorScreen.vue       # ⚠️ Defined but never imported as of v1.2.0
+│   │   │   ├── MirostatSelector.vue
+│   │   │   ├── ModelTagBadge.vue
+│   │   │   ├── ToggleSwitch.vue
+│   │   │   ├── TopBar.vue            # ⚠️ 0-byte placeholder; layout lives in App.vue
+│   │   │   └── icons/
 │   │   └── sidebar/
-│   │       ├── Sidebar.vue
-│   │       └── ConversationList.vue
+│   │       ├── Sidebar.vue           # ⚠️ Search input on line 43 is unwired
+│   │       └── ConversationList.vue  # Real conversation search lives here (Ctrl+K)
 │   │
 │   ├── views/
 │   │   ├── ChatPage.vue           # Main chat view
-│   │   ├── LaunchPage.vue         # Startup / connection error entry
-│   │   ├── ModelsPage.vue         # Model management
-│   │   └── SettingsPage.vue       # App settings
+│   │   ├── LaunchPage.vue         # Static `ollama launch <tool>` reference cards
+│   │   ├── ModelsPage.vue         # Tab shell; delegates to views/models/ subviews
+│   │   ├── models/
+│   │   │   ├── LocalModelsTab.vue # Installed model list with details/delete/update
+│   │   │   ├── MineTab.vue        # Private cloud models (push/pull, CL-04)
+│   │   │   ├── LibraryTab.vue     # Ollama library browser + search
+│   │   │   ├── CloudTab.vue       # Cloud model discovery
+│   │   │   └── EngineTab.vue      # GPU / model-path / create-model settings
+│   │   ├── SettingsPage.vue       # Tab shell; delegates to views/settings/ subviews
+│   │   └── settings/
+│   │       ├── GeneralTab.vue
+│   │       ├── ConnectivityTab.vue
+│   │       ├── ModelsTab.vue
+│   │       ├── PromptsTab.vue
+│   │       ├── AccountTab.vue
+│   │       ├── MaintenanceTab.vue
+│   │       └── AdvancedTab.vue
 │   │
 │   ├── lib/
 │   │   ├── tauri.ts               # Typed invoke() wrappers
 │   │   ├── markdown.ts            # markdown-it + Shiki + KaTeX pipeline
+│   │   ├── messageParser.ts       # Block-level message parser (code / think / tool_call / markdown parts)
+│   │   ├── appEvents.ts           # App-level custom event bus
+│   │   ├── clipboard.ts           # Clipboard write with secure-context check
+│   │   ├── urlOpener.ts           # Cross-platform URL open helper
 │   │   └── constants.ts
 │   │
 │   ├── router/                    # Vue Router routes
@@ -257,6 +324,7 @@ tauri::generate_handler![
     commands::models::list_models,
     commands::models::delete_model,
     commands::models::pull_model,          // streams model:pull-progress events
+    commands::models::push_model,          // streams model:push-progress events; pushes username/ models to Ollama Cloud
     commands::models::get_model_capabilities,
     commands::models::get_modelfile,       // fetches Modelfile for existing model via /api/show
     commands::models::create_model,        // streams model:create-* events via /api/create
@@ -287,6 +355,12 @@ tauri::generate_handler![
     commands::settings::delete_setting,
     commands::settings::delete_all_settings,
 
+    // ── Proxy ─────────────────────────────────────────────────────────────
+    commands::proxy::get_proxy_config,  // returns { proxy_url, username, has_password }
+    commands::proxy::save_proxy,        // saves URL+username to DB, password to keyring, rebuilds client
+    commands::proxy::delete_proxy,      // clears all proxy config, rebuilds client without proxy
+    commands::proxy::test_proxy,        // probes active host /api/version via a temporary proxy client
+
     // ── Folder Context ────────────────────────────────────────────────────
     commands::folders::link_folder,
     commands::folders::unlink_folder,
@@ -304,6 +378,10 @@ tauri::generate_handler![
     commands::service::start_ollama,
     commands::service::stop_ollama,
     commands::service::ollama_service_status,
+
+    // ── Model Updates ─────────────────────────────────────────────────────
+    commands::model_updates::get_models_with_updates, // returns cached outdated model names
+    commands::model_updates::check_model_updates,     // triggers an immediate background digest check
 
     // ── System ────────────────────────────────────────────────────────────
     commands::system_info::detect_hardware,  // reads /proc/meminfo + DRM sysfs
@@ -323,8 +401,11 @@ pub struct AppState {
     /// Path to the SQLite database file (used by backup_database).
     pub db_path: PathBuf,
 
-    /// Shared reqwest HTTP client (connection pooling, rustls TLS).
-    pub http_client: reqwest::Client,
+    /// Shared reqwest HTTP client wrapped in RwLock for runtime proxy switching.
+    /// Rebuilt by `save_proxy` / `delete_proxy` without app restart.
+    /// `build_http_client(proxy_url, username, password)` creates the client with
+    /// optional HTTP or SOCKS5 proxy support.
+    pub http_client: RwLock<reqwest::Client>,
 
     /// Send on this channel to interrupt an in-progress generation.
     /// None when no generation is running.
@@ -341,6 +422,15 @@ pub struct AppState {
 
     /// ID of the conversation currently visible (used by tray notifications).
     pub active_conversation_id: Mutex<Option<String>>,
+
+    /// Cached list of model names that have a newer digest on ollama.com/library.
+    pub models_with_updates: RwLock<Vec<String>>,
+
+    /// Guards against concurrent runs of do_update_check (manual + background loop).
+    pub update_check_running: AtomicBool,
+
+    /// Shutdown signal for the model-update background loop task.
+    pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 ```
 
@@ -445,6 +535,11 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |
 | `model:pull-progress` | Rust → Vue | `{ model, status, completed?, total?, percent? }` | Download progress chunk |
 | `model:pull-done` | Rust → Vue | `{ model }` | Model download complete |
+| `model:pull-error` | Rust → Vue | `{ model, error }` | Model pull failed (stream-embedded error) |
+| `model:push-progress` | Rust → Vue | `{ model, status, completed?, total?, percent }` | Upload progress chunk |
+| `model:push-done` | Rust → Vue | `{ model }` | Model push to Cloud complete |
+| `model:push-error` | Rust → Vue | `{ model, error }` | Model push failed (HTTP error or stream error) |
+| `model:updates-checked` | Rust → Vue | `{ outdated: string[] }` | Background update check result; names of locally installed models with newer versions on ollama.com |
 | `model:create-progress` | Rust → Vue | `{ model: string, status: string }` | Model creation progress status line |
 | `model:create-done` | Rust → Vue | `{ model: string }` | Model creation complete |
 | `model:create-error` | Rust → Vue | `{ model: string, error: string, cancelled: boolean }` | Model creation failed or cancelled |
@@ -491,20 +586,22 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | Composable | Responsibility |
 |---|---|
 | `useAppOrchestration` | App-level init: loads stores, starts event listeners, seeds default host |
-| `useStreamingEvents` | Registers all Tauri event listeners (`chat:token`, `chat:thinking-*`, etc.) |
-| `useStreaming` | Accumulates streaming buffer, manages `isThinking` state machine |
-| `useSendMessage` | Orchestrates send: validates input, calls `chatStore`, handles errors |
+| `useStreamingEvents` | Registers all Tauri event listeners (`chat:token`, `chat:thinking-*`, `chat:tool-*`, etc.) |
+| `useStreaming` | Accumulates streaming buffer, manages `isThinking` state machine, exposes `promptTokens` / `evalTokens` |
+| `useSendMessage` | Orchestrates send + stop generation; validates input, calls `chatStore`, handles errors |
 | `useConversationLifecycle` | Create / switch / delete conversations, title auto-generation |
-| `useDraftManager` | Persists chat input drafts per-conversation via `update_chat_draft` |
-| `useContextWindow` | Tracks folder context token budget vs. model `num_ctx` |
-| `useAttachments` | File/image drag-drop, clipboard paste, encoding to base64 |
-| `useModelLibrary` | Searches Ollama library, fetches model tags and README |
-| `useAutoScroll` | Scroll-lock logic: follows generation, pauses on user scroll-up |
-| `useKeyboard` | Global shortcuts (Ctrl+N, Escape, Ctrl+/, etc.) |
-| `useCollapsibleState` | Expand/collapse state for `ThinkBlock` panels |
+| `useDraftManager` | Persists raw chat-input drafts per-conversation via `update_chat_draft` |
+| `useDraftSync` | Higher-level draft sync for input + advanced options + attachments + presets |
+| `useContextWindow` | Tracks effective `num_ctx`, computed token usage (input + attachments + system + history), `≥70 %` flag for the Compact button |
+| `useAttachments` | Image picker / drag-drop; non-image drops are forwarded to `link_folder` as folder context. **No clipboard paste** — removed in v1.2.0 |
+| `useModelLibrary` | Searches Ollama library, fetches model tags and README, holds `hardware` ref from `detect_hardware` |
+| `useModelDefaults` | Apply / save / reset per-model default `ChatOptions` |
+| `useModelCreate` | Streaming create-model lifecycle (start / cancel / progress / done / error) |
+| `useUndoHistory` | Custom undo/redo stack for the chat input — required because WebKitGTK on Wayland doesn't drive native undo for `v-model`-controlled `<textarea>` |
+| `useKeyboard` | Global shortcuts (Esc, Ctrl+/, Ctrl+,, Ctrl+H, Ctrl+N, Ctrl+K, Ctrl+M, Ctrl+Shift+M, Ctrl+Shift+C, Ctrl+↑/↓) |
+| `useCollapsibleState` | Expand/collapse state for `ThinkBlock` and `SearchBlock` panels |
 | `useConfirmationModal` | Shared destructive-action confirmation dialog |
-| `useCopyToClipboard` | Clipboard write with 2s feedback flash |
-| `useTheme` | Dark/light mode, `prefers-color-scheme`, manual toggle |
+| `useCopyToClipboard` | Clipboard write with 2 s feedback flash |
 
 ### 5.3 Frontend Token Rendering Strategy
 
@@ -521,9 +618,10 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 
 The `services/` directory owns business logic. Command handlers are thin adapters; all substantive work happens here.
 
-### 6.1 ChatService (`services/chat.rs`)
+### 6.1 ChatService (`services/chat/`)
 
-Owns the full chat lifecycle:
+Split into four files: `mod.rs` (entry + `send()`), `context.rs` (sliding window),
+`compact.rs` (summarisation), `orchestrator.rs` (agent loop).
 
 ```rust
 pub struct SendParams {
@@ -538,21 +636,33 @@ pub struct SendParams {
     pub original_content: String,
 }
 
-impl ChatService {
+impl<R: Runtime> ChatService<'_, R> {
     /// Full send lifecycle:
-    /// 1. Persist user message to SQLite
-    /// 2. Build prompt via PromptService
-    /// 3. Apply sliding-window truncation (context management)
-    /// 4. Call Ollama API (streaming)
-    /// 5. Handle tool calls via WebSearchService (agent loop)
-    /// 6. Persist assistant response to SQLite
+    /// 1. Persist user message to SQLite (off-main-thread via spawn_db)
+    /// 2. Inject web_search system prompt + folder_context as system messages
+    /// 3. Merge chat_options with global ChatOptions (custom wins, falls back to global)
+    /// 4. Apply sliding-window truncation: trim oldest non-system messages
+    ///    until total estimated tokens ≤ 0.85 × num_ctx
+    /// 5. Call orchestrator.rs (agent loop, max 5 iterations, tool calls)
+    /// 6. Persist assistant response (with metrics) to SQLite
     /// 7. Emit chat:done
-    pub async fn send<R: Runtime>(params: SendParams, ...) -> Result<(), AppError>
+    pub async fn send(&self, params: SendParams) -> Result<(), AppError>;
 
-    /// Compact a conversation: summarize older messages to fit within context window.
-    pub async fn compact<R: Runtime>(...) -> Result<(), AppError>
+    /// Compact a conversation:
+    /// 1. Load full history + old title
+    /// 2. Build dialogue string from user/assistant turns only
+    /// 3. Non-streaming Ollama call (temperature=0.3) with the summary prompt
+    /// 4. Create a new conversation titled "Compact: <oldTitle>"
+    /// 5. Set summary as the new conversation's system prompt
+    /// 6. Copy the last 4 user/assistant messages, clearing prompt_tokens
+    /// 7. Return the new conversation id
+    pub async fn compact(&self, params: CompactParams) -> Result<String, AppError>;
 }
 ```
+
+Sliding-window logic (`services/chat/context.rs`): walks history in reverse,
+estimating tokens as `content.len() / 4`, accumulating until `budget` is
+reached. System messages at the head of the message list are always preserved.
 
 ### 6.2 PromptService (`services/prompt.rs`)
 

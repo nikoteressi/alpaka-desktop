@@ -50,6 +50,9 @@ pub enum AppError {
 
     #[error("Validation error: {0}")]
     Validation(String),
+
+    #[error("Generation cancelled")]
+    Cancelled,
 }
 
 // ── Conversions ────────────────────────────────────────────────────────────────

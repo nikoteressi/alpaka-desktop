@@ -111,18 +111,7 @@ describe("useChatStore", () => {
     store.messages["conv-1"] = [];
     store.streaming.buffer = "reply";
 
-    store.finalizeStreamedMessage(
-      "conv-1",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      42,
-    );
+    store.finalizeStreamedMessage("conv-1", { seed: 42 });
 
     expect(store.messages["conv-1"][0].seed).toBe(42);
   });
@@ -142,18 +131,9 @@ describe("useChatStore", () => {
     store.messages["conv-3"] = [];
     store.streaming.buffer = "reply";
 
-    store.finalizeStreamedMessage(
-      "conv-3",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      null as unknown as undefined,
-    );
+    store.finalizeStreamedMessage("conv-3", {
+      seed: null as unknown as undefined,
+    });
 
     expect(store.messages["conv-3"][0].seed).toBeUndefined();
   });

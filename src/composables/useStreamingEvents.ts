@@ -2,19 +2,20 @@ import { computed, type Ref } from "vue";
 import { useChatStore } from "../stores/chat";
 import { useStreaming } from "./useStreaming";
 
-let _streamingCleanup: (() => void) | null = null;
+// Singleton: intentionally module-scoped to survive composable re-instantiation
+// and allow cleanup of previous Tauri listeners on re-init (e.g. after logout).
+const _streaming = { cleanup: null as (() => void) | null };
 
 export function useStreamingEvents() {
   const chatStore = useChatStore();
 
   async function init() {
     if (chatStore._listenersInitialized) return;
-    chatStore._listenersInitialized = true;
 
     // Tear down any previous listener set before registering a new one.
-    if (_streamingCleanup) {
-      _streamingCleanup();
-      _streamingCleanup = null;
+    if (_streaming.cleanup) {
+      _streaming.cleanup();
+      _streaming.cleanup = null;
     }
 
     const conversationIdValue = computed(
@@ -74,27 +75,30 @@ export function useStreamingEvents() {
         chatStore.streaming.thinkTime = null;
       },
       onDone: (payload) => {
-        chatStore.finalizeStreamedMessage(
-          payload.conversation_id,
-          payload.total_tokens,
-          payload.prompt_tokens,
-          payload.tokens_per_sec,
-          payload.duration_ms,
-          payload.total_duration_ms,
-          payload.load_duration_ms,
-          payload.prompt_eval_duration_ms,
-          payload.eval_duration_ms,
-          payload.seed,
-        );
+        chatStore.finalizeStreamedMessage(payload.conversation_id, {
+          totalTokens: payload.total_tokens,
+          promptTokens: payload.prompt_tokens,
+          tokensPerSec: payload.tokens_per_sec,
+          generationTimeMs: payload.duration_ms,
+          totalDurationMs: payload.total_duration_ms,
+          loadDurationMs: payload.load_duration_ms,
+          promptEvalDurationMs: payload.prompt_eval_duration_ms,
+          evalDurationMs: payload.eval_duration_ms,
+          seed: payload.seed,
+        });
         chatStore.streaming.isStreaming = false;
         chatStore.streaming.tokensPerSec = payload.tokens_per_sec;
       },
+      onCancelled: (convId) => {
+        chatStore.finalizeStreamedMessage(convId);
+        chatStore.streaming.isStreaming = false;
+      },
       onError: (_convId, error) => {
         console.error("Chat stream error:", error);
-        if (!chatStore.streaming.buffer.trim()) {
-          chatStore.streaming.buffer = `⚠️ **Error**: ${error}`;
-        } else {
+        if (chatStore.streaming.buffer.trim()) {
           chatStore.streaming.buffer += `\n\n⚠️ **Error**: ${error}`;
+        } else {
+          chatStore.streaming.buffer = `⚠️ **Error**: ${error}`;
         }
         chatStore.finalizeStreamedMessage(_convId);
         chatStore.streaming.isStreaming = false;
@@ -124,8 +128,15 @@ export function useStreamingEvents() {
       },
     });
 
-    await listenersReady;
-    _streamingCleanup = cleanup;
+    try {
+      await listenersReady;
+      _streaming.cleanup = cleanup;
+      chatStore._listenersInitialized = true;
+    } catch (e) {
+      _streaming.cleanup = null;
+      cleanup();
+      throw e;
+    }
   }
 
   return { init };

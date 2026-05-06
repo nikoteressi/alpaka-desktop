@@ -29,6 +29,14 @@ export interface PullProgressPayload {
   percent: number;
 }
 
+export interface PushProgressPayload {
+  model: string;
+  status: string;
+  completed?: number;
+  total?: number;
+  percent: number;
+}
+
 export interface LibraryTag {
   name: string;
   size: string;
@@ -112,4 +120,8 @@ export interface CreateState {
   phase: "running" | "done" | "error" | "cancelled";
   error?: string;
   logLines: string[];
+}
+
+export interface ModelUpdatesCheckedPayload {
+  outdated: string[];
 }

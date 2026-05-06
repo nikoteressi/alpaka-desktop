@@ -9,8 +9,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- CL-04: Private model push/pull sync — "Mine" tab in Models page lists local `username/`-namespaced models; "Push to Cloud" button in model details streams upload progress via `model:push-*` events; "Pull a private model" input lets users pull by name; namespace naming hint in Create Model page guides naming for cloud push
+- MO-09: Model update notifications — background digest check every 6 h detects newer versions on ollama.com/library; Models nav item shows an update count badge; each outdated model shows an amber "Update" badge and a one-click re-pull button
+- G-05: GPU layer offloading configuration — Settings → Engine tab now has a "GPU Layers" input (`num_gpu`). Set to `-1` for auto (all layers), `0` for CPU-only, or any positive integer for partial offloading. Current GPU/VRAM is shown as a guide. The G-01 hardware display on the Models page reflects the configured offloading mode.
+- HTTP/SOCKS5 proxy support — configure a proxy URL, optional username, and password (stored in the system keyring) in Settings → Connection; a "Test proxy" button verifies end-to-end connectivity
+
+### Changed
+- Pre-release V1.3.0 cleanup: cleared all 26 open SonarCloud findings on `main`; refactored cognitive-complexity hotspots in `useKeyboard` (shortcut registry, complexity 27→6), `MessageBubble` (parser extracted to `src/lib/messageParser.ts`, complexity 29→~8), and `chat` store (`finalizeStreamedMessage` 10-param signature collapsed to a stats object); split monolithic `ChatInput.vue` (extracted `ChatInputComposer`), `ModelsPage.vue` (extracted `views/models/` tab components), and `SettingsPage.vue` (extracted `views/settings/` tab components); dramatically expanded unit and E2E coverage
+- Removed personal-email fallback in `AccountSettings.vue` — display now shows `—` when no email is set
+
 ### Fixed
+- Cancelling generation (Stop button or Esc) no longer emits `chat:done`, persists a partial message to the database, or triggers a completion notification; partial content is preserved in-session via the new `chat:cancelled` event
+- Esc key now correctly clears the streaming indicator (previously `isStreaming` stayed true after pressing Esc)
+- Network chunk errors mid-stream no longer emit a duplicate `chat:done` or persist the partial response as a completed message
+- Draft message input is now correctly saved to the database; IPC parameter casing mismatch (`conversation_id`/`draft_json` → `conversationId`/`draftJson`) prevented persistence silently
+- Clearing a draft on an unsaved conversation no longer logs "Conversation not found" warnings
+- Linked file context (text files attached via "Link File Context") is now correctly passed to the model; non-UTF-8 and permission-denied files previously returned empty content silently
+- File link errors in the chat input now show the actual backend error message instead of a generic fallback
 - E2E tests (`wdio run`) were crashing with `Failed to match capabilities` after Dependabot bumped `@wdio/local-runner`, `@wdio/mocha-framework`, `@wdio/types`, and `webdriverio` to v9 while `@wdio/cli` and `@wdio/spec-reporter` remained on v8; all wdio packages are now uniformly on v9.27.1
+
+### Security
+- Tauri capability narrowed from broad `fs:allow-read-file` to a scoped `read_image_file` command with an extension allowlist (`jpg`, `jpeg`, `png`, `gif`, `webp`, `bmp`) and 20 MB size guard; unused `opener:allow-open-path` capability removed
 
 ---
 

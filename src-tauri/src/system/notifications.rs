@@ -124,6 +124,24 @@ pub fn notify_model_pull_failed<R: Runtime>(app: &AppHandle<R>, name: &str, erro
     );
 }
 
+pub fn notify_model_pushed<R: Runtime>(app: &AppHandle<R>, name: &str) {
+    send_notification(
+        app,
+        "Model Pushed",
+        &format!("Model '{}' uploaded to Ollama Cloud.", name),
+        None,
+    );
+}
+
+pub fn notify_model_push_failed<R: Runtime>(app: &AppHandle<R>, name: &str, error: &str) {
+    send_notification(
+        app,
+        "Push Failed",
+        &format!("Failed to push '{}': {}", name, error),
+        None,
+    );
+}
+
 pub fn notify_host_offline<R: Runtime>(app: &AppHandle<R>, name: &str) {
     send_notification(
         app,

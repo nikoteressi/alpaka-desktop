@@ -61,6 +61,11 @@
                 class="model-card__pulled-badge text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/20"
                 >Pulled</span
               >
+              <span
+                v-if="hasUpdate"
+                class="model-card__update-badge text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                >Update</span
+              >
             </div>
 
             <div
@@ -299,6 +304,7 @@ const props = defineProps<{
   fileSize?: string;
   quant?: string;
   isInstalled?: boolean;
+  hasUpdate?: boolean;
   onClick?: () => void;
   onAction?: () => void;
   actionLabel?: string;

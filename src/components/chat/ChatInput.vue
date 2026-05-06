@@ -24,6 +24,7 @@ import ContextPill from "./input/ContextPill.vue";
 import AdvancedChatOptions from "./input/AdvancedChatOptions.vue";
 import CustomTooltip from "../shared/CustomTooltip.vue";
 import AttachMenu from "./input/AttachMenu.vue";
+import ChatInputComposer from "./input/ChatInputComposer.vue";
 
 const props = defineProps<{
   isStreaming: boolean;
@@ -52,6 +53,23 @@ const activeConvId = computed(() => chatStore.activeConversationId);
 
 // ---- Linked Context ----
 const isLinking = ref(false);
+const linkError = ref<string | null>(null);
+let linkErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showLinkError(msg: string) {
+  linkError.value = msg;
+  if (linkErrorTimer) clearTimeout(linkErrorTimer);
+  linkErrorTimer = setTimeout(() => {
+    linkError.value = null;
+    linkErrorTimer = null;
+  }, 4000);
+}
+
+function extractErrorMessage(err: unknown): string {
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  return "Failed to link file — binary or unreadable files cannot be used as context.";
+}
 
 async function pickContext(isFolder: boolean) {
   if (!activeConvId.value) return;
@@ -81,6 +99,7 @@ async function pickContext(isFolder: boolean) {
     });
   } catch (err) {
     console.error("Failed to link context:", err);
+    showLinkError(extractErrorMessage(err));
   } finally {
     isLinking.value = false;
   }
@@ -304,6 +323,7 @@ const {
       });
     } catch (err) {
       console.error("Failed to link dropped file:", err);
+      showLinkError(extractErrorMessage(err));
     } finally {
       isLinking.value = false;
     }
@@ -332,6 +352,9 @@ const {
   undo: doUndo,
   redo: doRedo,
 } = useUndoHistory(inputContent);
+
+// Trigger undo snapshot whenever inputContent changes from user typing
+watch(inputContent, scheduleSnapshot);
 
 // ---- Submit ----
 function handleEnter(e: KeyboardEvent) {
@@ -463,11 +486,13 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (linkErrorTimer) clearTimeout(linkErrorTimer);
   appEvents.removeEventListener(
     APP_EVENT.OPEN_MODEL_SWITCHER,
     onOpenModelSwitcher,
   );
   unlistenDrag?.();
+  clearAttachments();
 });
 </script>
 
@@ -518,6 +543,11 @@ onBeforeUnmount(() => {
         class="absolute inset-0 z-30 bg-[var(--accent-muted)] backdrop-blur-[2px] border-2 border-dashed border-[var(--accent)] flex items-center justify-center pointer-events-none rounded-[20px]"
       >
         <span class="text-[var(--accent)] font-medium">Drop images here</span>
+      </div>
+
+      <!-- File link error -->
+      <div v-if="linkError" class="text-[11px] text-red-400 mb-1 px-1">
+        {{ linkError }}
       </div>
 
       <!-- Linked Context List -->
@@ -582,15 +612,12 @@ onBeforeUnmount(() => {
 
       <AttachmentList :attachments="attachments" @remove="removeAttachment" />
 
-      <textarea
-        data-testid="chat-input"
+      <ChatInputComposer
         v-model="inputContent"
-        @input="scheduleSnapshot"
+        :isStreaming="isStreaming"
+        :hasAttachments="attachments.length > 0"
         @keydown="handleTextareaKeydown"
-        placeholder="Type a message…"
-        class="w-full bg-transparent focus:outline-none resize-none overflow-hidden text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
-        :disabled="isStreaming"
-        rows="1"
+        @submit="handleSubmit"
       />
 
       <div class="flex items-center justify-between mt-2">
@@ -802,56 +829,6 @@ onBeforeUnmount(() => {
             @select="selectModel"
             @pull="selectLibraryModel"
           />
-
-          <div
-            v-if="isStreaming"
-            data-testid="streaming-indicator"
-            style="display: none"
-          />
-          <button
-            data-testid="send-btn"
-            @click="handleSubmit"
-            :disabled="
-              !isStreaming && !inputContent.trim() && attachments.length === 0
-            "
-            :aria-label="isStreaming ? 'Stop generation' : 'Send message'"
-            class="w-7 h-7 rounded-full flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer disabled:opacity-30"
-            :class="
-              isStreaming
-                ? 'bg-[var(--bg-user-msg)] hover:bg-[var(--bg-active)]'
-                : inputContent.trim() || attachments.length > 0
-                  ? 'bg-[var(--text)] hover:bg-[var(--text-muted)]'
-                  : 'bg-[var(--bg-user-msg)]'
-            "
-          >
-            <svg
-              v-if="isStreaming"
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              class="text-[var(--text)]"
-            >
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-            <svg
-              v-else
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              :stroke="
-                inputContent.trim() || attachments.length > 0
-                  ? '#1a1a1a'
-                  : '#555'
-              "
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
-          </button>
         </div>
       </div>
     </div>

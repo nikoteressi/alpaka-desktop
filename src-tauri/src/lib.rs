@@ -23,6 +23,7 @@ pub fn run() {
             commands::models::list_models,
             commands::models::delete_model,
             commands::models::pull_model,
+            commands::models::push_model,
             commands::models::get_model_capabilities,
             commands::model_create::get_modelfile,
             commands::model_create::create_model,
@@ -38,6 +39,7 @@ pub fn run() {
             commands::auth::get_api_key_status,
             commands::auth::delete_api_key,
             commands::auth::validate_api_key,
+            commands::auth::get_ollama_user_profile,
             commands::hosts::list_hosts,
             commands::hosts::add_host,
             commands::hosts::update_host,
@@ -68,6 +70,10 @@ pub fn run() {
             commands::settings::get_all_settings,
             commands::settings::delete_setting,
             commands::settings::delete_all_settings,
+            commands::proxy::get_proxy_config,
+            commands::proxy::save_proxy,
+            commands::proxy::delete_proxy,
+            commands::proxy::test_proxy,
             commands::model_settings::get_model_defaults,
             commands::model_settings::set_model_defaults,
             commands::model_settings::reset_model_defaults,
@@ -86,6 +92,9 @@ pub fn run() {
             commands::system_info::detect_hardware,
             commands::system::report_active_view,
             commands::system::open_browser,
+            commands::model_updates::get_models_with_updates,
+            commands::model_updates::check_model_updates,
+            commands::attachments::read_image_file,
         ])
         .setup(|app| {
             // ── Logging (MED-08: enabled in all builds) ────────────────────────
@@ -148,12 +157,28 @@ pub fn run() {
 
             // ── Hosts Manager ──────────────────────────────────────────────────
             #[cfg(feature = "test-mode")]
-            let _ = shutdown_rx;
+            drop(shutdown_rx);
             #[cfg(not(feature = "test-mode"))]
             {
                 let health_handle =
                     commands::hosts::start_host_health_loop(app.handle().clone(), shutdown_rx);
                 *app.state::<AppState>().health_loop_handle.lock().unwrap() = Some(health_handle);
+            }
+
+            // ── Model update check loop ────────────────────────────────────────
+            #[cfg(not(feature = "test-mode"))]
+            {
+                let (upd_shutdown_tx, upd_shutdown_rx) = tokio::sync::oneshot::channel();
+                *app.state::<AppState>()
+                    .update_check_loop_shutdown
+                    .lock()
+                    .unwrap() = Some(upd_shutdown_tx);
+                let _ = tauri::async_runtime::spawn(
+                    crate::services::model_updates::run_update_check_loop(
+                        app.handle().clone(),
+                        upd_shutdown_rx,
+                    ),
+                );
             }
 
             Ok(())

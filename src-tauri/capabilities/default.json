@@ -12,8 +12,6 @@
     "dialog:allow-save",
     "notification:default",
     "global-shortcut:default",
-    "opener:allow-open-url",
-    "opener:allow-open-path",
-    "fs:allow-read-file"
+    "opener:allow-open-url"
   ]
 }

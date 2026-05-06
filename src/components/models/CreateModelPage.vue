@@ -56,6 +56,15 @@
         >
           Different name → creates a new model (original unchanged)
         </p>
+        <p
+          v-else-if="modelName.trim() && !modelName.includes('/')"
+          data-testid="namespace-hint"
+          class="text-[11px] text-[var(--text-muted)]"
+        >
+          Tip: name as
+          <code class="text-[var(--accent)]">username/modelname</code>
+          to enable cloud push
+        </p>
       </div>
 
       <div class="flex flex-col gap-1.5 flex-1 min-h-0">

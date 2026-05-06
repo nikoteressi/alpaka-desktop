@@ -29,10 +29,11 @@ export function modelMatchesTag(
 }
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { extractErrorMessage } from "../lib/tauri";
+import { extractErrorMessage, extractTauriError } from "../lib/tauri";
 import type {
   Model,
   PullProgressPayload,
+  PushProgressPayload,
   LibraryModel,
   ModelCapabilities,
   LibraryTag,
@@ -42,18 +43,21 @@ import type {
   CreateProgressPayload,
   CreateDonePayload,
   CreateErrorPayload,
+  ModelUpdatesCheckedPayload,
 } from "../types/models";
 
-export type { ModelCapabilities };
+export type { ModelCapabilities } from "../types/models";
 
 export const useModelStore = defineStore("models", {
   state: () => ({
     models: [] as Model[],
     pulling: {} as Record<string, PullProgressPayload>,
+    pushing: {} as Record<string, PushProgressPayload>,
     creating: {} as Record<string, CreateState>,
     isLoading: false,
     error: null as string | null,
     listenersInitialized: false,
+    _unlisten: [] as Array<() => void>,
     capabilities: {} as Record<string, ModelCapabilities>,
     modelUserData: {} as Record<string, ModelUserData>,
     // Library search state
@@ -61,6 +65,9 @@ export const useModelStore = defineStore("models", {
     searchQuery: "",
     isSearching: false,
     _searchTimer: null as ReturnType<typeof setTimeout> | null,
+    _searchVersion: 0,
+    modelsWithUpdates: new Set<string>(),
+    isCheckingUpdates: false,
     // Details view state
     selectedModel: null as LibraryModel | null,
     selectedModelTags: [] as LibraryTag[],
@@ -111,6 +118,8 @@ export const useModelStore = defineStore("models", {
       });
       return [...tagSet].sort((a, b) => a.localeCompare(b));
     },
+    hasUpdate: (state) => (name: string) => state.modelsWithUpdates.has(name),
+    updatesAvailableCount: (state) => state.modelsWithUpdates.size,
   },
   actions: {
     async fetchModels() {
@@ -128,19 +137,7 @@ export const useModelStore = defineStore("models", {
             console.error("Failed to fetch capabilities for some models:", err),
         );
       } catch (e: unknown) {
-        // Tauri AppError serializes as a tagged object e.g. {"Http":"connection refused"}.
-        // Check instanceof Error first since Error properties are non-enumerable.
-        if (e instanceof Error) {
-          this.error = e.message;
-        } else if (e && typeof e === "object" && !Array.isArray(e)) {
-          const entries = Object.entries(e as Record<string, unknown>);
-          this.error =
-            entries.length > 0
-              ? entries.map(([k, v]) => `${k}: ${v}`).join("; ")
-              : JSON.stringify(e);
-        } else {
-          this.error = String(e);
-        }
+        this.error = extractTauriError(e);
         console.error("[models] fetchModels failed:", e);
       } finally {
         this.isLoading = false;
@@ -234,6 +231,15 @@ export const useModelStore = defineStore("models", {
         delete this.pulling[name];
       }
     },
+    async pushModel(name: string) {
+      if (this.pushing[name]) return;
+      this.pushing[name] = { model: name, status: "starting...", percent: 0 };
+      try {
+        await invoke("push_model", { name });
+      } finally {
+        delete this.pushing[name];
+      }
+    },
     /**
      * Ensures a cloud model is available by pulling it if not already installed.
      */
@@ -259,7 +265,7 @@ export const useModelStore = defineStore("models", {
           readme: string;
           launch_apps: LaunchApp[];
         }>("get_library_model_readme", { slug });
-        if (this.selectedModel && this.selectedModel.slug === slug) {
+        if (this.selectedModel?.slug === slug) {
           this.selectedModel.readme = details.readme;
           this.selectedModel.launch_apps = details.launch_apps;
         }
@@ -291,17 +297,26 @@ export const useModelStore = defineStore("models", {
         return;
       }
       this.isSearching = true;
+      this._searchVersion++;
+      const version = this._searchVersion;
       this._searchTimer = setTimeout(async () => {
         try {
-          this.libraryResults = await invoke<LibraryModel[]>(
+          const results = await invoke<LibraryModel[]>(
             "search_ollama_library",
             { query: q },
           );
+          if (version === this._searchVersion) {
+            this.libraryResults = results;
+          }
         } catch (err) {
-          console.error("Library search failed:", err);
-          this.libraryResults = [];
+          if (version === this._searchVersion) {
+            console.error("Library search failed:", err);
+            this.libraryResults = [];
+          }
         } finally {
-          this.isSearching = false;
+          if (version === this._searchVersion) {
+            this.isSearching = false;
+          }
         }
       }, 300);
     },
@@ -311,47 +326,108 @@ export const useModelStore = defineStore("models", {
       this.isSearching = false;
       if (this._searchTimer) clearTimeout(this._searchTimer);
     },
+    async fetchInitialUpdateStatus(): Promise<void> {
+      try {
+        const outdated = await invoke<string[]>("get_models_with_updates");
+        this.modelsWithUpdates = new Set(outdated);
+      } catch (e) {
+        console.error("[models] fetchInitialUpdateStatus failed:", e);
+      }
+    },
+
+    async triggerUpdateCheck(): Promise<void> {
+      if (this.isCheckingUpdates) return;
+      this.isCheckingUpdates = true;
+      try {
+        await invoke("check_model_updates");
+      } catch (e) {
+        console.error("[models] triggerUpdateCheck failed:", e);
+        this.isCheckingUpdates = false;
+      }
+    },
     async initListeners() {
       if (this.listenersInitialized) return;
-      this.listenersInitialized = true;
-
-      await listen<PullProgressPayload>("model:pull-progress", (event) => {
-        const payload = event.payload;
-        this.pulling[payload.model] = payload;
-      });
-      await listen<{ model: string }>("model:pull-done", (event) => {
-        const payload = event.payload;
-        delete this.pulling[payload.model];
-        this.fetchModels();
-        this.fetchCapabilities(payload.model);
-      });
-      await listen<CreateProgressPayload>("model:create-progress", (event) => {
-        const { model, status } = event.payload;
-        if (this.creating[model]) {
-          this.creating[model].status = status;
-          this.creating[model].logLines.push(status);
-        }
-      });
-      await listen<CreateDonePayload>("model:create-done", (event) => {
-        const { model } = event.payload;
-        if (this.creating[model]) {
-          this.creating[model].phase = "done";
-        }
-        this.fetchModels();
-      });
-      await listen<CreateErrorPayload>("model:create-error", (event) => {
-        const { model, error, cancelled } = event.payload;
-        if (this.creating[model]) {
-          if (cancelled) {
-            // No reason to keep cancelled state in memory — delete immediately.
-            // CreateModelPage captures the phase locally before this fires.
-            delete this.creating[model];
-          } else {
-            this.creating[model].phase = "error";
-            this.creating[model].error = error;
-          }
-        }
-      });
+      const unlistens: Array<() => void> = [];
+      try {
+        unlistens.push(
+          ...(await Promise.all([
+            listen<PullProgressPayload>("model:pull-progress", (event) => {
+              const payload = event.payload;
+              this.pulling[payload.model] = payload;
+            }),
+            listen<{ model: string }>("model:pull-done", (event) => {
+              const payload = event.payload;
+              delete this.pulling[payload.model];
+              this.modelsWithUpdates.delete(payload.model);
+              this.fetchModels();
+              this.fetchCapabilities(payload.model);
+            }),
+            listen<{ model: string; error: string }>(
+              "model:pull-error",
+              (event) => {
+                const { model } = event.payload;
+                delete this.pulling[model];
+              },
+            ),
+            listen<CreateProgressPayload>("model:create-progress", (event) => {
+              const { model, status } = event.payload;
+              if (this.creating[model]) {
+                this.creating[model].status = status;
+                this.creating[model].logLines.push(status);
+              }
+            }),
+            listen<CreateDonePayload>("model:create-done", (event) => {
+              const { model } = event.payload;
+              if (this.creating[model]) {
+                this.creating[model].phase = "done";
+              }
+              this.fetchModels();
+            }),
+            listen<CreateErrorPayload>("model:create-error", (event) => {
+              const { model, error, cancelled } = event.payload;
+              if (this.creating[model]) {
+                if (cancelled) {
+                  // No reason to keep cancelled state in memory — delete immediately.
+                  // CreateModelPage captures the phase locally before this fires.
+                  delete this.creating[model];
+                } else {
+                  this.creating[model].phase = "error";
+                  this.creating[model].error = error;
+                }
+              }
+            }),
+            listen<ModelUpdatesCheckedPayload>(
+              "model:updates-checked",
+              (event) => {
+                this.modelsWithUpdates = new Set(event.payload.outdated);
+                this.isCheckingUpdates = false;
+              },
+            ),
+            listen<PushProgressPayload>("model:push-progress", (event) => {
+              const payload = event.payload;
+              this.pushing[payload.model] = payload;
+            }),
+            listen<{ model: string }>("model:push-done", (event) => {
+              const { model } = event.payload;
+              delete this.pushing[model];
+              this.fetchModels();
+            }),
+            listen<{ model: string; error: string }>(
+              "model:push-error",
+              (event) => {
+                const { model } = event.payload;
+                delete this.pushing[model];
+              },
+            ),
+          ])),
+        );
+        this._unlisten = unlistens;
+        this.listenersInitialized = true;
+      } catch (e) {
+        unlistens.forEach((fn) => fn());
+        // listenersInitialized stays false — retry is possible
+        throw e;
+      }
     },
 
     clearCreateState(name: string) {

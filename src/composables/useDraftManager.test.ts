@@ -206,8 +206,8 @@ describe("useDraftManager", () => {
       await saveDraftToDb("conv-1", draft);
 
       expect(invoke).toHaveBeenCalledWith("update_chat_draft", {
-        conversation_id: "conv-1",
-        draft_json: JSON.stringify(draft),
+        conversationId: "conv-1",
+        draftJson: JSON.stringify(draft),
       });
       expect(store.conversations[0].draft_json).toBe(JSON.stringify(draft));
     });
@@ -268,8 +268,8 @@ describe("useDraftManager", () => {
       expect(store.drafts["conv-clr"]).toBeUndefined();
       expect(store.conversations[0].draft_json).toBeNull();
       expect(invoke).toHaveBeenCalledWith("update_chat_draft", {
-        conversation_id: "conv-clr",
-        draft_json: null,
+        conversationId: "conv-clr",
+        draftJson: null,
       });
     });
 
