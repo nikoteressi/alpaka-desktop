@@ -22,7 +22,7 @@ export const useAuthStore = defineStore("auth", {
           if (!this.user) {
             this.user = { id: hostId, username: "Local Device" };
           }
-          this.fetchOllamaUserProfile().catch(() => {});
+          this.fetchOllamaUserProfile(hostId).catch(() => {});
         } else if (Object.values(this.authenticatedHosts).every((v) => !v)) {
           this.user = null;
         }
@@ -35,13 +35,13 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
-    async fetchOllamaUserProfile(): Promise<void> {
+    async fetchOllamaUserProfile(hostId?: string): Promise<void> {
       try {
         const profile = await invoke<{
           name: string;
           email?: string;
           plan?: string;
-        }>("get_ollama_user_profile");
+        }>("get_ollama_user_profile", { hostId: hostId ?? null });
         if (this.user) {
           this.user.username = profile.name;
           this.user.email = profile.email;
