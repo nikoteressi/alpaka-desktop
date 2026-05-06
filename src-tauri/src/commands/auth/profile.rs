@@ -1,13 +1,13 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::command;
 
 use super::ollama_key_path;
 use crate::error::AppError;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct OllamaUserProfile {
     pub name: String,
     pub email: Option<String>,
@@ -50,9 +50,15 @@ pub async fn get_ollama_user_profile() -> Result<OllamaUserProfile, AppError> {
         .build()
         .map_err(|e| AppError::Internal(format!("HTTP client build failed: {e}")))?;
 
+    // Go client appends ?ts=<ts> to the actual request URL in addition to including
+    // it in the signed challenge string (see api/client.go `do` function).
+    let url = format!("https://ollama.com/api/me?ts={ts}");
+
     let resp = client
-        .post("https://ollama.com/api/me")
+        .post(&url)
         .header("Authorization", auth_header)
+        // Server requires Content-Length even for empty POST bodies.
+        .body("")
         .send()
         .await
         .map_err(|e| AppError::Internal(format!("Failed to reach ollama.com: {e}")))?;
@@ -64,9 +70,44 @@ pub async fn get_ollama_user_profile() -> Result<OllamaUserProfile, AppError> {
         )));
     }
 
-    resp.json::<OllamaUserProfile>()
+    let body = resp
+        .text()
         .await
-        .map_err(|e| AppError::Internal(format!("Failed to parse profile response: {e}")))
+        .map_err(|e| AppError::Internal(format!("Failed to read profile response: {e}")))?;
+
+    // Server returns all fields but Name/Email may be empty strings if the key
+    // is not linked to an account. Treat that as an auth error so the UI can
+    // prompt the user to sign in again.
+    let profile: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| AppError::Internal(format!("Failed to parse profile JSON: {e}")))?;
+
+    let name = profile["Name"]
+        .as_str()
+        .or_else(|| profile["name"].as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let email = profile["Email"]
+        .as_str()
+        .or_else(|| profile["email"].as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    if name.is_empty() {
+        return Err(AppError::Auth(
+            "Key not linked to an Ollama account — please run 'ollama signin' again.".into(),
+        ));
+    }
+
+    Ok(OllamaUserProfile {
+        name,
+        email,
+        plan: profile["Plan"]
+            .as_str()
+            .or_else(|| profile["plan"].as_str())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string()),
+    })
 }
 
 /// Parse an unencrypted OpenSSH ed25519 private key file.
