@@ -10,7 +10,7 @@ export function useUndoHistory(target: Ref<string>) {
 
   function saveSnapshot() {
     const v = target.value;
-    if (v !== undoStack[undoStack.length - 1]) {
+    if (v !== undoStack.at(-1)) {
       undoStack.push(v);
       redoStack.length = 0;
       if (undoStack.length > 100) undoStack.shift();
@@ -26,7 +26,7 @@ export function useUndoHistory(target: Ref<string>) {
     saveSnapshot();
     if (undoStack.length <= 1) return;
     redoStack.push(undoStack.pop()!);
-    target.value = undoStack[undoStack.length - 1];
+    target.value = undoStack.at(-1)!;
   }
 
   function redo() {

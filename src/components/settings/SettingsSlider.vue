@@ -3,6 +3,7 @@
     <div class="flex justify-between items-center">
       <div class="flex items-center gap-1.5 min-w-0">
         <label
+          :for="sliderId"
           class="text-[11.5px] font-medium text-[var(--text-muted)] truncate"
           >{{ label }}</label
         >
@@ -31,6 +32,7 @@
     </p>
 
     <input
+      :id="sliderId"
       type="range"
       :min="min"
       :max="max"
@@ -43,7 +45,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
+
+const sliderId = useId();
 
 const props = defineProps<{
   label: string;

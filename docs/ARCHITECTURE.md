@@ -1,6 +1,6 @@
 # Alpaka Desktop — Architecture Document
 
-> **v1.2.0** — 2026-05-04
+> **v1.3.0-pre** — 2026-05-06
 > Companion to [PRODUCT_SPEC.md](PRODUCT_SPEC.md)
 
 ---
@@ -192,6 +192,7 @@ alpaka-desktop/
 │   │   │   ├── StreamIndicator.vue
 │   │   │   ├── TypingIndicator.vue
 │   │   │   └── input/
+│   │   │       ├── ChatInputComposer.vue  # Textarea + send/stop button + draft autosave
 │   │   │       ├── AdvancedChatOptions.vue
 │   │   │       ├── AttachMenu.vue
 │   │   │       ├── AttachmentList.vue
@@ -238,12 +239,30 @@ alpaka-desktop/
 │   ├── views/
 │   │   ├── ChatPage.vue           # Main chat view
 │   │   ├── LaunchPage.vue         # Static `ollama launch <tool>` reference cards
-│   │   ├── ModelsPage.vue         # Library + local + create-model
-│   │   └── SettingsPage.vue       # 7 tabs: General / Connection / Engine / Prompts / Account / Maintenance / Advanced
+│   │   ├── ModelsPage.vue         # Tab shell; delegates to views/models/ subviews
+│   │   ├── models/
+│   │   │   ├── LocalModelsTab.vue # Installed model list with details/delete/update
+│   │   │   ├── MineTab.vue        # Private cloud models (push/pull, CL-04)
+│   │   │   ├── LibraryTab.vue     # Ollama library browser + search
+│   │   │   ├── CloudTab.vue       # Cloud model discovery
+│   │   │   └── EngineTab.vue      # GPU / model-path / create-model settings
+│   │   ├── SettingsPage.vue       # Tab shell; delegates to views/settings/ subviews
+│   │   └── settings/
+│   │       ├── GeneralTab.vue
+│   │       ├── ConnectivityTab.vue
+│   │       ├── ModelsTab.vue
+│   │       ├── PromptsTab.vue
+│   │       ├── AccountTab.vue
+│   │       ├── MaintenanceTab.vue
+│   │       └── AdvancedTab.vue
 │   │
 │   ├── lib/
 │   │   ├── tauri.ts               # Typed invoke() wrappers
 │   │   ├── markdown.ts            # markdown-it + Shiki + KaTeX pipeline
+│   │   ├── messageParser.ts       # Block-level message parser (code / think / tool_call / markdown parts)
+│   │   ├── appEvents.ts           # App-level custom event bus
+│   │   ├── clipboard.ts           # Clipboard write with secure-context check
+│   │   ├── urlOpener.ts           # Cross-platform URL open helper
 │   │   └── constants.ts
 │   │
 │   ├── router/                    # Vue Router routes

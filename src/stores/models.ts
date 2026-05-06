@@ -46,7 +46,7 @@ import type {
   ModelUpdatesCheckedPayload,
 } from "../types/models";
 
-export type { ModelCapabilities };
+export type { ModelCapabilities } from "../types/models";
 
 export const useModelStore = defineStore("models", {
   state: () => ({
@@ -265,7 +265,7 @@ export const useModelStore = defineStore("models", {
           readme: string;
           launch_apps: LaunchApp[];
         }>("get_library_model_readme", { slug });
-        if (this.selectedModel && this.selectedModel.slug === slug) {
+        if (this.selectedModel?.slug === slug) {
           this.selectedModel.readme = details.readme;
           this.selectedModel.launch_apps = details.launch_apps;
         }

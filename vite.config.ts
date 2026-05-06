@@ -23,6 +23,16 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: 'coverage',
+      include: ['src/**/*.{ts,vue}'],
+      thresholds: { lines: 80, functions: 80, branches: 75, statements: 80 },
+      exclude: [
+        '**/*.config.{ts,js}',
+        'src/main.ts',
+        'src/router/**',
+        'src/types/**',
+        '**/*.d.ts',
+        'src/**/*.{spec,test}.{ts,js}',
+      ],
     },
   }
 })

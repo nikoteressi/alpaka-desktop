@@ -39,6 +39,7 @@ pub fn run() {
             commands::auth::get_api_key_status,
             commands::auth::delete_api_key,
             commands::auth::validate_api_key,
+            commands::auth::get_ollama_user_profile,
             commands::hosts::list_hosts,
             commands::hosts::add_host,
             commands::hosts::update_host,

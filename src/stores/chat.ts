@@ -11,6 +11,18 @@ import type {
 } from "../types/chat";
 import { DRAFT_ID_PREFIX } from "../lib/constants";
 
+export interface StreamFinalizeStats {
+  totalTokens?: number;
+  promptTokens?: number;
+  tokensPerSec?: number;
+  generationTimeMs?: number;
+  totalDurationMs?: number;
+  loadDurationMs?: number;
+  promptEvalDurationMs?: number;
+  evalDurationMs?: number;
+  seed?: number;
+}
+
 export function base64ToUint8Array(base64: string) {
   const binaryString = atob(base64);
   const bytes = new Uint8Array(binaryString.length);
@@ -147,15 +159,7 @@ export const useChatStore = defineStore("chat", {
 
     finalizeStreamedMessage(
       conversationId: string,
-      totalTokens?: number,
-      promptTokens?: number,
-      tokensPerSec?: number,
-      generationTimeMs?: number,
-      totalDurationMs?: number,
-      loadDurationMs?: number,
-      promptEvalDurationMs?: number,
-      evalDurationMs?: number,
-      seed?: number,
+      stats: StreamFinalizeStats = {},
     ) {
       if (!this.messages[conversationId]) {
         this.messages[conversationId] = [];
@@ -169,15 +173,16 @@ export const useChatStore = defineStore("chat", {
       this.messages[conversationId].push({
         role: "assistant",
         content: this.streaming.buffer,
-        tokens: totalTokens ?? this.streaming.evalTokens,
-        prompt_tokens: promptTokens ?? this.streaming.promptTokens,
-        tokens_per_sec: tokensPerSec ?? (this.streaming.tokensPerSec || 0),
-        generation_time_ms: generationTimeMs ?? 0,
-        total_duration_ms: totalDurationMs ?? 0,
-        load_duration_ms: loadDurationMs ?? 0,
-        prompt_eval_duration_ms: promptEvalDurationMs ?? 0,
-        eval_duration_ms: evalDurationMs ?? 0,
-        seed: seed ?? undefined,
+        tokens: stats.totalTokens ?? this.streaming.evalTokens,
+        prompt_tokens: stats.promptTokens ?? this.streaming.promptTokens,
+        tokens_per_sec:
+          stats.tokensPerSec ?? (this.streaming.tokensPerSec || 0),
+        generation_time_ms: stats.generationTimeMs ?? 0,
+        total_duration_ms: stats.totalDurationMs ?? 0,
+        load_duration_ms: stats.loadDurationMs ?? 0,
+        prompt_eval_duration_ms: stats.promptEvalDurationMs ?? 0,
+        eval_duration_ms: stats.evalDurationMs ?? 0,
+        seed: stats.seed ?? undefined,
       });
 
       this.streaming.buffer = "";

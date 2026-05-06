@@ -11,6 +11,11 @@ import TypingIndicator from "./TypingIndicator.vue";
 import { useSettingsStore } from "../../stores/settings";
 import { useCopyToClipboard } from "../../composables/useCopyToClipboard";
 import { uint8ArrayToBase64 } from "../../stores/chat";
+import {
+  parseMessageParts,
+  parseBlockMatch,
+  type MessagePart,
+} from "../../lib/messageParser";
 
 const props = defineProps<{
   message: Message;
@@ -23,16 +28,7 @@ const props = defineProps<{
 
 const isUser = computed(() => props.message.role === "user");
 
-interface MessagePart {
-  type: "markdown" | "code" | "tool" | "think";
-  content: string;
-  language?: string;
-  rendered?: string;
-  toolName?: string;
-  toolQuery?: string;
-}
-
-// Memoization cache for parseProcessedParts on finished messages
+// Memoization cache for finished messages
 const _parsedCache = ref<{ key: string; result: MessagePart[] } | null>(null);
 
 // Calculate parts immediately for finished messages, or use a throttled ref for streaming
@@ -46,7 +42,10 @@ const staticParts = computed(() => {
     return _parsedCache.value.result;
   }
 
-  const result = parseProcessedParts(props.message.content, isUser.value);
+  const result = parseMessageParts(props.message.content, {
+    renderMarkdown,
+    isUserMessage: isUser.value,
+  });
   _parsedCache.value = { key: cacheKey, result };
   return result;
 });
@@ -60,126 +59,8 @@ const displayParts = computed(() => {
   return staticParts.value || streamingParts.value;
 });
 
-function parseProcessedParts(
-  content: string,
-  isUserMessage: boolean,
-): MessagePart[] {
-  if (!content && !isUserMessage) return [];
-  if (isUserMessage) {
-    return [{ type: "markdown", content: content, rendered: content }];
-  }
-
-  const parts: MessagePart[] = [];
-  // Standard regex for full parsing (used for static messages and volatile tails)
-  const blockRegex =
-    /```(\w+)?\n(.*?)(?:```|$)|<think.*?<\/think>|<tool_call\b[^>]*>.*?<\/tool_call>/gis;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = blockRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      const text = content.slice(lastIndex, match.index);
-      if (text.trim()) {
-        parts.push({
-          type: "markdown",
-          content: text,
-          rendered: renderMarkdown(text),
-        });
-      }
-    }
-
-    const matchText = match[0];
-    if (matchText.toLowerCase().startsWith("<think")) {
-      const startTagMatch = matchText.match(/^<think([^>]*)>/i);
-      const startTag = startTagMatch ? startTagMatch[1] : "";
-      const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
-      const contentMatch = matchText.match(/^<think[^>]*>(.*)<\/think>$/is);
-
-      parts.push({
-        type: "think",
-        content: contentMatch
-          ? contentMatch[1].trim()
-          : matchText.replace(/^<think[^>]*>/i, "").trim(),
-        language: timeMatch ? timeMatch[1] : undefined,
-      });
-    } else if (matchText.toLowerCase().startsWith("<tool_call")) {
-      const nameM = matchText.match(/\bname="([^"]*)"/i);
-      const queryM = matchText.match(/\bquery="([^"]*)"/i);
-      const openEnd = matchText.indexOf(">");
-      const closeStart = matchText.lastIndexOf("</tool_call>");
-      parts.push({
-        type: "tool",
-        toolName: nameM?.[1],
-        toolQuery: queryM?.[1],
-        content:
-          openEnd >= 0 && closeStart > openEnd
-            ? matchText.slice(openEnd + 1, closeStart)
-            : "",
-      });
-    } else if (matchText.startsWith("```")) {
-      parts.push({
-        type: "code",
-        language: match[1] || "text",
-        content: match[2] || "",
-      });
-    }
-    lastIndex = blockRegex.lastIndex;
-  }
-
-  if (lastIndex < content.length) {
-    const text = content.slice(lastIndex);
-    if (text.trim()) {
-      parts.push({
-        type: "markdown",
-        content: text,
-        rendered: renderMarkdown(text),
-      });
-    }
-  }
-
-  return parts;
-}
-
 let frameCount = 0;
 const RENDER_EVERY_N_FRAMES = 4; // Approx 15fps during streaming for maximum smoothness/CPU balance
-
-function parseBlockMatch(match: RegExpExecArray): MessagePart | null {
-  const matchText = match[0];
-  if (matchText.toLowerCase().startsWith("<think")) {
-    const startTagMatch = matchText.match(/^<think([^>]*)>/i);
-    const startTag = startTagMatch ? startTagMatch[1] : "";
-    const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
-    const contentMatch = matchText.match(/^<think[^>]*>(.*)<\/think>$/is);
-    return {
-      type: "think",
-      content: contentMatch ? contentMatch[1].trim() : "",
-      language: timeMatch ? timeMatch[1] : undefined,
-    };
-  }
-  if (matchText.toLowerCase().startsWith("<tool_call")) {
-    const nameM = matchText.match(/\bname="([^"]*)"/i);
-    const queryM = matchText.match(/\bquery="([^"]*)"/i);
-    const openEnd = matchText.indexOf(">");
-    const closeStart = matchText.lastIndexOf("</tool_call>");
-    return {
-      type: "tool",
-      toolName: nameM?.[1],
-      toolQuery: queryM?.[1],
-      content:
-        openEnd >= 0 && closeStart > openEnd
-          ? matchText.slice(openEnd + 1, closeStart)
-          : "",
-    };
-  }
-  if (matchText.startsWith("```")) {
-    return {
-      type: "code",
-      language: match[1] || "text",
-      content: match[2] || "",
-    };
-  }
-  return null;
-}
 
 // Architectural Throttling for streaming only
 const { pause, resume, isActive } = useRafFn(
@@ -217,7 +98,10 @@ const { pause, resume, isActive } = useRafFn(
     const volatileContent = content.slice(lastStableIndex);
     streamingParts.value = [
       ...stableParts.value,
-      ...parseProcessedParts(volatileContent, false),
+      ...parseMessageParts(volatileContent, {
+        renderMarkdown,
+        allowOpenFence: true,
+      }),
     ];
   },
   { immediate: false },
@@ -265,9 +149,8 @@ const settingsStore = useSettingsStore();
 
 <template>
   <!-- User message: right-aligned bubble -->
-  <div
+  <article
     v-if="isUser"
-    role="article"
     aria-label="Your message"
     class="user-message"
     data-role="user"
@@ -297,17 +180,17 @@ const settingsStore = useSettingsStore();
           v-for="(img, idx) in message.images"
           :key="idx"
           :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
+          alt="Attached image"
           class="max-h-64 max-w-full rounded-lg object-contain border border-[var(--border-strong)]"
         />
       </div>
       {{ message.content }}
     </div>
-  </div>
+  </article>
 
   <!-- Assistant message: plain text area, no bubble -->
-  <div
+  <article
     v-else
-    role="article"
     aria-label="Assistant response"
     aria-live="polite"
     aria-atomic="false"
@@ -432,7 +315,7 @@ const settingsStore = useSettingsStore();
       :message-key="messageId"
       :seed="message.seed"
     />
-  </div>
+  </article>
 </template>
 
 <style scoped>
@@ -629,7 +512,7 @@ const settingsStore = useSettingsStore();
 /* ── Copy button ──────────────────────────────────────── */
 .copy-btn {
   background: none;
-  border: none;
+  border: 1px solid transparent;
   color: var(--text-dim);
   cursor: pointer;
   padding: 6px 10px;
@@ -642,7 +525,6 @@ const settingsStore = useSettingsStore();
   font-size: 11px;
   font-family: var(--sans);
   font-weight: 500;
-  border: 1px solid transparent;
 }
 
 .copy-btn:hover {

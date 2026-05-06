@@ -16,9 +16,12 @@ describe("useAuthStore", () => {
   it("login updates user and authenticated status", async () => {
     const authStore = useAuthStore();
 
-    // Backend returns null/void on success
     mockInvoke.mockResolvedValueOnce(null); // login
     mockInvoke.mockResolvedValueOnce(true); // get_auth_status
+    mockInvoke.mockResolvedValueOnce({
+      name: "nikoteressi",
+      email: "user@example.com",
+    }); // get_ollama_user_profile
 
     await authStore.login("host1", "token123");
 
@@ -29,8 +32,9 @@ describe("useAuthStore", () => {
     expect(mockInvoke).toHaveBeenCalledWith("get_auth_status", {
       hostId: "host1",
     });
-    expect(authStore.user?.username).toBe("Ollama User");
     expect(authStore.authenticatedHosts["host1"]).toBe(true);
+    // username is populated asynchronously from the profile fetch
+    expect(authStore.user).not.toBeNull();
   });
 
   it("logout clears authenticated status and user if no hosts left", async () => {

@@ -61,7 +61,7 @@ router.beforeEach((to, from, next) => {
       const leavingChat =
         from.path === "/" || from.path.includes("chat") || from.name === "chat";
       if (leavingChat) {
-        const confirmed = window.confirm(
+        const confirmed = globalThis.confirm(
           "A response is currently generating. Leave anyway?",
         );
         if (!confirmed) return next(false);

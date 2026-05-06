@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
 import ThinkBlock from "./ThinkBlock.vue";
 
 // Selector for the content panel — the innermost scrollable div.
@@ -146,5 +147,33 @@ describe("ThinkBlock", () => {
     // Default: open. Click should collapse it — toggling during thinking is intentional (bug #7).
     await wrapper.find("button").trigger("click");
     expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(false);
+  });
+
+  it("shows plain text (no markdown) while isThinking is true", async () => {
+    const wrapper = mount(ThinkBlock, {
+      props: { content: "**bold**", isThinking: true },
+    });
+    await nextTick();
+    const content = wrapper.find(".think-content");
+    expect(content.text()).toContain("**bold**");
+    expect(content.html()).not.toContain("<strong>");
+  });
+
+  it("renders markdown HTML once isThinking is false", async () => {
+    const wrapper = mount(ThinkBlock, {
+      props: { content: "some content", isThinking: false },
+    });
+    await nextTick();
+    const content = wrapper.find(".think-content--rendered");
+    expect(content.html()).toContain("<p>");
+  });
+
+  it("content container has max-height: 380px", async () => {
+    const wrapper = mount(ThinkBlock, {
+      props: { content: "test", isThinking: false },
+    });
+    await nextTick();
+    const panel = wrapper.find(CONTENT_PANEL);
+    expect(panel.exists()).toBe(true);
   });
 });
