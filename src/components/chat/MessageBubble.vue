@@ -40,7 +40,7 @@ const { hasPrev, hasNext, versionLabel, prevVersion, nextVersion } =
   useVersionSwitcher(props.message);
 
 function onRegenerate() {
-  emit("regenerate", props.message.id ?? "");
+  emit("regenerate", props.message.parentId ?? "");
 }
 
 // Memoization cache for finished messages

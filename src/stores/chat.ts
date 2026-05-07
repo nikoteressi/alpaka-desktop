@@ -360,6 +360,10 @@ export const useChatStore = defineStore("chat", {
             prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
             eval_duration_ms: m.eval_duration_ms ?? 0,
             seed: m.seed ?? undefined,
+            parentId: m.parent_id ?? null,
+            siblingOrder: m.sibling_order ?? 0,
+            siblingCount: m.sibling_count ?? 1,
+            isActive: m.is_active ?? true,
           };
         });
 

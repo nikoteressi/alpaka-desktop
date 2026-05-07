@@ -120,8 +120,9 @@
                   :sibling-order="item.message.siblingOrder ?? 0"
                   :parent-id="item.message.parentId ?? null"
                   :is-regenerating="
+                    item.message.role !== 'user' &&
                     chatStore.streaming.regeneratingMessageId ===
-                    item.message.id
+                      item.message.parentId
                   "
                   :class="item.outsideContext ? 'opacity-40' : ''"
                   @edit="onEdit(item.message)"
