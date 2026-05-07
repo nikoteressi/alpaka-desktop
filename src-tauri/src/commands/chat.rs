@@ -439,10 +439,7 @@ pub async fn switch_version(
 }
 
 #[tauri::command]
-pub async fn truncate_from(
-    message_id: String,
-    state: State<'_, AppState>,
-) -> Result<(), AppError> {
+pub async fn truncate_from(message_id: String, state: State<'_, AppState>) -> Result<(), AppError> {
     if message_id.is_empty() {
         return Err(AppError::Internal("message_id must not be empty".into()));
     }

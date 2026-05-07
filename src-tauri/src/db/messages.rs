@@ -515,32 +515,77 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let user_msg = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::User, content: "Q".into(),
-            parent_id: None, sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let user_msg = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::User,
+                content: "Q".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
-        create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A1".into(),
-            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "A1".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
-        create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A2".into(),
-            parent_id: Some(user_msg.id.clone()), sibling_order: 1, is_active: false,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "A2".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 1,
+                is_active: false,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
         let siblings = get_siblings(&conn, &user_msg.id).unwrap();
         assert_eq!(siblings.len(), 2);
@@ -553,34 +598,80 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let user_msg = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::User, content: "Q".into(),
-            parent_id: None, sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let user_msg = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::User,
+                content: "Q".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
         // First assistant response
-        create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A1".into(),
-            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "A1".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
         // Create a sibling (regenerated response)
-        let new_msg = create_sibling(&conn, &user_msg.id, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A2".into(),
-            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let new_msg = create_sibling(
+            &conn,
+            &user_msg.id,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "A2".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
         assert_eq!(new_msg.content, "A2");
         assert!(new_msg.is_active);
@@ -597,32 +688,77 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let user_msg = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::User, content: "Q".into(),
-            parent_id: None, sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let user_msg = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::User,
+                content: "Q".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
-        let a1 = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A1".into(),
-            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let a1 = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "A1".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
-        let a2 = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A2".into(),
-            parent_id: Some(user_msg.id.clone()), sibling_order: 1, is_active: false,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let a2 = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "A2".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 1,
+                is_active: false,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
         set_active_sibling(&conn, &a2.id).unwrap();
 
@@ -638,32 +774,77 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let u = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::User, content: "U".into(),
-            parent_id: None, sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let u = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::User,
+                content: "U".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
-        let a = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A".into(),
-            parent_id: Some(u.id.clone()), sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let a = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "A".into(),
+                parent_id: Some(u.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
-        let _u2 = create(&conn, NewMessage {
-            conversation_id: cid.clone(), role: MessageRole::User, content: "U2".into(),
-            parent_id: Some(a.id.clone()), sibling_order: 0, is_active: true,
-            images_json: None, files_json: None, tokens_used: None,
-            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
-            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
-            eval_duration_ms: None, seed: None,
-        }).unwrap();
+        let _u2 = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::User,
+                content: "U2".into(),
+                parent_id: Some(a.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
 
         truncate_after(&conn, &a.id).unwrap(); // delete A and everything after
 

@@ -350,10 +350,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let pmid = parent_message_id.clone();
         let history = spawn_db(self.state.db.clone(), move |conn| {
             let mut msgs = messages::list_for_conversation(conn, &conv_id)?;
-            let idx = msgs
-                .iter()
-                .position(|m| m.id == pmid)
-                .ok_or_else(|| AppError::Internal("parent_message_id not found in history".into()))?;
+            let idx = msgs.iter().position(|m| m.id == pmid).ok_or_else(|| {
+                AppError::Internal("parent_message_id not found in history".into())
+            })?;
             msgs.truncate(idx + 1);
             Ok(msgs)
         })
