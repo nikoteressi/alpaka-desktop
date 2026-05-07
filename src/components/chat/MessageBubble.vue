@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { renderMarkdown } from "../../lib/markdown";
 import type { Message, MessagePart } from "../../types/chat";
 import { useChatStore } from "../../stores/chat";
@@ -39,6 +39,23 @@ const isUser = computed(() => props.message.role === "user");
 // Inline edit state (user messages only)
 const isEditing = ref(false);
 const editContent = ref("");
+const editTextareaRef = ref<HTMLTextAreaElement | null>(null);
+
+function autoResize() {
+  const el = editTextareaRef.value;
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+watch(isEditing, (val) => {
+  if (val) {
+    nextTick(() => {
+      autoResize();
+      editTextareaRef.value?.focus();
+    });
+  }
+});
 
 function startEdit() {
   editContent.value = props.message.content;
@@ -159,9 +176,10 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
       <!-- Inline edit mode -->
       <div v-if="isEditing" class="user-edit-container">
         <textarea
+          ref="editTextareaRef"
           v-model="editContent"
           class="user-edit-textarea"
-          rows="4"
+          @input="autoResize"
           @keydown.ctrl.enter="applyEdit"
           @keydown.escape="cancelEdit"
         />
@@ -199,7 +217,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
         </div>
         <div
           v-if="!isStreaming"
-          class="user-footer-actions opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          class="user-footer-actions pointer-events-none group-hover:pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200"
         >
           <MessageActions
             :message="message"
@@ -322,24 +340,22 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 .user-message {
   display: flex;
   justify-content: flex-end;
-  padding: 12px 24px 32px; /* More space at bottom for actions */
+  padding: 12px 24px 8px;
   position: relative;
 }
 
 .user-bubble-container {
   max-width: 70%;
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
 }
 
 .user-footer-actions {
-  position: absolute;
-  bottom: -28px;
-  right: 0;
-  z-index: 20;
+  height: 24px;
+  display: flex;
+  align-items: center;
 }
 
 .user-bubble {
@@ -359,39 +375,43 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .user-edit-textarea {
   width: 100%;
-  background: var(--bg-base);
-  border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  padding: 10px 14px;
+  background: var(--bg-user-msg);
+  border: 1.5px solid var(--accent);
+  border-radius: 18px;
+  border-top-right-radius: 4px;
+  padding: 8px 14px;
   font-size: 14px;
   color: var(--text);
   line-height: 1.5;
   resize: none;
   outline: none;
   font-family: inherit;
-}
-
-.user-edit-textarea:focus {
-  border-color: var(--accent);
+  overflow: hidden;
+  min-height: 36px;
 }
 
 .user-edit-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-end;
+  padding-right: 2px;
 }
 
 .user-edit-btn {
-  padding: 6px 16px;
-  font-size: 13px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 500;
   border-radius: 8px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  border: none;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
 }
 
 .user-edit-btn--cancel {
@@ -401,6 +421,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 
 .user-edit-btn--cancel:hover {
   color: var(--text);
+  background: var(--bg-hover);
 }
 
 .user-edit-btn--apply {
