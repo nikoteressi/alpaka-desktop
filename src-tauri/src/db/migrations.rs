@@ -36,6 +36,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "message seed column",
         sql: include_str!("sql/004_message_seed.sql"),
     },
+    Migration {
+        version: 13,
+        description: "message branching (parent_id, sibling_order, is_active)",
+        sql: include_str!("sql/005_message_branching.sql"),
+    },
 ];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────
