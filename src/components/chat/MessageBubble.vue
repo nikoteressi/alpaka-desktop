@@ -44,18 +44,27 @@ const editTextareaRef = ref<HTMLTextAreaElement | null>(null);
 function autoResize() {
   const el = editTextareaRef.value;
   if (!el) return;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+  // Grow-only: avoids height="auto" collapse on every keystroke (causes blink in WebKit)
+  if (el.scrollHeight > el.clientHeight) {
+    el.style.height = `${el.scrollHeight}px`;
+  }
 }
 
-watch(isEditing, (val) => {
-  if (val) {
-    nextTick(() => {
-      autoResize();
-      editTextareaRef.value?.focus();
-    });
-  }
-});
+// flush:'post' — fires after the DOM update, so ref is already set and no nextTick needed
+watch(
+  isEditing,
+  (val) => {
+    if (!val) return;
+    const el = editTextareaRef.value;
+    if (!el) return;
+    // One-time sizing on open: "auto" trick is safe here (runs once, not on every keystroke)
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  },
+  { flush: "post" },
+);
 
 function startEdit() {
   editContent.value = props.message.content;
@@ -217,7 +226,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
         </div>
         <div
           v-if="!isStreaming"
-          class="user-footer-actions pointer-events-none group-hover:pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          class="user-footer-actions opacity-0 group-hover:opacity-100 transition-opacity duration-200"
         >
           <MessageActions
             :message="message"
@@ -391,7 +400,8 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   resize: none;
   outline: none;
   font-family: inherit;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 320px;
   min-height: 36px;
 }
 
