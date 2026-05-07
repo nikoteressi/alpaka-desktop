@@ -153,13 +153,17 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
             :disabled="!hasPrev"
             class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
             @click="prevVersion"
-          >&lt;</button>
+          >
+            &lt;
+          </button>
           <span>{{ versionLabel }}</span>
           <button
             :disabled="!hasNext"
             class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
             @click="nextVersion"
-          >&gt;</button>
+          >
+            &gt;
+          </button>
         </div>
       </div>
     </div>
@@ -179,7 +183,9 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
       <MessageActions :message="message" :is-user="false" mode="version-only" />
     </div>
 
-    <div v-if="isRegenerating" class="text-xs text-neutral-500 italic py-2">Regenerating…</div>
+    <div v-if="isRegenerating" class="text-xs text-neutral-500 italic py-2">
+      Regenerating…
+    </div>
 
     <div v-else class="assistant-content rendered-markdown-container">
       <template v-for="(group, gIdx) in unifiedGroups" :key="gIdx">
@@ -276,13 +282,17 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
             :disabled="!hasPrev"
             class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
             @click="prevVersion"
-          >&lt;</button>
+          >
+            &lt;
+          </button>
           <span>{{ versionLabel }}</span>
           <button
             :disabled="!hasNext"
             class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
             @click="nextVersion"
-          >&gt;</button>
+          >
+            &gt;
+          </button>
         </div>
       </div>
     </div>

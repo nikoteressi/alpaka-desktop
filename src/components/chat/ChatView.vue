@@ -119,7 +119,10 @@
                   :sibling-count="item.message.siblingCount ?? 0"
                   :sibling-order="item.message.siblingOrder ?? 0"
                   :parent-id="item.message.parentId ?? null"
-                  :is-regenerating="chatStore.streaming.regeneratingMessageId === item.message.id"
+                  :is-regenerating="
+                    chatStore.streaming.regeneratingMessageId ===
+                    item.message.id
+                  "
                   :class="item.outsideContext ? 'opacity-40' : ''"
                   @edit="onEdit(item.message)"
                   @regenerate="onRegenerate"
