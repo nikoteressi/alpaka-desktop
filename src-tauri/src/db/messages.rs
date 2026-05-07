@@ -247,9 +247,16 @@ pub fn create_sibling(
     new.parent_id = Some(parent_id.to_owned());
     new.is_active = true;
 
+    // All four operations must succeed together; wrap in a transaction so a
+    // failed INSERT cannot leave siblings deactivated with no active replacement.
+    let tx = conn.unchecked_transaction()?;
+
     if siblings.len() >= 5 {
         if let Some(oldest_inactive) = siblings.iter().find(|s| !s.is_active) {
-            truncate_after(conn, &oldest_inactive.id)?;
+            conn.execute(
+                "DELETE FROM messages WHERE id = ?1",
+                params![oldest_inactive.id],
+            )?;
         }
     }
 
@@ -258,7 +265,9 @@ pub fn create_sibling(
         params![parent_id],
     )?;
 
-    create(conn, new)
+    let msg = create(conn, new)?;
+    tx.commit()?;
+    Ok(msg)
 }
 
 /// Makes the target message active; deactivates all other messages with the same parent_id.
