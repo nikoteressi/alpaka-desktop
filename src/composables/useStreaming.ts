@@ -35,13 +35,13 @@ export function useStreaming(
 
   const unlisteners: Array<() => void> = [];
 
+  function matchesConversation(payloadConvId: string) {
+    return !conversationId.value || conversationId.value === payloadConvId;
+  }
+
   async function setupListeners() {
     const unlistenToken = await listen<TokenPayload>("chat:token", (event) => {
-      if (
-        conversationId.value &&
-        event.payload.conversation_id !== conversationId.value
-      )
-        return;
+      if (!matchesConversation(event.payload.conversation_id)) return;
       if (isThinking.value) {
         thinkingBuffer.value += event.payload.content;
       } else {
@@ -53,11 +53,7 @@ export function useStreaming(
     const unlistenThinkingStart = await listen<ThinkingPayload>(
       "chat:thinking-start",
       (event) => {
-        if (
-          conversationId.value &&
-          event.payload.conversation_id !== conversationId.value
-        )
-          return;
+        if (!matchesConversation(event.payload.conversation_id)) return;
         isThinking.value = true;
         callbacks.onThinkingStart?.(event.payload.conversation_id);
       },
@@ -66,11 +62,7 @@ export function useStreaming(
     const unlistenThinkingToken = await listen<ThinkingTokenPayload>(
       "chat:thinking-token",
       (event) => {
-        if (
-          conversationId.value &&
-          event.payload.conversation_id !== conversationId.value
-        )
-          return;
+        if (!matchesConversation(event.payload.conversation_id)) return;
         thinkingBuffer.value += event.payload.content;
         callbacks.onThinkingToken?.(event.payload);
       },
@@ -79,11 +71,7 @@ export function useStreaming(
     const unlistenThinkingEnd = await listen<ThinkingPayload>(
       "chat:thinking-end",
       (event) => {
-        if (
-          conversationId.value &&
-          event.payload.conversation_id !== conversationId.value
-        )
-          return;
+        if (!matchesConversation(event.payload.conversation_id)) return;
         isThinking.value = false;
         callbacks.onThinkingEnd?.(
           event.payload.conversation_id,
@@ -93,11 +81,7 @@ export function useStreaming(
     );
 
     const unlistenDone = await listen<DonePayload>("chat:done", (event) => {
-      if (
-        conversationId.value &&
-        event.payload.conversation_id !== conversationId.value
-      )
-        return;
+      if (!matchesConversation(event.payload.conversation_id)) return;
       isStreaming.value = false;
       tokensPerSec.value = event.payload.tokens_per_sec;
       callbacks.onDone?.(event.payload);
@@ -106,11 +90,7 @@ export function useStreaming(
     const unlistenToolCall = await listen<ToolCallPayload>(
       "chat:tool-call",
       (event) => {
-        if (
-          conversationId.value &&
-          event.payload.conversation_id !== conversationId.value
-        )
-          return;
+        if (!matchesConversation(event.payload.conversation_id)) return;
         callbacks.onToolCall?.(event.payload);
       },
     );
@@ -118,11 +98,7 @@ export function useStreaming(
     const unlistenToolReading = await listen<ToolReadingPayload>(
       "chat:tool-reading",
       (event) => {
-        if (
-          conversationId.value &&
-          event.payload.conversation_id !== conversationId.value
-        )
-          return;
+        if (!matchesConversation(event.payload.conversation_id)) return;
         callbacks.onToolReading?.(event.payload);
       },
     );
@@ -130,11 +106,7 @@ export function useStreaming(
     const unlistenToolResult = await listen<ToolResultPayload>(
       "chat:tool-result",
       (event) => {
-        if (
-          conversationId.value &&
-          event.payload.conversation_id !== conversationId.value
-        )
-          return;
+        if (!matchesConversation(event.payload.conversation_id)) return;
         callbacks.onToolResult?.(event.payload);
       },
     );
@@ -143,22 +115,14 @@ export function useStreaming(
       conversation_id: string;
       error: string;
     }>("chat:error", (event) => {
-      if (
-        conversationId.value &&
-        event.payload.conversation_id !== conversationId.value
-      )
-        return;
+      if (!matchesConversation(event.payload.conversation_id)) return;
       callbacks.onError?.(event.payload.conversation_id, event.payload.error);
     });
 
     const unlistenCancelled = await listen<{ conversation_id: string }>(
       "chat:cancelled",
       (event) => {
-        if (
-          conversationId.value &&
-          event.payload.conversation_id !== conversationId.value
-        )
-          return;
+        if (!matchesConversation(event.payload.conversation_id)) return;
         callbacks.onCancelled?.(event.payload.conversation_id);
       },
     );
