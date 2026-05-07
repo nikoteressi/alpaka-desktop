@@ -328,6 +328,13 @@ describe("ChatView.vue", () => {
       toolCalls: [],
       promptTokens: 0,
       evalTokens: 0,
+      searchState: null,
+      searchResults: [],
+      sidebarOpen: false,
+      activeSearchMessageId: null,
+      activeSearchData: [],
+      activeMessageParts: [],
+      regeneratingMessageId: null,
     };
 
     const wrapper = mountChatView();
@@ -352,6 +359,13 @@ describe("ChatView.vue", () => {
       toolCalls: [],
       promptTokens: 0,
       evalTokens: 0,
+      searchState: null,
+      searchResults: [],
+      sidebarOpen: false,
+      activeSearchMessageId: null,
+      activeSearchData: [],
+      activeMessageParts: [],
+      regeneratingMessageId: null,
     };
 
     const wrapper = mountChatView();

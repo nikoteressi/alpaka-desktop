@@ -52,6 +52,7 @@ export function useSendMessage() {
       promptTokens: store.totalActiveTokens,
       evalTokens: 0,
       activeMessageParts: [],
+      regeneratingMessageId: null,
     };
 
     // Snapshot message state before push — used for rollback on invoke failure
