@@ -29,7 +29,11 @@ describe("ThinkBlock", () => {
 
   it("starts expanded when mounted with isThinking: true", () => {
     const wrapper = mount(ThinkBlock, {
-      props: { parts: [thinkPart("reasoning here")], isThinking: true },
+      props: {
+        parts: [thinkPart("reasoning here")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
     expect(isHidden(wrapper)).toBe(false);
   });
@@ -145,9 +149,9 @@ describe("ThinkBlock", () => {
     expect(contents[0].html()).toContain("<strong>bold</strong>");
   });
 
-  it("isOpen ref is true on mount", () => {
+  it("isOpen ref is true on mount when streaming", () => {
     const wrapper = mount(ThinkBlock, {
-      props: { parts: [thinkPart("")], isThinking: true },
+      props: { parts: [thinkPart("")], isThinking: true, isOverallStreaming: true },
     });
     expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(true);
   });

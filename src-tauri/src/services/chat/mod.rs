@@ -91,12 +91,12 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let msg_content = content.clone();
         let imgs = base64_images.clone();
 
-        let history = spawn_db(self.state.db.clone(), move |conn| {
+        let (history, user_msg_id) = spawn_db(self.state.db.clone(), move |conn| {
             let images_json = imgs
                 .map(|i| serde_json::to_string(&i).map_err(AppError::from))
                 .transpose()?;
 
-            messages::create(
+            let user_msg = messages::create(
                 conn,
                 messages::NewMessage {
                     conversation_id: conv_id.clone(),
@@ -119,7 +119,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 },
             )?;
 
-            messages::list_for_conversation(conn, &conv_id)
+            let history = messages::list_for_conversation(conn, &conv_id)?;
+            Ok((history, user_msg.id))
         })
         .await?;
 
@@ -297,7 +298,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         conversation_id: conv_id,
                         role: messages::MessageRole::Assistant,
                         content: final_content,
-                        parent_id: None,
+                        parent_id: Some(user_msg_id),
                         sibling_order: 0,
                         is_active: true,
                         images_json: None,

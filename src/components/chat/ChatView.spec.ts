@@ -712,7 +712,7 @@ describe("ChatView.vue", () => {
 
     // Click the MessageBubble stub — the stub emits 'edit' on click.
     await wrapper.find('[data-testid="message-bubble-stub"]').trigger("click");
-    await nextTick();
+    await flushPromises();
 
     expect(chatStore.drafts["conv-1"]).toMatchObject({
       content: "Hello edit me",

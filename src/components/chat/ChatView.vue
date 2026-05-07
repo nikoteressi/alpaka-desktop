@@ -410,10 +410,20 @@ async function onStop() {
 async function onEdit(message: Message) {
   const conversationId = chatStore.activeConversationId;
   if (!conversationId) return;
-  if (message.id) {
-    await invoke("truncate_from", { messageId: message.id });
-    delete chatStore.messages[conversationId];
-    await chatStore.loadConversation(conversationId);
+
+  let msgId = message.id;
+  if (!msgId) {
+    // Optimistic push didn't get a DB id yet — refresh first to get it
+    await chatStore.refreshMessages(conversationId);
+    const refreshed = chatStore.messages[conversationId] ?? [];
+    msgId = refreshed.find(
+      (m) => m.role === message.role && m.content === message.content,
+    )?.id;
+  }
+
+  if (msgId) {
+    await invoke("truncate_from", { messageId: msgId });
+    await chatStore.refreshMessages(conversationId);
   }
   const current = chatStore.drafts[conversationId];
   setDraft(conversationId, {

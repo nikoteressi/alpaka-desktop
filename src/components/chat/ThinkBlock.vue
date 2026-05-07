@@ -153,7 +153,7 @@ const props = defineProps<{
 
 const { isOpen, toggle: _toggle } = useCollapsibleState({
   messageKey: props.messageKey,
-  initialOpen: true,
+  initialOpen: !!props.isOverallStreaming,
 });
 
 const contentEl = ref<HTMLElement | null>(null);

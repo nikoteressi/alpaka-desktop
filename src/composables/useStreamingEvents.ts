@@ -93,6 +93,8 @@ export function useStreamingEvents() {
     });
     chatStore.streaming.isStreaming = false;
     chatStore.streaming.tokensPerSec = payload.tokens_per_sec;
+    // Reload from DB to populate message IDs needed for edit/regenerate
+    void chatStore.refreshMessages(payload.conversation_id);
   }
 
   function onCancelled(convId: string) {

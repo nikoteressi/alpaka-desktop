@@ -447,6 +447,47 @@ export const useChatStore = defineStore("chat", {
       }
     },
 
+    async refreshMessages(conversationId: string): Promise<void> {
+      try {
+        const rawMessages = await invoke<BackendMessage[]>("get_messages", {
+          conversationId,
+        });
+        if (this.activeConversationId !== conversationId) return;
+        this.messages[conversationId] = (rawMessages || []).map((m) => {
+          let images: Uint8Array[] = [];
+          try {
+            if (m.images_json) {
+              const base64s = JSON.parse(m.images_json) as string[];
+              images = base64s.map(base64ToUint8Array);
+            }
+          } catch {
+            // ignore malformed image data
+          }
+          return {
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            images,
+            tokens: m.tokens_used ?? 0,
+            prompt_tokens: m.prompt_tokens ?? 0,
+            tokens_per_sec: m.tokens_per_sec ?? 0,
+            generation_time_ms: m.generation_time_ms ?? 0,
+            total_duration_ms: m.total_duration_ms ?? 0,
+            load_duration_ms: m.load_duration_ms ?? 0,
+            prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
+            eval_duration_ms: m.eval_duration_ms ?? 0,
+            seed: m.seed ?? undefined,
+            parentId: m.parent_id ?? null,
+            siblingOrder: m.sibling_order ?? 0,
+            siblingCount: m.sibling_count ?? 1,
+            isActive: m.is_active ?? true,
+          };
+        });
+      } catch (err) {
+        console.warn("Could not refresh messages", err);
+      }
+    },
+
     async regenerateMessage(parentMessageId: string): Promise<void> {
       const conversationId = this.activeConversationId;
       if (!conversationId) return;
