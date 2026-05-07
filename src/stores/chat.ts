@@ -494,6 +494,18 @@ export const useChatStore = defineStore("chat", {
       const conv = this.conversations.find((c) => c.id === conversationId);
       if (!conv) return;
 
+      // Mirror streaming setup so the send button is blocked and the streaming bubble appears
+      this.streaming.isStreaming = true;
+      this.streaming.currentConversationId = conversationId;
+      this.streaming.buffer = "";
+      this.streaming.thinkingBuffer = "";
+      this.streaming.isThinking = false;
+      this.streaming.tokensPerSec = null;
+      this.streaming.promptTokens = 0;
+      this.streaming.evalTokens = 0;
+      this.streaming.searchState = null;
+      this.streaming.searchResults = [];
+      this.streaming.activeMessageParts = [];
       this.streaming.regeneratingMessageId = parentMessageId;
 
       try {
@@ -505,9 +517,14 @@ export const useChatStore = defineStore("chat", {
           chatOptions: null,
           webSearchEnabled: false,
         });
-      } finally {
+      } catch (err) {
+        // invoke failed before streaming started; clean up
+        this.streaming.isStreaming = false;
         this.streaming.regeneratingMessageId = null;
+        throw err;
       }
+      // isStreaming is reset by onDone event handler; just clear the regen flag
+      this.streaming.regeneratingMessageId = null;
     },
   },
 });

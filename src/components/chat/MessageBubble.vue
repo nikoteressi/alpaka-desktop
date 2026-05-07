@@ -120,7 +120,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   <!-- User Message -->
   <article v-if="isUser" class="user-message group">
     <div class="user-bubble-container relative">
-      <div v-if="!isRegenerating" class="user-bubble">
+      <div class="user-bubble">
         <div
           v-if="message.images && message.images.length > 0"
           class="flex flex-wrap gap-2 mb-2"
@@ -134,7 +134,6 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
         </div>
         {{ message.content }}
       </div>
-      <div v-else class="text-xs text-neutral-500 italic">Regenerating…</div>
       <div
         v-if="!isStreaming"
         class="user-footer-actions opacity-0 group-hover:opacity-100 transition-opacity duration-300"
@@ -183,11 +182,10 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
       <MessageActions :message="message" :is-user="false" mode="version-only" />
     </div>
 
-    <div v-if="isRegenerating" class="text-xs text-neutral-500 italic py-2">
-      Regenerating…
-    </div>
-
-    <div v-else class="assistant-content rendered-markdown-container">
+    <div
+      class="assistant-content rendered-markdown-container"
+      :class="{ 'opacity-40': isRegenerating }"
+    >
       <template v-for="(group, gIdx) in unifiedGroups" :key="gIdx">
         <ThinkBlock
           v-if="group.type === 'thought' && isThoughtGroupVisible(group, gIdx)"

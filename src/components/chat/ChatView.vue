@@ -222,6 +222,38 @@
       />
     </div>
   </div>
+
+  <BaseModal
+    :show="!!editingMessage"
+    title="Edit Message"
+    :show-close="true"
+    max-width="560px"
+    @close="onEditCancel"
+  >
+    <div class="p-5">
+      <textarea
+        v-model="editContent"
+        class="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded-lg p-3 text-sm text-[var(--text)] resize-none focus:outline-none focus:border-[var(--accent)]"
+        rows="6"
+        @keydown.ctrl.enter="onEditConfirm"
+      />
+    </div>
+    <template #footer>
+      <button
+        class="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors rounded-lg"
+        @click="onEditCancel"
+      >
+        Cancel
+      </button>
+      <button
+        class="px-4 py-2 text-sm bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+        :disabled="!editContent.trim()"
+        @click="onEditConfirm"
+      >
+        Apply
+      </button>
+    </template>
+  </BaseModal>
 </template>
 
 <script setup lang="ts">
@@ -232,12 +264,12 @@ import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import MessageBubble from "./MessageBubble.vue";
 import ChatInput from "./ChatInput.vue";
 import SearchSidebar from "./SearchSidebar.vue";
+import BaseModal from "../shared/BaseModal.vue";
 import { useChatStore } from "../../stores/chat";
 import { useModelStore } from "../../stores/models";
 import { useSettingsStore } from "../../stores/settings";
 import { useAppOrchestration } from "../../composables/useAppOrchestration";
 import { useSendMessage } from "../../composables/useSendMessage";
-import { useDraftManager } from "../../composables/useDraftManager";
 import type { Message } from "../../types/chat";
 import type { ChatOptions } from "../../types/settings";
 
@@ -278,11 +310,12 @@ const modelStore = useModelStore();
 const settingsStore = useSettingsStore();
 const orchestration = useAppOrchestration();
 const { sendMessage, stopGeneration } = useSendMessage();
-const { setDraft } = useDraftManager();
 
 const scrollContainer = ref<HTMLElement | null>(null);
 const isAutoScrollEnabled = ref(true);
 const isSystemPromptExpanded = ref(false);
+const editingMessage = ref<Message | null>(null);
+const editContent = ref("");
 
 const messages = computed(() => chatStore.activeMessages);
 const nonSystemMessages = computed(() =>
@@ -407,13 +440,29 @@ async function onStop() {
   await stopGeneration();
 }
 
-async function onEdit(message: Message) {
+function onEdit(message: Message) {
+  editingMessage.value = message;
+  editContent.value = message.content;
+}
+
+function onEditCancel() {
+  editingMessage.value = null;
+  editContent.value = "";
+}
+
+async function onEditConfirm() {
+  const message = editingMessage.value;
+  const content = editContent.value.trim();
+  editingMessage.value = null;
+  editContent.value = "";
+
+  if (!message || !content) return;
+
   const conversationId = chatStore.activeConversationId;
   if (!conversationId) return;
 
   let msgId = message.id;
   if (!msgId) {
-    // Optimistic push didn't get a DB id yet — refresh first to get it
     await chatStore.refreshMessages(conversationId);
     const refreshed = chatStore.messages[conversationId] ?? [];
     msgId = refreshed.find(
@@ -425,15 +474,8 @@ async function onEdit(message: Message) {
     await invoke("truncate_from", { messageId: msgId });
     await chatStore.refreshMessages(conversationId);
   }
-  const current = chatStore.drafts[conversationId];
-  setDraft(conversationId, {
-    content: message.content,
-    attachments: [],
-    linkedContexts: [],
-    webSearchEnabled: current?.webSearchEnabled ?? false,
-    thinkEnabled: current?.thinkEnabled ?? false,
-    thinkLevel: current?.thinkLevel ?? "medium",
-  });
+
+  await sendMessage(content);
 }
 
 async function onRegenerate(messageId: string) {

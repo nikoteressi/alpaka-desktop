@@ -691,7 +691,7 @@ describe("ChatView.vue", () => {
 
   // ------------------------------------------------------------------ onEdit
 
-  it("onEdit: MessageBubble edit event populates the draft with message content", async () => {
+  it("onEdit: MessageBubble edit event opens the edit modal pre-filled with message content", async () => {
     const msg = {
       id: "m1",
       role: "user" as const,
@@ -712,11 +712,12 @@ describe("ChatView.vue", () => {
 
     // Click the MessageBubble stub — the stub emits 'edit' on click.
     await wrapper.find('[data-testid="message-bubble-stub"]').trigger("click");
-    await flushPromises();
+    await nextTick();
 
-    expect(chatStore.drafts["conv-1"]).toMatchObject({
-      content: "Hello edit me",
-    });
+    // Modal should now be open with the message content pre-filled in the textarea.
+    const textarea = document.querySelector("textarea");
+    expect(textarea).not.toBeNull();
+    expect((textarea as HTMLTextAreaElement).value).toBe("Hello edit me");
   });
 
   // ------------------------------------------------------------------ scrollend callback
