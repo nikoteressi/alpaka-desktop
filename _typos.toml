@@ -7,6 +7,9 @@ PN = "PN"
 # "&lt;thi" in docs/dev/backend.md is a partial HTML entity example showing cross-chunk
 # boundary splitting of the <think> tag — not a misspelling.
 thi = "thi"
+# "calculat" is an intentional prefix match in ThinkBlock.vue to detect both
+# "calculating" and "calculation" in the model's reasoning output.
+calculat = "calculat"
 
 [files]
 extend-exclude = [
