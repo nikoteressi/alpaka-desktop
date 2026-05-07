@@ -399,6 +399,59 @@ pub async fn compact_conversation<R: Runtime>(
         .await
 }
 
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn regenerate_message<R: Runtime>(
+    conversation_id: String,
+    parent_message_id: String,
+    model: String,
+    think_mode: Option<String>,
+    chat_options: Option<ChatOptions>,
+    web_search_enabled: bool,
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    let service = crate::services::chat::ChatService::new(app, &state);
+    service
+        .send_regenerate(crate::services::chat::RegenerateParams {
+            conversation_id,
+            parent_message_id,
+            model,
+            think_mode,
+            chat_options,
+            web_search_enabled,
+        })
+        .await
+}
+
+#[tauri::command]
+pub async fn switch_version(
+    sibling_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    if sibling_id.is_empty() {
+        return Err(AppError::Internal("sibling_id must not be empty".into()));
+    }
+    spawn_db(state.db.clone(), move |conn| {
+        messages::set_active_sibling(conn, &sibling_id)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn truncate_from(
+    message_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    if message_id.is_empty() {
+        return Err(AppError::Internal("message_id must not be empty".into()));
+    }
+    spawn_db(state.db.clone(), move |conn| {
+        messages::truncate_after(conn, &message_id)
+    })
+    .await
+}
+
 #[cfg(test)]
 #[path = "chat.tests.rs"]
 mod tests;
