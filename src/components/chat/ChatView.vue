@@ -404,7 +404,8 @@ async function onStop() {
 }
 
 async function onEdit(message: Message) {
-  const conversationId = chatStore.activeConversationId!;
+  const conversationId = chatStore.activeConversationId;
+  if (!conversationId) return;
   if (message.id) {
     await invoke("truncate_from", { messageId: message.id });
     delete chatStore.messages[conversationId];
