@@ -12,6 +12,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - DeepSeek-inspired chat visual styling (#149): thinking blocks now render as a collapsible timeline with step-by-step reasoning, animated brain icon, dot markers, and auto-collapse after generation; web search shown as an inline pill inside the timeline during streaming, then as a post-message favicon-stack badge that opens a 320 px source sidebar (`SearchSidebar.vue`); `chat:tool-reading` Tauri event streams preview results before the LLM finishes reading
 - `MessageActions.vue` — copy, edit, regenerate, like/dislike, and version-switcher controls per message; shown on hover
+- Message branching (#150): regenerate an assistant response to create an alternative version; navigate between versions with `<` / `>` controls and a `1/N` counter directly in the message bubble (`useVersionSwitcher` composable)
+- `regenerate_message` Tauri command — streams a new assistant response as a sibling branch of the existing message
+- `switch_version` Tauri command — activates a sibling message, updating the active conversation path
+- `truncate_from` Tauri command — removes a message and all its descendants (used by edit-message to reset from the edited point)
+- History stripping: `<think>` and `<tool_call>` blocks are stripped from assistant messages before they are included in LLM history context (`strip_history_content` in `services/chat/mod.rs`)
+
+### Changed
+- Edit message now calls `truncate_from` before setting the draft, so the conversation resets cleanly from the edited point instead of appending after stale messages
+- Like, Dislike, and Share buttons removed from `MessageActions.vue`
 
 ### Fixed
 - `message.id` was always `undefined` in the store message mapping, causing edit/index lookups to silently fail

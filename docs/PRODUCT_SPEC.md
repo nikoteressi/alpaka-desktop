@@ -60,7 +60,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | C-07 | **Multi-chat tabs/panels** | P1 | 🔲 Backlog | Side-by-side or tabbed conversations |
 | C-08 | **Chat export to JSON** | P1 | 🟡 | `export_conversation` Tauri command implemented and exposed in `lib/tauri.ts`, but no UI button calls it |
 | C-08b | **Chat export to Markdown** | P1 | 🔲 Backlog | Not implemented in backend or UI |
-| C-09 | **Chat branching** | P2 | 🔲 Backlog | Fork conversation at any message |
+| C-09 | **Chat branching** | P2 | ✅ | Regenerate assistant responses to create sibling branches; navigate between versions with `<` / `>` controls in `MessageBubble.vue` (`useVersionSwitcher`). Edit message truncates conversation from the edited point before resending. |
 | C-10 | **Chat backup & restore** | P1 | ⚠️ | Raw SQLite backup/restore wired in `Settings → Maintenance`; no per-conversation JSON import/export UI |
 | C-11 | **Compact / TWM mode** | P1 | ⚠️ | `Ctrl+Shift+M` collapses the 48 px icon strip (`App.vue:14`). Padding, font sizes and the top-bar layout described in §3.6 are **not** implemented |
 | C-12 | **Conversation summarisation (Compact)** | P1 | ✅ | Button at ≥70 % context usage; summarises history with `temperature=0.3`, creates a new conversation with the summary as a system prompt + last 4 turns (`services/chat/compact.rs`) |
@@ -376,6 +376,9 @@ messages
 ├── total_duration_ms, load_duration_ms
 ├── prompt_eval_duration_ms, eval_duration_ms
 ├── created_at
+├── parent_id (FK → messages, nullable)   -- branching: points to parent message
+├── sibling_order (int, default 0)         -- position among siblings
+└── is_active (bool, default 1)            -- whether this branch is on the active path
 
 settings
 ├── key (PK)
@@ -522,7 +525,7 @@ Optional:
 | **Phase 5 — Distribution** | AUR (bin + git), `.deb`, AppImage, documentation site | ✅ v1.0.1 |
 | **Phase 6 — v1.2** | Custom model creation, model tagging/favorites, preset profiles, per-model defaults, seed control, Mirostat, stop sequences, configurable model path, API key UI, conversation search | ✅ v1.2.0 |
 | **Phase 7 — v1.3 (planned)** | Wire `ErrorScreen` into router, expose chat export button, folder-context tree picker, top-bar host switcher, true Compact/TWM layout (padding/font/top-bar collapse), Markdown export | Planned |
-| **Phase 8 — v2.x** | Multi-chat tabs, chat branching, plugin system, Flatpak, proxy support, mobile companion | Planned |
+| **Phase 8 — v2.x** | Multi-chat tabs, plugin system, Flatpak, mobile companion | Planned |
 
 ### 9.1 Known UI Gaps (from v1.2.0 audit)
 

@@ -27,7 +27,7 @@
 │  │                        │    │  ├─────────────────────┤  │ │
 │  │  ┌──────────────────┐  │    │  │  Ollama Client      │  │ │
 │  │  │  Composables     │  │    │  │  (ollama/)          │  │ │
-│  │  │  17 composables  │  │    │  ├─────────────────────┤  │ │
+│  │  │  18 composables  │  │    │  ├─────────────────────┤  │ │
 │  │  └──────────────────┘  │    │  │  SQLite (db/)       │  │ │
 │  └────────────────────────┘    │  ├─────────────────────┤  │ │
 │                                │  │  Auth / Keyring     │  │ │
@@ -161,7 +161,7 @@ alpaka-desktop/
 │   │   ├── settings.ts           # User preferences
 │   │   └── ui.ts                 # Sidebar, theme, compact mode
 │   │
-│   ├── composables/              # Vue 3 composition functions (17 total)
+│   ├── composables/              # Vue 3 composition functions (18 total)
 │   │   ├── useAppOrchestration.ts   # App-level init and lifecycle coordination
 │   │   ├── useAttachments.ts        # Image picker / drag-drop / file→folder-context bridge
 │   │   ├── useCollapsibleState.ts   # Think-block expand/collapse
@@ -178,7 +178,8 @@ alpaka-desktop/
 │   │   ├── useSendMessage.ts        # Message send + stop orchestration
 │   │   ├── useStreaming.ts          # Streaming state accumulation
 │   │   ├── useStreamingEvents.ts    # Raw Tauri event listener setup
-│   │   └── useUndoHistory.ts        # Custom Ctrl+Z / Shift+Z stack for chat input
+│   │   ├── useUndoHistory.ts        # Custom Ctrl+Z / Shift+Z stack for chat input
+│   │   └── useVersionSwitcher.ts    # Per-message sibling navigation (hasPrev/hasNext/prevVersion/nextVersion)
 │   │
 │   ├── components/
 │   │   ├── chat/
@@ -321,6 +322,9 @@ tauri::generate_handler![
     commands::chat::backup_database,
     commands::chat::restore_database,
     commands::chat::compact_conversation,  // delegates to ChatService::compact()
+    commands::chat::regenerate_message,    // streams new assistant response as a sibling branch
+    commands::chat::switch_version,        // activates a sibling message, updating the active path
+    commands::chat::truncate_from,         // removes a message and all its descendants
 
     // ── Models ────────────────────────────────────────────────────────────
     commands::models::list_models,
@@ -605,6 +609,7 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `useCollapsibleState` | Expand/collapse state for `ThinkBlock` and `SearchBlock` panels |
 | `useConfirmationModal` | Shared destructive-action confirmation dialog |
 | `useCopyToClipboard` | Clipboard write with 2 s feedback flash |
+| `useVersionSwitcher` | Per-message sibling navigation: `hasPrev`, `hasNext`, `versionLabel`, `prevVersion`, `nextVersion`; calls `switch_version` Tauri command |
 
 ### 5.3 Frontend Token Rendering Strategy
 
@@ -660,7 +665,20 @@ impl<R: Runtime> ChatService<'_, R> {
     /// 6. Copy the last 4 user/assistant messages, clearing prompt_tokens
     /// 7. Return the new conversation id
     pub async fn compact(&self, params: CompactParams) -> Result<String, AppError>;
+
+    /// Regenerate an assistant response as a new sibling branch:
+    /// 1. Create a sibling message record (db::messages::create_sibling)
+    /// 2. Activate the new sibling (db::messages::set_active_sibling)
+    /// 3. Load active-path history, strip <think>/<tool_call> blocks via strip_history_content()
+    /// 4. Stream a new response via the agent loop
+    /// 5. Persist and emit chat:done
+    pub async fn send_regenerate(&self, params: RegenerateParams) -> Result<(), AppError>;
 }
+
+/// Strips <think> and <tool_call> blocks from assistant message content
+/// before it is included in the LLM history context.
+/// Called by send_regenerate() and send() to keep context clean.
+pub fn strip_history_content(content: &str) -> String;
 ```
 
 Sliding-window logic (`services/chat/context.rs`): walks history in reverse,
@@ -883,7 +901,11 @@ CREATE TABLE IF NOT EXISTS messages (
     load_duration_ms        INTEGER,
     prompt_eval_duration_ms INTEGER,
     eval_duration_ms        INTEGER,
-    created_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at              TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    -- branching columns (migration v13)
+    parent_id               TEXT    REFERENCES messages(id) ON DELETE CASCADE,
+    sibling_order           INTEGER NOT NULL DEFAULT 0,
+    is_active               INTEGER NOT NULL DEFAULT 1
 );
 
 -- settings (key-value)
