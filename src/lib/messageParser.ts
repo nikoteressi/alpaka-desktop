@@ -1,16 +1,8 @@
-export type MessagePart = {
-  type: "markdown" | "code" | "think" | "tool";
-  content: string;
-  language?: string;
-  rendered?: string;
-  toolName?: string;
-  toolQuery?: string;
-};
+import type { MessagePart } from "../types/chat";
 
 // Matches fully-closed blocks (strict — code fence requires closing ```)
 const STRICT_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)\`\`\`|<think.*?<\/think>|<tool_call\b[^>]*>.*?<\/tool_call>`;
-// Matches blocks where a trailing code fence is optional (for streaming tails)
-const TAIL_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)(?:\`\`\`|$)|<think.*?<\/think>|<tool_call\b[^>]*>.*?<\/tool_call>`;
+const TAIL_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)(?:\`\`\`|$)|<think.*?(?:<\/think>|$)|<tool_call\b[^>]*>(?:.*?<\/tool_call>|.*)`;
 
 function parseThink(matchText: string): MessagePart {
   const startTagMatch = matchText.match(/^<think([^>]*)>/i);
@@ -20,9 +12,9 @@ function parseThink(matchText: string): MessagePart {
   return {
     type: "think",
     content: contentMatch
-      ? contentMatch[1].trim()
-      : matchText.replace(/^<think[^>]*>/i, "").trim(),
-    language: timeMatch ? timeMatch[1] : undefined,
+      ? contentMatch[1]
+      : matchText.replace(/^<think[^>]*>/i, ""),
+    thinkDuration: timeMatch ? parseFloat(timeMatch[1]) : undefined,
   };
 }
 
@@ -31,14 +23,28 @@ function parseToolCall(matchText: string): MessagePart {
   const queryM = matchText.match(/\bquery="([^"]*)"/i);
   const openEnd = matchText.indexOf(">");
   const closeStart = matchText.lastIndexOf("</tool_call>");
+  const rawContent =
+    openEnd >= 0 && closeStart > openEnd
+      ? matchText.slice(openEnd + 1, closeStart)
+      : "";
+
+  let results = undefined;
+  if (nameM?.[1] === "web_search" && rawContent.trim()) {
+    try {
+      const parsed = JSON.parse(rawContent);
+      results = Array.isArray(parsed?.results) ? parsed.results : undefined;
+    } catch {
+      // not JSON
+    }
+  }
+
   return {
     type: "tool",
     toolName: nameM?.[1],
     toolQuery: queryM?.[1],
-    content:
-      openEnd >= 0 && closeStart > openEnd
-        ? matchText.slice(openEnd + 1, closeStart)
-        : "",
+    content: rawContent,
+    toolResults: results,
+    isDone: true, // Finished messages are always done
   };
 }
 

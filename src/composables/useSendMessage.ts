@@ -44,8 +44,14 @@ export function useSendMessage() {
       tokensPerSec: null,
       thinkTime: null,
       toolCalls: [],
+      searchState: null,
+      searchResults: [],
+      sidebarOpen: false,
+      activeSearchMessageId: null,
+      activeSearchData: [],
       promptTokens: store.totalActiveTokens,
       evalTokens: 0,
+      activeMessageParts: [],
     };
 
     // Snapshot message state before push — used for rollback on invoke failure

@@ -8,6 +8,8 @@ import type {
   ChatDraft,
   LinkedContext,
   FolderContextPayload,
+  MessagePart,
+  SearchResult,
 } from "../types/chat";
 import { DRAFT_ID_PREFIX } from "../lib/constants";
 
@@ -57,8 +59,14 @@ export const useChatStore = defineStore("chat", {
       tokensPerSec: null,
       thinkTime: null,
       toolCalls: [],
+      searchState: null,
+      searchResults: [],
+      sidebarOpen: false,
+      activeSearchMessageId: null,
+      activeSearchData: [],
       promptTokens: 0,
       evalTokens: 0,
+      activeMessageParts: [] as MessagePart[],
     } as StreamingState,
     _listenersInitialized: false,
     /** Draft conversation — local-only, not yet persisted to DB */
@@ -190,6 +198,61 @@ export const useChatStore = defineStore("chat", {
       this.streaming.isThinking = false;
       this.streaming.thinkTime = null;
       this.streaming.toolCalls = [];
+      this.streaming.searchState = null;
+      this.streaming.searchResults = [];
+      this.streaming.activeMessageParts = [];
+    },
+
+    // Avoids re-parsing the entire buffer on every token.
+    updateActivePart(
+      type: MessagePart["type"],
+      content: string,
+      metadata: Partial<MessagePart> = {},
+    ) {
+      const parts = this.streaming.activeMessageParts;
+      const lastPart = parts[parts.length - 1];
+
+      // If we're continuing the same part type, append content
+      if (
+        lastPart &&
+        lastPart.type === type &&
+        (type === "markdown" || type === "think")
+      ) {
+        lastPart.content += content;
+        return;
+      }
+
+      // Otherwise, create a new part
+      parts.push({
+        type,
+        content,
+        ...metadata,
+      } as MessagePart);
+    },
+
+    updatePartMetadata(
+      type: MessagePart["type"],
+      metadata: Partial<MessagePart>,
+    ) {
+      const parts = this.streaming.activeMessageParts;
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (parts[i].type === type) {
+          Object.assign(parts[i], metadata);
+          break;
+        }
+      }
+    },
+
+    openSearchSidebar(messageId: string | null, results: SearchResult[]) {
+      this.streaming.sidebarOpen = true;
+      this.streaming.activeSearchMessageId = messageId;
+      this.streaming.activeSearchData = results;
+    },
+
+    closeSearchSidebar() {
+      this.streaming.sidebarOpen = false;
+      this.streaming.activeSearchMessageId = null;
+      this.streaming.activeSearchData = [];
     },
 
     async loadConversations(reset = false) {
@@ -282,6 +345,7 @@ export const useChatStore = defineStore("chat", {
           }
 
           return {
+            id: m.id,
             role: m.role,
             content: m.content,
             images,

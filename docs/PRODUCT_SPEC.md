@@ -53,7 +53,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 |---|---|---|---|---|
 | C-01 | **Multi-turn chat** | P0 | ✅ | Persistent conversation threads with full history |
 | C-02 | **Streaming text rendering** | P0 | ✅ | Token-by-token display via `chat:token` Tauri events with typing cursor |
-| C-03 | **Reasoning/thinking blocks** | P0 | ✅ | Collapsible `<think>` panels with console-style rendering and pulsing border (`ThinkBlock.vue`) |
+| C-03 | **Reasoning/thinking blocks** | P0 | ✅ | DeepSeek-inspired collapsible timeline (`ThinkBlock.vue`): step-by-step reasoning with dot markers, inline web-search pills, animated brain icon while streaming, auto-collapse 1.5 s after generation ends |
 | C-04 | **Markdown rendering** | P0 | ✅ | Full GFM via `markdown-it` + KaTeX (`lib/markdown.ts`) |
 | C-05 | **Code blocks with copy button** | P0 | ✅ | Language detection, Shiki syntax highlighting, one-click copy (`CodeBlock.vue`) |
 | C-06 | **Chat history persistence** | P0 | ✅ | SQLite-backed; pin, rename, delete, and search by title (`Ctrl+K` inside `ConversationList.vue`) |
@@ -152,7 +152,7 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 |---|---|---|---|---|
 | CT-01 | **`ollama launch` support** | P1 | ⚠️ | `LaunchPage.vue` is a static reference card list (Claude / Codex / OpenCode / Droid / Pi) with copyable `ollama launch <tool>` commands. No actual launching from inside the app |
 | CT-02 | **Anthropic Messages API compat** | P1 | 🔲 Backlog | Local models with Claude Code–compatible tools |
-| CT-03 | **Tool calling visualization** | P1 | ✅ | `chat:tool-call` and `chat:tool-result` events; `<tool_call>` markers parsed and rendered inline by `MessageBubble.vue:75` and `SearchBlock.vue` |
+| CT-03 | **Tool calling visualization** | P1 | ✅ | `chat:tool-call`, `chat:tool-reading`, and `chat:tool-result` events; search shown as inline pill in ThinkBlock timeline during streaming, then as a post-message favicon-stack badge (`SearchBlock.vue`); clicking badge opens `SearchSidebar.vue` (320 px source cards) |
 
 ### 2.9 Local Folder Context (Lightweight RAG)
 
