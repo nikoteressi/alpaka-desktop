@@ -214,6 +214,14 @@
         </div>
       </transition>
 
+      <!-- Streaming sentinel for E2E tests: exists in DOM only while streaming -->
+      <div
+        v-if="isStreamingForActiveChat"
+        data-testid="streaming-indicator"
+        aria-hidden="true"
+        style="display: none"
+      />
+
       <!-- Input Area -->
       <ChatInput
         :is-streaming="isStreamingForActiveChat"

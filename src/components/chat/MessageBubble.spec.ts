@@ -58,4 +58,39 @@ describe("MessageBubble.vue", () => {
     const htmlDiv = wrapper.find(".rendered-markdown");
     expect(htmlDiv.html()).toContain("<strong>Bolded Content</strong>");
   });
+
+  it("shows edit textarea after clicking edit button on user message", async () => {
+    const wrapper = mount(MessageBubble, {
+      props: { message: { role: "user", content: "Original text" } },
+    });
+    await wrapper.find('[title="Edit"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find("textarea").exists()).toBe(true);
+    expect(
+      (wrapper.find("textarea").element as HTMLTextAreaElement).value,
+    ).toBe("Original text");
+  });
+
+  it("cancelEdit hides the textarea and resets content", async () => {
+    const wrapper = mount(MessageBubble, {
+      props: { message: { role: "user", content: "Original text" } },
+    });
+    await wrapper.find('[title="Edit"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    await wrapper.find(".user-edit-btn--cancel").trigger("click");
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find("textarea").exists()).toBe(false);
+  });
+
+  it("applyEdit emits editConfirm with trimmed content", async () => {
+    const wrapper = mount(MessageBubble, {
+      props: { message: { role: "user", content: "Original" } },
+    });
+    await wrapper.find('[title="Edit"]').trigger("click");
+    await wrapper.vm.$nextTick();
+    const textarea = wrapper.find("textarea");
+    await textarea.setValue("  Updated content  ");
+    await wrapper.find(".user-edit-btn--apply").trigger("click");
+    expect(wrapper.emitted("editConfirm")).toEqual([["Updated content"]]);
+  });
 });

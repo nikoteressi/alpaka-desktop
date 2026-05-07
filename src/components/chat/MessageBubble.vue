@@ -154,7 +154,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 
 <template>
   <!-- User Message -->
-  <article v-if="isUser" class="user-message group">
+  <article v-if="isUser" data-role="user" class="user-message group">
     <div class="user-bubble-container relative">
       <!-- Inline edit mode -->
       <div v-if="isEditing" class="user-edit-container">
@@ -219,6 +219,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   <!-- Assistant Message -->
   <article
     v-else
+    data-role="assistant"
     class="assistant-message group"
     :class="{ 'assistant-message--streaming': isStreaming }"
   >
