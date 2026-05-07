@@ -13,9 +13,7 @@ pub struct Message {
     pub conversation_id: String,
     pub role: MessageRole,
     pub content: String,
-    /// Base64-encoded images (JSON array).
     pub images_json: String,
-    /// File attachment metadata (JSON array).
     pub files_json: String,
     pub tokens_used: Option<i64>,
     pub generation_time_ms: Option<i64>,
@@ -27,6 +25,10 @@ pub struct Message {
     pub eval_duration_ms: Option<i64>,
     pub seed: Option<i64>,
     pub created_at: String,
+    pub parent_id: Option<String>,
+    pub sibling_order: i64,
+    pub is_active: bool,
+    pub sibling_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -66,6 +68,9 @@ pub struct NewMessage {
     pub conversation_id: String,
     pub role: MessageRole,
     pub content: String,
+    pub parent_id: Option<String>,
+    pub sibling_order: i64,
+    pub is_active: bool,
     pub images_json: Option<String>,
     pub files_json: Option<String>,
     pub tokens_used: Option<i64>,
@@ -82,6 +87,7 @@ pub struct NewMessage {
 fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     let role_str: String = row.get(2)?;
     let role = role_str.parse::<MessageRole>().unwrap_or(MessageRole::User);
+    let is_active_int: i64 = row.get(18).unwrap_or(1);
 
     Ok(Message {
         id: row.get(0)?,
@@ -100,6 +106,10 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         eval_duration_ms: row.get(13)?,
         seed: row.get(14)?,
         created_at: row.get(15)?,
+        parent_id: row.get(16)?,
+        sibling_order: row.get(17).unwrap_or(0),
+        is_active: is_active_int != 0,
+        sibling_count: row.get(19).unwrap_or(1),
     })
 }
 
@@ -114,7 +124,7 @@ pub fn list_for_conversation(
         "SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at
+                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count
          FROM messages
          WHERE conversation_id = ?1
          ORDER BY created_at ASC",
@@ -131,14 +141,15 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
     let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let images_json = new.images_json.unwrap_or_else(|| "[]".to_owned());
     let files_json = new.files_json.unwrap_or_else(|| "[]".to_owned());
+    let is_active_int: i64 = if new.is_active { 1 } else { 0 };
 
     conn.execute(
         "INSERT INTO messages
              (id, conversation_id, role, content, images_json, files_json,
               tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
               total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-              seed, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+              seed, created_at, parent_id, sibling_order, is_active)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
         params![
             id,
             new.conversation_id,
@@ -156,6 +167,9 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
             new.eval_duration_ms,
             new.seed,
             now,
+            new.parent_id,
+            new.sibling_order,
+            is_active_int,
         ],
     )?;
 
@@ -163,7 +177,7 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
         "SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at
+                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count
          FROM messages WHERE id = ?1",
         params![id],
         row_to_message,
@@ -229,6 +243,9 @@ mod tests {
                 conversation_id: cid.clone(),
                 role: MessageRole::User,
                 content: "Hello".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
                 images_json: None,
                 files_json: None,
                 tokens_used: None,
@@ -250,6 +267,9 @@ mod tests {
                 conversation_id: cid.clone(),
                 role: MessageRole::Assistant,
                 content: "Hi there".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
                 images_json: None,
                 files_json: None,
                 tokens_used: Some(10),
@@ -282,6 +302,9 @@ mod tests {
                 conversation_id: cid.clone(),
                 role: MessageRole::User,
                 content: "Bye".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
                 images_json: None,
                 files_json: None,
                 tokens_used: None,
@@ -300,5 +323,40 @@ mod tests {
         let deleted = delete_for_conversation(&conn, &cid).unwrap();
         assert_eq!(deleted, 1);
         assert!(list_for_conversation(&conn, &cid).unwrap().is_empty());
+    }
+
+    #[test]
+    fn message_has_branching_fields() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let msg = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::User,
+                content: "hi".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(msg.sibling_order, 0);
+        assert!(msg.is_active);
+        assert!(msg.parent_id.is_none());
+        assert_eq!(msg.sibling_count, 1);
     }
 }
