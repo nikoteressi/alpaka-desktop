@@ -183,10 +183,12 @@ alpaka-desktop/
 │   ├── components/
 │   │   ├── chat/
 │   │   │   ├── ChatView.vue          # Virtualised message list (vue-virtual-scroller)
-│   │   │   ├── MessageBubble.vue     # Markdown + think + code + tool-call rendering
-│   │   │   ├── ThinkBlock.vue
+│   │   │   ├── MessageBubble.vue     # Renders activeMessageParts (markdown/code/think/tool) via unifiedGroups; memoises finished messages with staticParts cache
+│   │   │   ├── MessageActions.vue    # Copy / edit / regenerate / like-dislike / version switcher buttons
+│   │   │   ├── ThinkBlock.vue        # DeepSeek-style timeline: think steps + inline SearchBlock + auto-collapse after generation
 │   │   │   ├── CodeBlock.vue
-│   │   │   ├── SearchBlock.vue       # Web search tool-call results
+│   │   │   ├── SearchBlock.vue       # Two-state pill: "found" (inline in ThinkBlock) and "final" (post-message badge); opens SearchSidebar
+│   │   │   ├── SearchSidebar.vue     # 320 px right panel listing web search source cards (favicon, title, snippet, link)
 │   │   │   ├── StatsBlock.vue        # Per-message metrics
 │   │   │   ├── ChatInput.vue
 │   │   │   ├── StreamIndicator.vue
@@ -532,6 +534,7 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `chat:done` | Rust → Vue | `{ conversation_id, total_tokens?, duration_ms?, tokens_per_sec?, seed? }` | Generation complete, message persisted; `seed` present only when a fixed seed was used |
 | `chat:error` | Rust → Vue | `{ conversation_id, error }` | Stream or generation error |
 | `chat:tool-call` | Rust → Vue | `{ conversation_id, tool_name, arguments }` | LLM requested a tool call (web search) |
+| `chat:tool-reading` | Rust → Vue | `{ conversation_id, results_preview: SearchResult[] }` | Web search HTTP responses received; preview results streamed before the LLM finishes reading |
 | `chat:tool-result` | Rust → Vue | `{ conversation_id, tool_name, result }` | Tool call result returned to LLM |
 | `model:pull-progress` | Rust → Vue | `{ model, status, completed?, total?, percent? }` | Download progress chunk |
 | `model:pull-done` | Rust → Vue | `{ model }` | Model download complete |

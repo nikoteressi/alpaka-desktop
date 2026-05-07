@@ -1,203 +1,217 @@
 <template>
-  <div
-    class="flex flex-col h-full overflow-hidden bg-[var(--bg-chat)] relative"
-  >
-    <!-- Chat History / Scroll Area -->
+  <div class="chat-view-container h-full relative overflow-hidden">
+    <!-- Search Results Sidebar -->
+    <SearchSidebar />
+
+    <!-- Sidebar Overlay (dim background when sidebar is open) -->
     <div
-      class="flex-1 overflow-y-auto w-full relative scroll-smooth"
-      ref="scrollContainer"
-      @scroll="onScroll"
+      v-if="chatStore.streaming.sidebarOpen"
+      class="sidebar-overlay"
+      @click="chatStore.closeSearchSidebar()"
+    ></div>
+
+    <div
+      class="flex flex-col h-full overflow-hidden bg-[var(--bg-chat)] relative"
     >
-      <div class="max-w-4xl mx-auto w-full min-h-full pb-12 flex flex-col">
-        <!-- System Instructions Header -->
-        <div v-if="chatStore.activeSystemPrompt" class="px-4 pt-6 mb-2">
-          <div
-            class="bg-[var(--bg-surface)] border border-[var(--border-muted)] rounded-xl shadow-sm overflow-hidden"
-          >
-            <!-- Header row — always visible, click to toggle -->
-            <button
-              class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--bg-chat)] transition-colors"
-              @click="isSystemPromptExpanded = !isSystemPromptExpanded"
+      <!-- Chat History / Scroll Area -->
+      <div
+        class="flex-1 overflow-y-auto w-full relative scroll-smooth"
+        ref="scrollContainer"
+        @scroll="onScroll"
+      >
+        <div class="max-w-4xl mx-auto w-full min-h-full pb-12 flex flex-col">
+          <!-- System Instructions Header -->
+          <div v-if="chatStore.activeSystemPrompt" class="px-4 pt-6 mb-2">
+            <div
+              class="bg-[var(--bg-surface)] border border-[var(--border-muted)] rounded-xl shadow-sm overflow-hidden"
             >
-              <div
-                class="flex-shrink-0 p-1.5 bg-[var(--accent-muted)] rounded-lg"
+              <!-- Header row — always visible, click to toggle -->
+              <button
+                class="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[var(--bg-chat)] transition-colors"
+                @click="isSystemPromptExpanded = !isSystemPromptExpanded"
               >
+                <div
+                  class="flex-shrink-0 p-1.5 bg-[var(--accent-muted)] rounded-lg"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#4a80d0"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path
+                      d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
+                    />
+                  </svg>
+                </div>
+                <span
+                  class="text-[11px] text-[var(--text-muted)] font-mono uppercase tracking-wider flex-1"
+                  >System Instructions</span
+                >
+                <!-- Collapsed preview -->
+                <span
+                  v-if="!isSystemPromptExpanded"
+                  class="text-[12px] text-[var(--text-muted)] italic truncate max-w-xs opacity-60"
+                >
+                  {{
+                    chatStore.activeSystemPrompt.split("\n")[0].substring(0, 80)
+                  }}
+                </span>
+                <!-- Chevron -->
                 <svg
-                  width="14"
-                  height="14"
+                  class="flex-shrink-0 w-3.5 h-3.5 text-[var(--text-muted)] transition-transform"
+                  :class="isSystemPromptExpanded ? 'rotate-180' : ''"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#4a80d0"
+                  stroke="currentColor"
                   stroke-width="2.5"
                   stroke-linecap="round"
-                  stroke-linejoin="round"
                 >
-                  <path d="M12 20h9" />
-                  <path
-                    d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"
-                  />
+                  <path d="M6 9l6 6 6-6" />
                 </svg>
-              </div>
-              <span
-                class="text-[11px] text-[var(--text-muted)] font-mono uppercase tracking-wider flex-1"
-                >System Instructions</span
-              >
-              <!-- Collapsed preview -->
-              <span
-                v-if="!isSystemPromptExpanded"
-                class="text-[12px] text-[var(--text-muted)] italic truncate max-w-xs opacity-60"
-              >
-                {{
-                  chatStore.activeSystemPrompt.split("\n")[0].substring(0, 80)
-                }}
-              </span>
-              <!-- Chevron -->
-              <svg
-                class="flex-shrink-0 w-3.5 h-3.5 text-[var(--text-muted)] transition-transform"
-                :class="isSystemPromptExpanded ? 'rotate-180' : ''"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-            <!-- Expanded body -->
-            <div v-if="isSystemPromptExpanded" class="px-4 pb-4">
-              <div
-                class="text-[13px] text-[var(--text-h)] leading-relaxed italic opacity-80 whitespace-pre-wrap"
-              >
-                {{ chatStore.activeSystemPrompt }}
+              </button>
+              <!-- Expanded body -->
+              <div v-if="isSystemPromptExpanded" class="px-4 pb-4">
+                <div
+                  class="text-[13px] text-[var(--text-h)] leading-relaxed italic opacity-80 whitespace-pre-wrap"
+                >
+                  {{ chatStore.activeSystemPrompt }}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <DynamicScroller
-          v-if="nonSystemMessages.length > 0"
-          :items="itemsForScroller"
-          :min-item-size="80"
-          item-class="scroller-item"
-          key-field="id"
-          class="w-full"
-        >
-          <template #default="{ item, index, active }">
-            <DynamicScrollerItem
-              v-if="isScrollerItem(item)"
-              :item="item"
-              :active="active"
-              :size-dependencies="[
-                item.message.content,
-                item.isStreaming,
-                item.thinkingContent,
-                item.isThinking,
-                item.tokensPerSec,
-                chatStore.expandedStats.has(item.id),
-              ]"
-              :data-index="index"
-            >
-              <MessageBubble
-                :message="item.message"
-                :message-id="item.id"
-                :is-streaming="item.isStreaming"
-                :thinking-content="item.thinkingContent"
-                :is-thinking="item.isThinking"
-                :tokens-per-sec="item.tokensPerSec"
-                :class="item.outsideContext ? 'opacity-40' : ''"
-              />
-            </DynamicScrollerItem>
-            <DynamicScrollerItem
-              v-else-if="isBoundaryItem(item)"
-              :item="item"
-              :active="active"
-            >
-              <div class="flex items-center gap-3 py-3 px-6">
-                <div class="flex-1 h-px bg-amber-500/25"></div>
-                <span
-                  class="text-[10px] text-amber-400/60 font-medium whitespace-nowrap select-none"
-                >
-                  ↑ Outside context window
-                </span>
-                <div class="flex-1 h-px bg-amber-500/25"></div>
-              </div>
-            </DynamicScrollerItem>
-          </template>
-        </DynamicScroller>
-
-        <div v-else class="flex-1 flex flex-col items-center justify-center">
-          <div class="w-32 h-32 flex items-center justify-center">
-            <img
-              src="../../assets/llama-main.png"
-              alt="Ollama"
-              class="w-full h-full object-contain themed-logo opacity-80"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Scroll to bottom button -->
-    <transition name="fade">
-      <button
-        v-if="!isAutoScrollEnabled && messages.length > 0"
-        @click="scrollToBottom()"
-        class="absolute bottom-28 left-1/2 -translate-x-1/2 bg-[var(--bg-surface)] border border-[var(--border)] shadow-lg rounded-full px-4 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-h)] hover:bg-[var(--border-muted)] transition-colors cursor-pointer"
-      >
-        ↓ Jump to present
-      </button>
-    </transition>
-
-    <!-- Model download progress banner -->
-    <transition name="slide-up">
-      <div
-        v-if="activePullProgress"
-        class="absolute bottom-[120px] left-1/2 -translate-x-1/2 w-full max-w-md z-30"
-      >
-        <div
-          class="mx-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-4 py-3 shadow-[var(--shadow)]"
-        >
-          <div class="flex items-center gap-2.5 mb-2">
-            <svg
-              class="w-4 h-4 text-[var(--text-muted)] flex-shrink-0 animate-spin"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke-linecap="round" />
-            </svg>
-            <span class="text-[13px] text-[var(--text-h)] font-medium truncate"
-              >Downloading {{ activePullProgress.model }}</span
-            >
-            <span
-              class="text-[12px] text-[var(--text-muted)] ml-auto flex-shrink-0"
-              >{{ activePullProgress.status }}</span
-            >
-          </div>
-          <div class="h-1 bg-[var(--bg-chat)] rounded-full overflow-hidden">
-            <div
-              class="h-full bg-gradient-to-r from-[#4a80d0] to-[#6aa0f0] rounded-full transition-all duration-300"
-              :style="{ width: activePullProgress.percent + '%' }"
-            />
-          </div>
-          <div
-            v-if="activePullProgress.percent > 0"
-            class="text-[11px] text-[var(--text-muted)] mt-1 text-right"
+          <DynamicScroller
+            v-if="nonSystemMessages.length > 0"
+            :items="itemsForScroller"
+            :min-item-size="80"
+            item-class="scroller-item"
+            key-field="id"
+            class="w-full"
           >
-            {{ Math.round(activePullProgress.percent) }}%
+            <template #default="{ item, index, active }">
+              <DynamicScrollerItem
+                v-if="isScrollerItem(item)"
+                :item="item"
+                :active="active"
+                :size-dependencies="[
+                  item.message.content,
+                  item.isStreaming,
+                  item.thinkingContent,
+                  item.isThinking,
+                  item.tokensPerSec,
+                  chatStore.expandedStats.has(item.id),
+                ]"
+                :data-index="index"
+              >
+                <MessageBubble
+                  :message="item.message"
+                  :message-id="item.id"
+                  :is-streaming="item.isStreaming"
+                  :thinking-content="item.thinkingContent"
+                  :is-thinking="item.isThinking"
+                  :tokens-per-sec="item.tokensPerSec"
+                  :class="item.outsideContext ? 'opacity-40' : ''"
+                  @edit="onEdit(item.message)"
+                />
+              </DynamicScrollerItem>
+              <DynamicScrollerItem
+                v-else-if="isBoundaryItem(item)"
+                :item="item"
+                :active="active"
+              >
+                <div class="flex items-center gap-3 py-3 px-6">
+                  <div class="flex-1 h-px bg-amber-500/25"></div>
+                  <span
+                    class="text-[10px] text-amber-400/60 font-medium whitespace-nowrap select-none"
+                  >
+                    ↑ Outside context window
+                  </span>
+                  <div class="flex-1 h-px bg-amber-500/25"></div>
+                </div>
+              </DynamicScrollerItem>
+            </template>
+          </DynamicScroller>
+
+          <div v-else class="flex-1 flex flex-col items-center justify-center">
+            <div class="w-32 h-32 flex items-center justify-center">
+              <img
+                src="../../assets/llama-main.png"
+                alt="Ollama"
+                class="w-full h-full object-contain themed-logo opacity-80"
+              />
+            </div>
           </div>
         </div>
       </div>
-    </transition>
 
-    <!-- Input Area -->
-    <ChatInput
-      :is-streaming="isStreamingForActiveChat"
-      @send="onSend"
-      @stop="onStop"
-    />
+      <!-- Scroll to bottom button -->
+      <transition name="fade">
+        <button
+          v-if="!isAutoScrollEnabled && messages.length > 0"
+          @click="scrollToBottom()"
+          class="absolute bottom-28 left-1/2 -translate-x-1/2 bg-[var(--bg-surface)] border border-[var(--border)] shadow-lg rounded-full px-4 py-1.5 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-h)] hover:bg-[var(--border-muted)] transition-colors cursor-pointer"
+        >
+          ↓ Jump to present
+        </button>
+      </transition>
+
+      <!-- Model download progress banner -->
+      <transition name="slide-up">
+        <div
+          v-if="activePullProgress"
+          class="absolute bottom-[120px] left-1/2 -translate-x-1/2 w-full max-w-md z-30"
+        >
+          <div
+            class="mx-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-xl px-4 py-3 shadow-[var(--shadow)]"
+          >
+            <div class="flex items-center gap-2.5 mb-2">
+              <svg
+                class="w-4 h-4 text-[var(--text-muted)] flex-shrink-0 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke-linecap="round" />
+              </svg>
+              <span
+                class="text-[13px] text-[var(--text-h)] font-medium truncate"
+                >Downloading {{ activePullProgress.model }}</span
+              >
+              <span
+                class="text-[12px] text-[var(--text-muted)] ml-auto flex-shrink-0"
+                >{{ activePullProgress.status }}</span
+              >
+            </div>
+            <div class="h-1 bg-[var(--bg-chat)] rounded-full overflow-hidden">
+              <div
+                class="h-full bg-gradient-to-r from-[#4a80d0] to-[#6aa0f0] rounded-full transition-all duration-300"
+                :style="{ width: activePullProgress.percent + '%' }"
+              />
+            </div>
+            <div
+              v-if="activePullProgress.percent > 0"
+              class="text-[11px] text-[var(--text-muted)] mt-1 text-right"
+            >
+              {{ Math.round(activePullProgress.percent) }}%
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <!-- Input Area -->
+      <ChatInput
+        :is-streaming="isStreamingForActiveChat"
+        @send="onSend"
+        @stop="onStop"
+      />
+    </div>
   </div>
 </template>
 
@@ -207,11 +221,13 @@ import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import MessageBubble from "./MessageBubble.vue";
 import ChatInput from "./ChatInput.vue";
+import SearchSidebar from "./SearchSidebar.vue";
 import { useChatStore } from "../../stores/chat";
 import { useModelStore } from "../../stores/models";
 import { useSettingsStore } from "../../stores/settings";
 import { useAppOrchestration } from "../../composables/useAppOrchestration";
 import { useSendMessage } from "../../composables/useSendMessage";
+import { useDraftManager } from "../../composables/useDraftManager";
 import type { Message } from "../../types/chat";
 import type { ChatOptions } from "../../types/settings";
 
@@ -252,6 +268,7 @@ const modelStore = useModelStore();
 const settingsStore = useSettingsStore();
 const orchestration = useAppOrchestration();
 const { sendMessage, stopGeneration } = useSendMessage();
+const { setDraft } = useDraftManager();
 
 const scrollContainer = ref<HTMLElement | null>(null);
 const isAutoScrollEnabled = ref(true);
@@ -380,6 +397,19 @@ async function onStop() {
   await stopGeneration();
 }
 
+function onEdit(message: Message) {
+  const conversationId = chatStore.activeConversationId!;
+  const current = chatStore.drafts[conversationId];
+  setDraft(conversationId, {
+    content: message.content,
+    attachments: [],
+    linkedContexts: [],
+    webSearchEnabled: current?.webSearchEnabled ?? false,
+    thinkEnabled: current?.thinkEnabled ?? false,
+    thinkLevel: current?.thinkLevel ?? "medium",
+  });
+}
+
 // Timer used to guard onScroll from re-disabling auto-scroll during a programmatic smooth scroll.
 // Cleared either by scrollend event (preferred) or a 500ms fallback.
 let _smoothScrollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -447,6 +477,7 @@ watch(
   () => {
     isSystemPromptExpanded.value = false;
     isAutoScrollEnabled.value = true;
+    chatStore.closeSearchSidebar();
   },
 );
 
@@ -503,5 +534,13 @@ onMounted(async () => {
 .slide-up-leave-to {
   opacity: 0;
   transform: translate(-50%, 20px);
+}
+
+.sidebar-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  backdrop-filter: blur(2px);
 }
 </style>

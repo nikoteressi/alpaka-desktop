@@ -9,6 +9,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- DeepSeek-inspired chat visual styling (#149): thinking blocks now render as a collapsible timeline with step-by-step reasoning, animated brain icon, dot markers, and auto-collapse after generation; web search shown as an inline pill inside the timeline during streaming, then as a post-message favicon-stack badge that opens a 320 px source sidebar (`SearchSidebar.vue`); `chat:tool-reading` Tauri event streams preview results before the LLM finishes reading
+- `MessageActions.vue` — copy, edit, regenerate, like/dislike, and version-switcher controls per message; shown on hover
+
+### Fixed
+- `message.id` was always `undefined` in the store message mapping, causing edit/index lookups to silently fail
+- `--bg-elevated-rgb` CSS variable was undefined, breaking `rgba()` usage in `SearchBlock.vue` and `MessageActions.vue`
+- Comprehensive `.rendered-markdown` typography stylesheet — Tailwind v4 Preflight stripped all browser defaults; headings, lists, inline code, blockquotes, and links now render correctly without `@tailwindcss/typography`
+
 ---
 
 ## [1.3.0] - 2026-05-06

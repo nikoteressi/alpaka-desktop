@@ -100,6 +100,25 @@ impl<R: Runtime> WebSearchService<R> {
                     }),
                 );
 
+                // Parse results for UI preview/reading state
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&search_result_text) {
+                    let results = if let Some(arr) = parsed.get("results").and_then(|r| r.as_array()) {
+                        arr.clone()
+                    } else if let Some(arr) = parsed.as_array() {
+                        arr.clone()
+                    } else {
+                        Vec::new()
+                    };
+
+                    let _ = self.app.emit(
+                        "chat:tool-reading",
+                        json!({
+                            "conversation_id": conversation_id,
+                            "results_preview": results,
+                        }),
+                    );
+                }
+
                 tool_results.push((tc.clone(), search_result_text.clone()));
 
                 let cleaned_result = search::format_search_results_for_llm(&search_result_text);

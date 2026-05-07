@@ -829,6 +829,52 @@ onBeforeUnmount(() => {
             @select="selectModel"
             @pull="selectLibraryModel"
           />
+
+          <!-- Send Button -->
+          <button
+            data-testid="send-btn"
+            @click="handleSubmit"
+            :disabled="
+              !isStreaming && !inputContent.trim() && attachments.length === 0
+            "
+            :aria-label="isStreaming ? 'Stop generation' : 'Send message'"
+            class="w-7 h-7 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer disabled:opacity-30 ml-1.5"
+            :class="
+              isStreaming
+                ? 'bg-[var(--bg-user-msg)] hover:bg-[var(--bg-active)]'
+                : inputContent.trim() || attachments.length > 0
+                  ? 'bg-[var(--text)] hover:bg-[var(--text-muted)] scale-105 shadow-sm'
+                  : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)]'
+            "
+          >
+            <svg
+              v-if="isStreaming"
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              :class="isStreaming ? 'text-[var(--text)]' : ''"
+            >
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+            <svg
+              v-else
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              :stroke="
+                inputContent.trim() || attachments.length > 0
+                  ? 'var(--bg-base)'
+                  : 'var(--text-muted)'
+              "
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>

@@ -118,7 +118,7 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
   <div class="relative" ref="modelSelectorRef" data-testid="model-selector">
     <button
       @click="openModelDropdown"
-      class="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-2xl px-2.5 py-1 text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors flex-shrink-0 whitespace-nowrap"
+      class="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-full px-3 h-7 text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors flex-shrink-0 whitespace-nowrap"
       :class="
         isModelDropdownOpen
           ? 'bg-[var(--bg-active)] ring-1 ring-[var(--accent)]/30'
@@ -135,7 +135,7 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
       >
         <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke-linecap="round" />
       </svg>
-      <span class="max-w-[140px] truncate leading-none">{{
+      <span class="max-w-[200px] truncate leading-none">{{
         activeModelName
       }}</span>
       <svg

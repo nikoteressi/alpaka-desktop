@@ -12,7 +12,6 @@ export function useStreamingEvents() {
   async function init() {
     if (chatStore._listenersInitialized) return;
 
-    // Tear down any previous listener set before registering a new one.
     if (_streaming.cleanup) {
       _streaming.cleanup();
       _streaming.cleanup = null;
@@ -30,8 +29,10 @@ export function useStreamingEvents() {
           .replace("</think>", "");
         if (chatStore.streaming.isThinking) {
           chatStore.streaming.thinkingBuffer += content;
+          chatStore.updateActivePart("think", content);
         } else {
           chatStore.streaming.buffer += content;
+          chatStore.updateActivePart("markdown", content);
           if (!payload.eval_tokens) {
             chatStore.streaming.evalTokens++;
           }
@@ -48,9 +49,11 @@ export function useStreamingEvents() {
         chatStore.streaming.isThinking = true;
         chatStore.streaming.thinkTime = null;
         thinkStartTime = Date.now();
+        chatStore.updateActivePart("think", "");
       },
       onThinkingToken: (payload) => {
         chatStore.streaming.thinkingBuffer += payload.content;
+        chatStore.updateActivePart("think", payload.content);
         if (payload.prompt_tokens) {
           chatStore.streaming.promptTokens = payload.prompt_tokens;
         }
@@ -71,6 +74,9 @@ export function useStreamingEvents() {
 
         const timeAttr = time > 0 ? ` time=${time.toFixed(1)}` : "";
         chatStore.streaming.buffer += `<think${timeAttr}>\n${chatStore.streaming.thinkingBuffer}\n</think>\n\n`;
+        chatStore.updatePartMetadata("think", {
+          thinkDuration: time > 0 ? time : undefined,
+        });
         chatStore.streaming.thinkingBuffer = "";
         chatStore.streaming.thinkTime = null;
       },
@@ -95,10 +101,13 @@ export function useStreamingEvents() {
       },
       onError: (_convId, error) => {
         console.error("Chat stream error:", error);
+        const errorMsg = `⚠️ **Error**: ${error}`;
         if (chatStore.streaming.buffer.trim()) {
-          chatStore.streaming.buffer += `\n\n⚠️ **Error**: ${error}`;
+          chatStore.streaming.buffer += `\n\n${errorMsg}`;
+          chatStore.updateActivePart("markdown", `\n\n${errorMsg}`);
         } else {
-          chatStore.streaming.buffer = `⚠️ **Error**: ${error}`;
+          chatStore.streaming.buffer = errorMsg;
+          chatStore.updateActivePart("markdown", errorMsg);
         }
         chatStore.finalizeStreamedMessage(_convId);
         chatStore.streaming.isStreaming = false;
@@ -108,17 +117,32 @@ export function useStreamingEvents() {
           name: payload.tool_name,
           query: payload.query,
         });
-        // Append tag for persistence
+        chatStore.streaming.searchState = "found";
         chatStore.streaming.buffer += `\n<tool_call name="${payload.tool_name}" query="${payload.query}"></tool_call>\n`;
+        chatStore.updateActivePart("tool", "", {
+          toolName: payload.tool_name,
+          toolQuery: payload.query,
+        });
+      },
+      onToolReading: (payload) => {
+        chatStore.streaming.searchState = "reading";
+        chatStore.streaming.searchResults = payload.results_preview;
+        chatStore.updatePartMetadata("tool", {
+          toolResults: payload.results_preview,
+        });
       },
       onToolResult: (payload) => {
+        chatStore.streaming.searchState = "done";
+        chatStore.updatePartMetadata("tool", {
+          isDone: true,
+          content: payload.result,
+        });
         const call = chatStore.streaming.toolCalls.find(
           (c) => c.name === payload.tool_name && c.query === payload.query,
         );
         if (call) {
           call.result = payload.result;
         }
-        // Update the tag in the buffer with the result
         const tag = `<tool_call name="${payload.tool_name}" query="${payload.query}"></tool_call>`;
         const replacement = `<tool_call name="${payload.tool_name}" query="${payload.query}">${payload.result}</tool_call>`;
         chatStore.streaming.buffer = chatStore.streaming.buffer.replace(

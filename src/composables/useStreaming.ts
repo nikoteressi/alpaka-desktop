@@ -7,6 +7,7 @@ import type {
   DonePayload,
   ToolCallPayload,
   ToolResultPayload,
+  ToolReadingPayload,
 } from "../types/chat";
 
 export interface StreamingCallbacks {
@@ -18,6 +19,7 @@ export interface StreamingCallbacks {
   onCancelled?: (conversationId: string) => void;
   onError?: (conversationId: string, error: string) => void;
   onToolCall?: (payload: ToolCallPayload) => void;
+  onToolReading?: (payload: ToolReadingPayload) => void;
   onToolResult?: (payload: ToolResultPayload) => void;
 }
 
@@ -113,6 +115,18 @@ export function useStreaming(
       },
     );
 
+    const unlistenToolReading = await listen<ToolReadingPayload>(
+      "chat:tool-reading",
+      (event) => {
+        if (
+          conversationId.value &&
+          event.payload.conversation_id !== conversationId.value
+        )
+          return;
+        callbacks.onToolReading?.(event.payload);
+      },
+    );
+
     const unlistenToolResult = await listen<ToolResultPayload>(
       "chat:tool-result",
       (event) => {
@@ -156,6 +170,7 @@ export function useStreaming(
       unlistenThinkingEnd,
       unlistenDone,
       unlistenToolCall,
+      unlistenToolReading,
       unlistenToolResult,
       unlistenError,
       unlistenCancelled,
