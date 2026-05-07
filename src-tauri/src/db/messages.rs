@@ -210,6 +210,86 @@ pub fn delete_for_conversation(
     .map_err(AppError::from)
 }
 
+/// Returns all sibling messages with the given parent_id, ordered by sibling_order.
+pub fn get_siblings(conn: &Connection, parent_id: &str) -> Result<Vec<Message>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, conversation_id, role, content, images_json, files_json,
+                tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
+                total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
+                seed, created_at, parent_id, sibling_order, is_active,
+                (SELECT COUNT(*) FROM messages s WHERE s.parent_id = ?1) as sibling_count
+         FROM messages WHERE parent_id = ?1 ORDER BY sibling_order ASC",
+    )?;
+    let rows = stmt.query_map(params![parent_id], row_to_message)?;
+    rows.map(|r| r.map_err(AppError::from))
+        .collect::<Result<Vec<_>, _>>()
+}
+
+/// Inserts a new active sibling under `parent_id`, deactivating existing siblings.
+///
+/// Enforces a maximum of 5 siblings: if already at 5, the oldest inactive sibling
+/// and its entire subtree are deleted first (ON DELETE CASCADE handles descendants).
+/// The new sibling gets sibling_order = max(existing) + 1.
+pub fn create_sibling(
+    conn: &Connection,
+    parent_id: &str,
+    mut new: NewMessage,
+) -> Result<Message, AppError> {
+    let siblings = get_siblings(conn, parent_id)?;
+
+    let next_order = siblings
+        .iter()
+        .map(|s| s.sibling_order)
+        .max()
+        .map(|m| m + 1)
+        .unwrap_or(0);
+    new.sibling_order = next_order;
+    new.parent_id = Some(parent_id.to_owned());
+    new.is_active = true;
+
+    if siblings.len() >= 5 {
+        if let Some(oldest_inactive) = siblings.iter().find(|s| !s.is_active) {
+            truncate_after(conn, &oldest_inactive.id)?;
+        }
+    }
+
+    conn.execute(
+        "UPDATE messages SET is_active = 0 WHERE parent_id = ?1",
+        params![parent_id],
+    )?;
+
+    create(conn, new)
+}
+
+/// Makes the target message active; deactivates all other messages with the same parent_id.
+pub fn set_active_sibling(conn: &Connection, message_id: &str) -> Result<(), AppError> {
+    let parent_id: Option<String> = conn.query_row(
+        "SELECT parent_id FROM messages WHERE id = ?1",
+        params![message_id],
+        |row| row.get(0),
+    )?;
+
+    if let Some(pid) = parent_id {
+        conn.execute(
+            "UPDATE messages SET is_active = 0 WHERE parent_id = ?1",
+            params![pid],
+        )?;
+    }
+
+    conn.execute(
+        "UPDATE messages SET is_active = 1 WHERE id = ?1",
+        params![message_id],
+    )?;
+
+    Ok(())
+}
+
+/// Deletes the given message and all its descendants (entire subtree via ON DELETE CASCADE).
+pub fn truncate_after(conn: &Connection, message_id: &str) -> Result<(), AppError> {
+    conn.execute("DELETE FROM messages WHERE id = ?1", params![message_id])?;
+    Ok(())
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -419,6 +499,168 @@ mod tests {
         assert_eq!(msgs[1].content, "Response B");
         assert_eq!(msgs[1].sibling_count, 2);
         assert_eq!(msgs[1].sibling_order, 1);
+    }
+
+    #[test]
+    fn get_siblings_returns_all_with_same_parent() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let user_msg = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::User, content: "Q".into(),
+            parent_id: None, sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A1".into(),
+            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A2".into(),
+            parent_id: Some(user_msg.id.clone()), sibling_order: 1, is_active: false,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        let siblings = get_siblings(&conn, &user_msg.id).unwrap();
+        assert_eq!(siblings.len(), 2);
+        assert_eq!(siblings[0].content, "A1");
+        assert_eq!(siblings[1].content, "A2");
+    }
+
+    #[test]
+    fn create_sibling_deactivates_existing_and_inserts_new() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let user_msg = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::User, content: "Q".into(),
+            parent_id: None, sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        // First assistant response
+        create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A1".into(),
+            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        // Create a sibling (regenerated response)
+        let new_msg = create_sibling(&conn, &user_msg.id, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A2".into(),
+            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        assert_eq!(new_msg.content, "A2");
+        assert!(new_msg.is_active);
+        assert_eq!(new_msg.sibling_order, 1); // assigned max+1
+
+        let siblings = get_siblings(&conn, &user_msg.id).unwrap();
+        assert_eq!(siblings.len(), 2);
+        let inactive = siblings.iter().find(|s| s.content == "A1").unwrap();
+        assert!(!inactive.is_active);
+    }
+
+    #[test]
+    fn set_active_sibling_swaps_active_flag() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let user_msg = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::User, content: "Q".into(),
+            parent_id: None, sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        let a1 = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A1".into(),
+            parent_id: Some(user_msg.id.clone()), sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        let a2 = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A2".into(),
+            parent_id: Some(user_msg.id.clone()), sibling_order: 1, is_active: false,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        set_active_sibling(&conn, &a2.id).unwrap();
+
+        let siblings = get_siblings(&conn, &user_msg.id).unwrap();
+        let s1 = siblings.iter().find(|s| s.id == a1.id).unwrap();
+        let s2 = siblings.iter().find(|s| s.id == a2.id).unwrap();
+        assert!(!s1.is_active);
+        assert!(s2.is_active);
+    }
+
+    #[test]
+    fn truncate_after_deletes_message_and_descendants() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let u = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::User, content: "U".into(),
+            parent_id: None, sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        let a = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::Assistant, content: "A".into(),
+            parent_id: Some(u.id.clone()), sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        let _u2 = create(&conn, NewMessage {
+            conversation_id: cid.clone(), role: MessageRole::User, content: "U2".into(),
+            parent_id: Some(a.id.clone()), sibling_order: 0, is_active: true,
+            images_json: None, files_json: None, tokens_used: None,
+            generation_time_ms: None, prompt_tokens: None, tokens_per_sec: None,
+            total_duration_ms: None, load_duration_ms: None, prompt_eval_duration_ms: None,
+            eval_duration_ms: None, seed: None,
+        }).unwrap();
+
+        truncate_after(&conn, &a.id).unwrap(); // delete A and everything after
+
+        let msgs = list_for_conversation(&conn, &cid).unwrap();
+        assert_eq!(msgs.len(), 1, "only root user message remains");
+        assert_eq!(msgs[0].content, "U");
     }
 
     #[test]
