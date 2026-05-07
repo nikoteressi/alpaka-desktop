@@ -12,6 +12,7 @@ import TypingIndicator from "./TypingIndicator.vue";
 import { useSettingsStore } from "../../stores/settings";
 import { uint8ArrayToBase64 } from "../../stores/chat";
 import { parseMessageParts } from "../../lib/messageParser";
+import { useVersionSwitcher } from "../../composables/useVersionSwitcher";
 
 const props = defineProps<{
   message: Message;
@@ -20,13 +21,27 @@ const props = defineProps<{
   thinkingContent?: string;
   isThinking?: boolean;
   tokensPerSec?: number | null;
+  siblingCount?: number;
+  siblingOrder?: number;
+  parentId?: string | null;
+  isRegenerating?: boolean;
 }>();
 
-const emit = defineEmits<{ edit: [] }>();
+const emit = defineEmits<{
+  edit: [];
+  regenerate: [messageId: string];
+}>();
 
 const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
 const isUser = computed(() => props.message.role === "user");
+
+const { hasPrev, hasNext, versionLabel, prevVersion, nextVersion } =
+  useVersionSwitcher(props.message);
+
+function onRegenerate() {
+  emit("regenerate", props.message.id ?? "");
+}
 
 // Memoization cache for finished messages
 const _parsedCache = ref<{ key: string; result: MessagePart[] } | null>(null);
@@ -105,7 +120,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   <!-- User Message -->
   <article v-if="isUser" class="user-message group">
     <div class="user-bubble-container relative">
-      <div class="user-bubble">
+      <div v-if="!isRegenerating" class="user-bubble">
         <div
           v-if="message.images && message.images.length > 0"
           class="flex flex-wrap gap-2 mb-2"
@@ -119,6 +134,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
         </div>
         {{ message.content }}
       </div>
+      <div v-else class="text-xs text-neutral-500 italic">Regenerating…</div>
       <div
         v-if="!isStreaming"
         class="user-footer-actions opacity-0 group-hover:opacity-100 transition-opacity duration-300"
@@ -129,6 +145,22 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           mode="all"
           @edit="emit('edit')"
         />
+        <div
+          v-if="versionLabel !== null"
+          class="flex items-center gap-1 text-xs text-neutral-400 mt-1 justify-end"
+        >
+          <button
+            :disabled="!hasPrev"
+            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            @click="prevVersion"
+          >&lt;</button>
+          <span>{{ versionLabel }}</span>
+          <button
+            :disabled="!hasNext"
+            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            @click="nextVersion"
+          >&gt;</button>
+        </div>
       </div>
     </div>
   </article>
@@ -147,7 +179,9 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
       <MessageActions :message="message" :is-user="false" mode="version-only" />
     </div>
 
-    <div class="assistant-content rendered-markdown-container">
+    <div v-if="isRegenerating" class="text-xs text-neutral-500 italic py-2">Regenerating…</div>
+
+    <div v-else class="assistant-content rendered-markdown-container">
       <template v-for="(group, gIdx) in unifiedGroups" :key="gIdx">
         <ThinkBlock
           v-if="group.type === 'thought' && isThoughtGroupVisible(group, gIdx)"
@@ -199,7 +233,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
     <TypingIndicator v-if="isStreaming && displayParts.length === 0" />
 
     <!-- Final Search Badge & Stats & Actions -->
-    <div v-if="!isStreaming" class="assistant-footer">
+    <div v-if="!isStreaming && !isRegenerating" class="assistant-footer">
       <SearchBlock
         v-if="finalSearchResults.length > 0"
         type="final"
@@ -232,7 +266,24 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           :message="message"
           :is-user="false"
           mode="actions-only"
+          @regenerate="onRegenerate"
         />
+        <div
+          v-if="versionLabel !== null"
+          class="flex items-center gap-1 text-xs text-neutral-400 mt-1"
+        >
+          <button
+            :disabled="!hasPrev"
+            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            @click="prevVersion"
+          >&lt;</button>
+          <span>{{ versionLabel }}</span>
+          <button
+            :disabled="!hasNext"
+            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            @click="nextVersion"
+          >&gt;</button>
+        </div>
       </div>
     </div>
   </article>
