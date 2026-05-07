@@ -122,7 +122,14 @@ mod tests {
     fn strip_removes_multiline_think_blocks() {
         let input = "Before\n<think>\nline1\nline2\n</think>\nAfter";
         let result = strip_history_content(input);
-        assert_eq!(result.trim(), "Before\n\nAfter".trim());
+        assert_eq!(result, "Before\n\nAfter");
+    }
+
+    #[test]
+    fn strip_drops_tail_on_unclosed_tag() {
+        let input = "text <think>unclosed";
+        let result = strip_history_content(input);
+        assert_eq!(result, "text");
     }
 
     #[test]
