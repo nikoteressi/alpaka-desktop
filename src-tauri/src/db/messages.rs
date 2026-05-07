@@ -87,7 +87,7 @@ pub struct NewMessage {
 fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     let role_str: String = row.get(2)?;
     let role = role_str.parse::<MessageRole>().unwrap_or(MessageRole::User);
-    let is_active_int: i64 = row.get(18).unwrap_or(1);
+    let is_active_int: i64 = row.get(18)?;
 
     Ok(Message {
         id: row.get(0)?,
@@ -107,7 +107,7 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         seed: row.get(14)?,
         created_at: row.get(15)?,
         parent_id: row.get(16)?,
-        sibling_order: row.get(17).unwrap_or(0),
+        sibling_order: row.get(17)?,
         is_active: is_active_int != 0,
         sibling_count: row.get(19).unwrap_or(1),
     })
@@ -121,6 +121,8 @@ pub fn list_for_conversation(
     conversation_id: &str,
 ) -> Result<Vec<Message>, AppError> {
     let mut stmt = conn.prepare(
+        // sibling_count=1 here is a placeholder; Task 3 replaces this with a recursive CTE
+        // that computes the real count from the active-path tree.
         "SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
