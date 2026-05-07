@@ -7,7 +7,7 @@
     "
     @keydown="$emit('keydown', $event)"
     placeholder="Type a message…"
-    class="w-full bg-transparent focus:outline-none resize-none overflow-hidden text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
+    class="w-full bg-transparent focus:outline-none resize-none overflow-y-auto text-[var(--text)] text-[13.5px] leading-relaxed placeholder-[var(--text-dim)] max-h-48 min-h-[36px]"
     :disabled="isStreaming"
     rows="1"
   />

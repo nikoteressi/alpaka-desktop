@@ -63,7 +63,8 @@ describe("MessageBubble.vue", () => {
     const wrapper = mount(MessageBubble, {
       props: { message: { role: "user", content: "Original text" } },
     });
-    await wrapper.find('[title="Edit"]').trigger("click");
+    await wrapper.find(".user-message").trigger("mouseenter");
+    await wrapper.find('[aria-label="Edit"]').trigger("click");
     await wrapper.vm.$nextTick();
     expect(wrapper.find("textarea").exists()).toBe(true);
     expect(
@@ -75,7 +76,8 @@ describe("MessageBubble.vue", () => {
     const wrapper = mount(MessageBubble, {
       props: { message: { role: "user", content: "Original text" } },
     });
-    await wrapper.find('[title="Edit"]').trigger("click");
+    await wrapper.find(".user-message").trigger("mouseenter");
+    await wrapper.find('[aria-label="Edit"]').trigger("click");
     await wrapper.vm.$nextTick();
     await wrapper.find(".user-edit-btn--cancel").trigger("click");
     await wrapper.vm.$nextTick();
@@ -86,7 +88,8 @@ describe("MessageBubble.vue", () => {
     const wrapper = mount(MessageBubble, {
       props: { message: { role: "user", content: "Original" } },
     });
-    await wrapper.find('[title="Edit"]').trigger("click");
+    await wrapper.find(".user-message").trigger("mouseenter");
+    await wrapper.find('[aria-label="Edit"]').trigger("click");
     await wrapper.vm.$nextTick();
     const textarea = wrapper.find("textarea");
     await textarea.setValue("  Updated content  ");

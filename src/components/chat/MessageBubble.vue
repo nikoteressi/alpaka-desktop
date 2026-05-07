@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch } from "vue";
 import { renderMarkdown } from "../../lib/markdown";
 import type { Message, MessagePart } from "../../types/chat";
 import { useChatStore } from "../../stores/chat";
@@ -40,26 +40,15 @@ const isUser = computed(() => props.message.role === "user");
 const isEditing = ref(false);
 const editContent = ref("");
 const editTextareaRef = ref<HTMLTextAreaElement | null>(null);
+const isHovered = ref(false);
 
-function autoResize() {
-  const el = editTextareaRef.value;
-  if (!el) return;
-  // Grow-only: avoids height="auto" collapse on every keystroke (causes blink in WebKit)
-  if (el.scrollHeight > el.clientHeight) {
-    el.style.height = `${el.scrollHeight}px`;
-  }
-}
-
-// flush:'post' — fires after the DOM update, so ref is already set and no nextTick needed
+// flush:'post' — fires after DOM update, ref is guaranteed set, no nextTick needed
 watch(
   isEditing,
   (val) => {
     if (!val) return;
     const el = editTextareaRef.value;
     if (!el) return;
-    // One-time sizing on open: "auto" trick is safe here (runs once, not on every keystroke)
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
   },
@@ -180,7 +169,13 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 
 <template>
   <!-- User Message -->
-  <article v-if="isUser" data-role="user" class="user-message group">
+  <article
+    v-if="isUser"
+    data-role="user"
+    class="user-message"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false"
+  >
     <div class="user-bubble-container relative">
       <!-- Inline edit mode -->
       <div v-if="isEditing" class="user-edit-container">
@@ -188,7 +183,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           ref="editTextareaRef"
           v-model="editContent"
           class="user-edit-textarea"
-          @input="autoResize"
+          rows="4"
           @keydown.ctrl.enter="applyEdit"
           @keydown.escape="cancelEdit"
         />
@@ -224,10 +219,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           </div>
           {{ message.content }}
         </div>
-        <div
-          v-if="!isStreaming"
-          class="user-footer-actions opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-        >
+        <div v-if="!isStreaming && isHovered" class="user-footer-actions">
           <MessageActions
             :message="message"
             :is-user="true"
@@ -247,8 +239,10 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   <article
     v-else
     data-role="assistant"
-    class="assistant-message group"
+    class="assistant-message"
     :class="{ 'assistant-message--streaming': isStreaming }"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false"
   >
     <div
       class="assistant-content rendered-markdown-container"
@@ -331,9 +325,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           class="w-full"
         />
       </div>
-      <div
-        class="assistant-footer__actions opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-      >
+      <div v-if="isHovered" class="assistant-footer__actions">
         <MessageActions
           :message="message"
           :is-user="false"
@@ -402,7 +394,6 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   font-family: inherit;
   overflow-y: auto;
   max-height: 320px;
-  min-height: 36px;
 }
 
 .user-edit-actions {

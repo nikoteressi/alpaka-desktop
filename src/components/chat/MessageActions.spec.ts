@@ -14,7 +14,7 @@ describe("MessageActions — copy button", () => {
     const wrapper = mount(MessageActions, {
       props: { message, isUser: false },
     });
-    expect(wrapper.find('[title="Copy content"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="Copy"]').exists()).toBe(true);
   });
 
   it("calls handleCopy when copy button is clicked", async () => {
@@ -32,7 +32,7 @@ describe("MessageActions — copy button", () => {
       props: { message, isUser: false },
     });
 
-    await wrapper.find('[title="Copy content"]').trigger("click");
+    await wrapper.find('[aria-label="Copy"]').trigger("click");
     expect(writeText).toHaveBeenCalledWith("Hello world");
   });
 });

@@ -11,85 +11,92 @@
       v-if="mode === 'all' || mode === 'actions-only'"
       class="action-group main-actions-row"
     >
-      <button
-        v-if="isUser"
-        class="action-btn"
-        title="Edit"
-        @click="$emit('edit')"
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path
-            d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-          ></path>
-          <path
-            d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-          ></path>
-        </svg>
-      </button>
+      <CustomTooltip v-if="isUser" text="Edit" wrapper-class="inline-flex">
+        <button class="action-btn" aria-label="Edit" @click="$emit('edit')">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+            ></path>
+            <path
+              d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+            ></path>
+          </svg>
+        </button>
+      </CustomTooltip>
 
-      <button
-        class="action-btn"
-        :title="copied ? 'Copied!' : 'Copy content'"
-        @click="handleCopy"
+      <CustomTooltip
+        :text="copied ? 'Copied!' : 'Copy'"
+        wrapper-class="inline-flex"
       >
-        <svg
-          v-if="copied"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <button
+          class="action-btn"
+          :aria-label="copied ? 'Copied!' : 'Copy'"
+          @click="handleCopy"
         >
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-        <svg
-          v-else
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-      </button>
+          <svg
+            v-if="copied"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <svg
+            v-else
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </button>
+      </CustomTooltip>
 
-      <button
+      <CustomTooltip
         v-if="!isUser"
-        class="action-btn"
-        title="Regenerate"
-        @click="$emit('regenerate')"
+        text="Regenerate"
+        wrapper-class="inline-flex"
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <button
+          class="action-btn"
+          aria-label="Regenerate"
+          @click="$emit('regenerate')"
         >
-          <path d="M23 4v6h-6"></path>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </svg>
-      </button>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M23 4v6h-6"></path>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+      </CustomTooltip>
     </div>
 
     <!-- Version Switcher (Branching) — rendered after action buttons -->
@@ -132,6 +139,7 @@
 import { ref, computed } from "vue";
 import type { Message } from "../../types/chat";
 import { useCopyToClipboard } from "../../composables/useCopyToClipboard";
+import CustomTooltip from "../shared/CustomTooltip.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -215,7 +223,7 @@ async function handleCopy() {
   color: var(--text-muted);
 }
 
-.action-btn[title="Copied!"] {
+.action-btn[aria-label="Copied!"] {
   color: var(--success);
 }
 </style>
