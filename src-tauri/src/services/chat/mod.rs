@@ -363,7 +363,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let mut initial_messages: Vec<Message> = Vec::new();
 
         if web_search_enabled {
-            let date_str = chrono::Local::now().format("%B %d, %Y").to_string();
+            let date_str = Local::now().format("%B %d, %Y").to_string();
             let system_content = format!(
                 "CRITICAL: The current real-world date is {}. \
                 You have active, real-time access to the web via the 'web_search' tool. \
