@@ -67,6 +67,7 @@ export const useChatStore = defineStore("chat", {
       promptTokens: 0,
       evalTokens: 0,
       activeMessageParts: [] as MessagePart[],
+      regeneratingMessageId: null,
     } as StreamingState,
     _listenersInitialized: false,
     /** Draft conversation — local-only, not yet persisted to DB */
@@ -201,6 +202,7 @@ export const useChatStore = defineStore("chat", {
       this.streaming.searchState = null;
       this.streaming.searchResults = [];
       this.streaming.activeMessageParts = [];
+      this.streaming.regeneratingMessageId = null;
     },
 
     // Avoids re-parsing the entire buffer on every token.
@@ -429,6 +431,38 @@ export const useChatStore = defineStore("chat", {
       });
       await this.loadConversations(true);
       return newConvId;
+    },
+
+    async switchVersion(siblingId: string): Promise<void> {
+      await invoke("switch_version", { siblingId });
+      const id = this.activeConversationId;
+      if (id) {
+        // Clear cached messages to bypass the early-return guard in loadConversation.
+        delete this.messages[id];
+        await this.loadConversation(id);
+      }
+    },
+
+    async regenerateMessage(parentMessageId: string): Promise<void> {
+      const conversationId = this.activeConversationId;
+      if (!conversationId) return;
+      const conv = this.conversations.find((c) => c.id === conversationId);
+      if (!conv) return;
+
+      this.streaming.regeneratingMessageId = parentMessageId;
+
+      try {
+        await invoke("regenerate_message", {
+          conversationId,
+          parentMessageId,
+          model: conv.model,
+          thinkMode: null,
+          chatOptions: null,
+          webSearchEnabled: false,
+        });
+      } finally {
+        this.streaming.regeneratingMessageId = null;
+      }
     },
   },
 });
