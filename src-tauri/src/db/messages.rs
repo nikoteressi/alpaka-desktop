@@ -115,21 +115,29 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
 
 // ── CRUD ───────────────────────────────────────────────────────────────────────
 
-/// Return all messages for a conversation in chronological order.
+/// Return all messages on the active path for a conversation in chronological order.
 pub fn list_for_conversation(
     conn: &Connection,
     conversation_id: &str,
 ) -> Result<Vec<Message>, AppError> {
     let mut stmt = conn.prepare(
-        // sibling_count=1 here is a placeholder; Task 3 replaces this with a recursive CTE
-        // that computes the real count from the active-path tree.
-        "SELECT id, conversation_id, role, content, images_json, files_json,
+        "WITH RECURSIVE active_path AS (
+             SELECT m.*,
+                    (SELECT COUNT(*) FROM messages s WHERE s.parent_id = m.parent_id) as sibling_count
+             FROM messages m
+             WHERE m.conversation_id = ?1 AND m.parent_id IS NULL
+             UNION ALL
+             SELECT m.*,
+                    (SELECT COUNT(*) FROM messages s WHERE s.parent_id = m.parent_id) as sibling_count
+             FROM messages m
+             JOIN active_path ap ON m.parent_id = ap.id
+             WHERE m.is_active = 1
+         )
+         SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count
-         FROM messages
-         WHERE conversation_id = ?1
-         ORDER BY created_at ASC",
+                seed, created_at, parent_id, sibling_order, is_active, sibling_count
+         FROM active_path ORDER BY created_at ASC",
     )?;
 
     let rows = stmt.query_map(params![conversation_id], row_to_message)?;
@@ -325,6 +333,92 @@ mod tests {
         let deleted = delete_for_conversation(&conn, &cid).unwrap();
         assert_eq!(deleted, 1);
         assert!(list_for_conversation(&conn, &cid).unwrap().is_empty());
+    }
+
+    #[test]
+    fn list_follows_active_path_only() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        // Insert root user message (no parent)
+        let user_msg = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::User,
+                content: "Hello".into(),
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
+
+        // Insert two sibling assistant messages with same parent
+        let _a1 = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "Response A".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 0,
+                is_active: false, // inactive
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
+
+        let _a2 = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid.clone(),
+                role: MessageRole::Assistant,
+                content: "Response B".into(),
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 1,
+                is_active: true, // active
+                images_json: None,
+                files_json: None,
+                tokens_used: None,
+                generation_time_ms: None,
+                prompt_tokens: None,
+                tokens_per_sec: None,
+                total_duration_ms: None,
+                load_duration_ms: None,
+                prompt_eval_duration_ms: None,
+                eval_duration_ms: None,
+                seed: None,
+            },
+        )
+        .unwrap();
+
+        let msgs = list_for_conversation(&conn, &cid).unwrap();
+        assert_eq!(msgs.len(), 2, "only user + active assistant");
+        assert_eq!(msgs[1].content, "Response B");
+        assert_eq!(msgs[1].sibling_count, 2);
+        assert_eq!(msgs[1].sibling_order, 1);
     }
 
     #[test]
