@@ -61,14 +61,14 @@
                         style="display: inline-block; width: 100%"
                       >
                         <span
-                          v-if="
-                            isThinking &&
-                            idx === parts.length - 1 &&
-                            sIdx === stepsPerPart[idx].length - 1
-                          "
+                          v-if="isThinking && idx === parts.length - 1"
                           ref="contentEl"
                           class="think-step__active"
-                          >{{ step }}<span class="think-cursor"></span
+                          >{{ step
+                          }}<span
+                            v-if="sIdx === stepsPerPart[idx].length - 1"
+                            class="think-cursor"
+                          ></span
                         ></span>
                         <div v-else v-html="renderMarkdown(step)"></div>
                       </div>
