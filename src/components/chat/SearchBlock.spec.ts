@@ -145,3 +145,38 @@ describe("SearchBlock — sidebar toggle", () => {
     expect(wrapper.find(".search-badge--active").exists()).toBe(false);
   });
 });
+
+describe("SearchBlock — favicon error handling", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it("handleFaviconError hides the parent element of a broken favicon", async () => {
+    const wrapper = mount(SearchBlock, {
+      props: { type: "final", results: twoResults },
+    });
+    const img = wrapper.find("img.search-badge__favicon");
+    expect(img.exists()).toBe(true);
+
+    const parent = img.element.parentElement as HTMLElement;
+    parent.style.display = "flex";
+
+    await img.trigger("error");
+
+    expect(parent.style.display).toBe("none");
+  });
+
+  it("favicon URL computation skips results with invalid URLs", () => {
+    const badResult = [
+      { url: "not-a-valid-url", title: "Bad", content: "" },
+      { url: "https://valid.com/page", title: "Good", content: "" },
+    ];
+    const wrapper = mount(SearchBlock, {
+      props: { type: "final", results: badResult },
+    });
+    const imgs = wrapper.findAll("img.search-badge__favicon");
+    // Only the valid URL produces a favicon
+    expect(imgs.length).toBe(1);
+    expect(imgs[0].attributes("src")).toContain("valid.com");
+  });
+});
