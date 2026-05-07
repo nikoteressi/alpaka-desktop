@@ -116,8 +116,13 @@
                   :thinking-content="item.thinkingContent"
                   :is-thinking="item.isThinking"
                   :tokens-per-sec="item.tokensPerSec"
+                  :sibling-count="item.message.siblingCount ?? 0"
+                  :sibling-order="item.message.siblingOrder ?? 0"
+                  :parent-id="item.message.parentId ?? null"
+                  :is-regenerating="chatStore.streaming.regeneratingMessageId === item.message.parentId"
                   :class="item.outsideContext ? 'opacity-40' : ''"
                   @edit="onEdit(item.message)"
+                  @regenerate="onRegenerate"
                 />
               </DynamicScrollerItem>
               <DynamicScrollerItem
@@ -217,6 +222,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import MessageBubble from "./MessageBubble.vue";
@@ -397,8 +403,13 @@ async function onStop() {
   await stopGeneration();
 }
 
-function onEdit(message: Message) {
+async function onEdit(message: Message) {
   const conversationId = chatStore.activeConversationId!;
+  if (message.id) {
+    await invoke("truncate_from", { messageId: message.id });
+    delete chatStore.messages[conversationId];
+    await chatStore.loadConversation(conversationId);
+  }
   const current = chatStore.drafts[conversationId];
   setDraft(conversationId, {
     content: message.content,
@@ -408,6 +419,10 @@ function onEdit(message: Message) {
     thinkEnabled: current?.thinkEnabled ?? false,
     thinkLevel: current?.thinkLevel ?? "medium",
   });
+}
+
+async function onRegenerate(messageId: string) {
+  await chatStore.regenerateMessage(messageId);
 }
 
 // Timer used to guard onScroll from re-disabling auto-scroll during a programmatic smooth scroll.
