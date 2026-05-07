@@ -28,6 +28,10 @@ export interface Message {
   eval_duration_ms?: number;
   seed?: number;
   created_at?: string;
+  parentId?: string | null;
+  siblingOrder?: number;
+  siblingCount?: number;
+  isActive?: boolean;
 }
 
 export interface BackendMessage {
@@ -47,6 +51,10 @@ export interface BackendMessage {
   eval_duration_ms: number | null;
   seed: number | null;
   created_at: string;
+  parent_id?: string | null;
+  sibling_order?: number;
+  sibling_count?: number;
+  is_active?: boolean;
 }
 
 export interface Conversation {
@@ -109,6 +117,7 @@ export interface StreamingState {
   promptTokens: number;
   evalTokens: number;
   activeMessageParts: MessagePart[];
+  regeneratingMessageId: string | null;
 }
 
 export interface TokenPayload {
