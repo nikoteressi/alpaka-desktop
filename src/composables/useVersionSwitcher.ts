@@ -2,48 +2,30 @@ import { computed } from "vue";
 import { useChatStore } from "../stores/chat";
 import type { Message } from "../types/chat";
 
-export function useVersionSwitcher(message: Message) {
+export function useVersionSwitcher(getMessage: () => Message) {
   const store = useChatStore();
 
-  const allMessages = computed((): Message[] =>
-    store.activeConversationId
-      ? (store.messages[store.activeConversationId] ?? [])
-      : [],
-  );
-
-  const siblings = computed((): Message[] => {
-    if (!message.parentId) return [];
-    return allMessages.value
-      .filter((m: Message) => m.parentId === message.parentId)
-      .sort(
-        (a: Message, b: Message) =>
-          (a.siblingOrder ?? 0) - (b.siblingOrder ?? 0),
-      );
-  });
-
-  const currentIndex = computed(() =>
-    siblings.value.findIndex((m: Message) => m.id === message.id),
-  );
-
-  const hasPrev = computed(() => currentIndex.value > 0);
+  const hasPrev = computed(() => (getMessage().siblingOrder ?? 0) > 0);
   const hasNext = computed(
-    () => currentIndex.value < siblings.value.length - 1,
+    () =>
+      (getMessage().siblingOrder ?? 0) < (getMessage().siblingCount ?? 1) - 1,
   );
   const versionLabel = computed(() => {
-    if (siblings.value.length <= 1) return null;
-    return `${currentIndex.value + 1} / ${siblings.value.length}`;
+    const msg = getMessage();
+    if ((msg.siblingCount ?? 1) <= 1) return null;
+    return `${(msg.siblingOrder ?? 0) + 1} / ${msg.siblingCount ?? 1}`;
   });
 
   async function prevVersion() {
-    if (!hasPrev.value) return;
-    const prev = siblings.value[currentIndex.value - 1];
-    if (prev.id) await store.switchVersion(prev.id);
+    const msg = getMessage();
+    if (!hasPrev.value || !msg.id) return;
+    await store.navigateVersion(msg.id, -1);
   }
 
   async function nextVersion() {
-    if (!hasNext.value) return;
-    const next = siblings.value[currentIndex.value + 1];
-    if (next.id) await store.switchVersion(next.id);
+    const msg = getMessage();
+    if (!hasNext.value || !msg.id) return;
+    await store.navigateVersion(msg.id, 1);
   }
 
   return { hasPrev, hasNext, versionLabel, prevVersion, nextVersion };

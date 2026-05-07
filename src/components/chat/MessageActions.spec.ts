@@ -65,7 +65,7 @@ describe("MessageActions — version switcher", () => {
     const wrapper = mount(MessageActions, {
       props: { message, isUser: false, currentVersion: 2, totalVersions: 3 },
     });
-    const buttons = wrapper.findAll(".action-btn");
+    const buttons = wrapper.find(".version-switcher").findAll(".action-btn");
     await buttons[0].trigger("click");
     expect(wrapper.emitted("prev-version")).toBeTruthy();
   });

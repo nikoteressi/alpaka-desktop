@@ -96,13 +96,19 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 .map(|i| serde_json::to_string(&i).map_err(AppError::from))
                 .transpose()?;
 
+            // Chain the new user message to the last active message so it belongs
+            // to the current branch. If the history is empty (first message in a
+            // conversation) parent_id stays None and the message becomes the root.
+            let active_path = messages::list_for_conversation(conn, &conv_id)?;
+            let parent_id = active_path.last().map(|m| m.id.clone());
+
             let user_msg = messages::create(
                 conn,
                 messages::NewMessage {
                     conversation_id: conv_id.clone(),
                     role: messages::MessageRole::User,
                     content: msg_content,
-                    parent_id: None,
+                    parent_id,
                     sibling_order: 0,
                     is_active: true,
                     images_json,

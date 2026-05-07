@@ -64,6 +64,7 @@ pub fn run() {
             commands::chat::compact_conversation,
             commands::chat::regenerate_message,
             commands::chat::switch_version,
+            commands::chat::navigate_version,
             commands::chat::truncate_from,
             commands::service::start_ollama,
             commands::service::stop_ollama,

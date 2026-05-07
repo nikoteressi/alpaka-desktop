@@ -21,6 +21,16 @@ pub async fn get_messages(
 const MAX_TITLE_LEN: usize = 500;
 const MAX_SYSTEM_PROMPT_LEN: usize = 32_000;
 
+fn check_length(value: &str, name: &str, max: usize) -> Result<(), AppError> {
+    if value.len() > max {
+        return Err(AppError::Internal(format!(
+            "{name} too long: {} chars (max {max})",
+            value.len()
+        )));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn create_conversation(
     state: State<'_, AppState>,
@@ -29,22 +39,10 @@ pub async fn create_conversation(
     system_prompt: Option<String>,
 ) -> Result<conversations::Conversation, AppError> {
     if let Some(ref t) = title {
-        if t.len() > MAX_TITLE_LEN {
-            return Err(AppError::Internal(format!(
-                "Title too long: {} chars (max {})",
-                t.len(),
-                MAX_TITLE_LEN
-            )));
-        }
+        check_length(t, "Title", MAX_TITLE_LEN)?;
     }
     if let Some(ref sp) = system_prompt {
-        if sp.len() > MAX_SYSTEM_PROMPT_LEN {
-            return Err(AppError::Internal(format!(
-                "System prompt too long: {} chars (max {})",
-                sp.len(),
-                MAX_SYSTEM_PROMPT_LEN
-            )));
-        }
+        check_length(sp, "System prompt", MAX_SYSTEM_PROMPT_LEN)?;
     }
     spawn_db(state.db.clone(), move |conn| {
         let conv = conversations::create(
@@ -110,13 +108,7 @@ pub async fn update_conversation_title(
     conversation_id: String,
     title: String,
 ) -> Result<(), AppError> {
-    if title.len() > MAX_TITLE_LEN {
-        return Err(AppError::Internal(format!(
-            "Title too long: {} chars (max {})",
-            title.len(),
-            MAX_TITLE_LEN
-        )));
-    }
+    check_length(&title, "Title", MAX_TITLE_LEN)?;
     spawn_db(state.db.clone(), move |conn| {
         conversations::update_title(conn, &conversation_id, &title)
     })
@@ -167,13 +159,7 @@ pub async fn update_system_prompt(
     conversation_id: String,
     system_prompt: String,
 ) -> Result<(), AppError> {
-    if system_prompt.len() > MAX_SYSTEM_PROMPT_LEN {
-        return Err(AppError::Internal(format!(
-            "System prompt too long: {} chars (max {})",
-            system_prompt.len(),
-            MAX_SYSTEM_PROMPT_LEN
-        )));
-    }
+    check_length(&system_prompt, "System prompt", MAX_SYSTEM_PROMPT_LEN)?;
     spawn_db(state.db.clone(), move |conn| {
         conversations::update_system_prompt(conn, &conversation_id, &system_prompt)
     })
@@ -434,6 +420,24 @@ pub async fn switch_version(
     }
     spawn_db(state.db.clone(), move |conn| {
         messages::set_active_sibling(conn, &sibling_id)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn navigate_version(
+    message_id: String,
+    direction: i64,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    if message_id.is_empty() {
+        return Err(AppError::Internal("message_id must not be empty".into()));
+    }
+    if direction.abs() != 1 {
+        return Err(AppError::Internal("direction must be 1 or -1".into()));
+    }
+    spawn_db(state.db.clone(), move |conn| {
+        messages::navigate_sibling(conn, &message_id, direction)
     })
     .await
 }

@@ -31,26 +31,12 @@ fn test_export_conversation_to_path_red() {
             conversation_id: conv.id.clone(),
             role: MessageRole::User,
             content: "Hello from test".into(),
-            parent_id: None,
-            sibling_order: 0,
-            is_active: true,
-            images_json: None,
-            files_json: None,
-            tokens_used: None,
-            generation_time_ms: None,
-            prompt_tokens: None,
-            tokens_per_sec: None,
-            total_duration_ms: None,
-            load_duration_ms: None,
-            prompt_eval_duration_ms: None,
-            eval_duration_ms: None,
-            seed: None,
+            ..Default::default()
         },
     )
     .unwrap();
 
     let export_path = dir.join("export.json");
-    // Updated to new function name
     db::conversations::export_to_path(&conn, &conv.id, &export_path).unwrap();
 
     // Should have created a file
@@ -106,7 +92,6 @@ fn test_format_search_results_red() {
     })
     .to_string();
 
-    // Updated to new module location
     let formatted = crate::ollama::search::format_search_results_for_llm(&raw);
     assert!(formatted.contains("Search Results:"));
     assert!(formatted.contains("[1] Title: Test Title 1"));

@@ -151,7 +151,11 @@ describe("ThinkBlock", () => {
 
   it("isOpen ref is true on mount when streaming", () => {
     const wrapper = mount(ThinkBlock, {
-      props: { parts: [thinkPart("")], isThinking: true, isOverallStreaming: true },
+      props: {
+        parts: [thinkPart("")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
     expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(true);
   });

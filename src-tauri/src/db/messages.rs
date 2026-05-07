@@ -84,6 +84,30 @@ pub struct NewMessage {
     pub seed: Option<i64>,
 }
 
+impl Default for NewMessage {
+    fn default() -> Self {
+        Self {
+            conversation_id: String::new(),
+            role: MessageRole::User,
+            content: String::new(),
+            parent_id: None,
+            sibling_order: 0,
+            is_active: true,
+            images_json: None,
+            files_json: None,
+            tokens_used: None,
+            generation_time_ms: None,
+            prompt_tokens: None,
+            tokens_per_sec: None,
+            total_duration_ms: None,
+            load_duration_ms: None,
+            prompt_eval_duration_ms: None,
+            eval_duration_ms: None,
+            seed: None,
+        }
+    }
+}
+
 fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     let role_str: String = row.get(2)?;
     let role = role_str.parse::<MessageRole>().unwrap_or(MessageRole::User);
@@ -270,8 +294,7 @@ pub fn create_sibling(
     Ok(msg)
 }
 
-/// Makes the target message active; deactivates all other messages with the same parent_id.
-pub fn set_active_sibling(conn: &Connection, message_id: &str) -> Result<(), AppError> {
+fn set_active_sibling_inner(conn: &Connection, message_id: &str) -> Result<(), AppError> {
     let parent_id: Option<String> = conn.query_row(
         "SELECT parent_id FROM messages WHERE id = ?1",
         params![message_id],
@@ -293,9 +316,45 @@ pub fn set_active_sibling(conn: &Connection, message_id: &str) -> Result<(), App
     Ok(())
 }
 
+/// Makes the target message active; deactivates all other messages with the same parent_id.
+pub fn set_active_sibling(conn: &Connection, message_id: &str) -> Result<(), AppError> {
+    let tx = conn.unchecked_transaction()?;
+    set_active_sibling_inner(conn, message_id)?;
+    tx.commit()?;
+    Ok(())
+}
+
 /// Deletes the given message and all its descendants (entire subtree via ON DELETE CASCADE).
 pub fn truncate_after(conn: &Connection, message_id: &str) -> Result<(), AppError> {
     conn.execute("DELETE FROM messages WHERE id = ?1", params![message_id])?;
+    Ok(())
+}
+
+/// Activates the sibling at `current_order + direction` under the same parent.
+pub fn navigate_sibling(
+    conn: &Connection,
+    message_id: &str,
+    direction: i64,
+) -> Result<(), AppError> {
+    if direction.abs() != 1 {
+        return Err(AppError::Internal("direction must be 1 or -1".into()));
+    }
+    let tx = conn.unchecked_transaction()?;
+    let (parent_id, current_order): (Option<String>, i64) = conn.query_row(
+        "SELECT parent_id, sibling_order FROM messages WHERE id = ?1",
+        params![message_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    let parent_id = parent_id
+        .ok_or_else(|| AppError::Internal("root messages have no siblings to navigate".into()))?;
+    let target_order = current_order + direction;
+    let target_id: String = conn.query_row(
+        "SELECT id FROM messages WHERE parent_id = ?1 AND sibling_order = ?2",
+        params![parent_id, target_order],
+        |row| row.get(0),
+    )?;
+    set_active_sibling_inner(conn, &target_id)?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -331,46 +390,27 @@ mod tests {
         .id
     }
 
+    /// Minimal message builder: sets the three required fields; everything else
+    /// uses `NewMessage::default()` (all Options → None, sibling_order → 0, is_active → true).
+    fn new_msg(cid: &str, role: MessageRole, content: &str) -> NewMessage {
+        NewMessage {
+            conversation_id: cid.to_owned(),
+            role,
+            content: content.into(),
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn create_and_list_messages() {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "Hello".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        create(&conn, new_msg(&cid, MessageRole::User, "Hello")).unwrap();
 
         create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "Hi there".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
                 tokens_used: Some(10),
                 generation_time_ms: Some(250),
                 prompt_tokens: Some(5),
@@ -379,7 +419,7 @@ mod tests {
                 load_duration_ms: Some(10),
                 prompt_eval_duration_ms: Some(40),
                 eval_duration_ms: Some(250),
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "Hi there")
             },
         )
         .unwrap();
@@ -395,29 +435,7 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "Bye".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        create(&conn, new_msg(&cid, MessageRole::User, "Bye")).unwrap();
 
         let deleted = delete_for_conversation(&conn, &cid).unwrap();
         assert_eq!(deleted, 1);
@@ -429,76 +447,25 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        // Insert root user message (no parent)
-        let user_msg = create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "Hello".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        let user_msg = create(&conn, new_msg(&cid, MessageRole::User, "Hello")).unwrap();
 
-        // Insert two sibling assistant messages with same parent
-        let _a1 = create(
+        // Two sibling assistant messages under the same parent; only B is active.
+        create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "Response A".into(),
                 parent_id: Some(user_msg.id.clone()),
-                sibling_order: 0,
-                is_active: false, // inactive
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                is_active: false,
+                ..new_msg(&cid, MessageRole::Assistant, "Response A")
             },
         )
         .unwrap();
 
-        let _a2 = create(
+        create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "Response B".into(),
                 parent_id: Some(user_msg.id.clone()),
                 sibling_order: 1,
-                is_active: true, // active
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "Response B")
             },
         )
         .unwrap();
@@ -515,50 +482,13 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let user_msg = create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "Q".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        let user_msg = create(&conn, new_msg(&cid, MessageRole::User, "Q")).unwrap();
 
         create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "A1".into(),
                 parent_id: Some(user_msg.id.clone()),
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "A1")
             },
         )
         .unwrap();
@@ -566,23 +496,10 @@ mod tests {
         create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "A2".into(),
                 parent_id: Some(user_msg.id.clone()),
                 sibling_order: 1,
                 is_active: false,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "A2")
             },
         )
         .unwrap();
@@ -598,84 +515,27 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let user_msg = create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "Q".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        let user_msg = create(&conn, new_msg(&cid, MessageRole::User, "Q")).unwrap();
 
-        // First assistant response
         create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "A1".into(),
                 parent_id: Some(user_msg.id.clone()),
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "A1")
             },
         )
         .unwrap();
 
-        // Create a sibling (regenerated response)
-        let new_msg = create_sibling(
+        let new_msg_result = create_sibling(
             &conn,
             &user_msg.id,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "A2".into(),
-                parent_id: Some(user_msg.id.clone()),
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
+            new_msg(&cid, MessageRole::Assistant, "A2"),
         )
         .unwrap();
 
-        assert_eq!(new_msg.content, "A2");
-        assert!(new_msg.is_active);
-        assert_eq!(new_msg.sibling_order, 1); // assigned max+1
+        assert_eq!(new_msg_result.content, "A2");
+        assert!(new_msg_result.is_active);
+        assert_eq!(new_msg_result.sibling_order, 1); // assigned max+1
 
         let siblings = get_siblings(&conn, &user_msg.id).unwrap();
         assert_eq!(siblings.len(), 2);
@@ -688,50 +548,13 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let user_msg = create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "Q".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        let user_msg = create(&conn, new_msg(&cid, MessageRole::User, "Q")).unwrap();
 
         let a1 = create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "A1".into(),
                 parent_id: Some(user_msg.id.clone()),
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "A1")
             },
         )
         .unwrap();
@@ -739,23 +562,10 @@ mod tests {
         let a2 = create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "A2".into(),
                 parent_id: Some(user_msg.id.clone()),
                 sibling_order: 1,
                 is_active: false,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "A2")
             },
         )
         .unwrap();
@@ -774,79 +584,27 @@ mod tests {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let u = create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "U".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        let u = create(&conn, new_msg(&cid, MessageRole::User, "U")).unwrap();
 
         let a = create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::Assistant,
-                content: "A".into(),
                 parent_id: Some(u.id.clone()),
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::Assistant, "A")
             },
         )
         .unwrap();
 
-        let _u2 = create(
+        create(
             &conn,
             NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "U2".into(),
                 parent_id: Some(a.id.clone()),
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
+                ..new_msg(&cid, MessageRole::User, "U2")
             },
         )
         .unwrap();
 
-        truncate_after(&conn, &a.id).unwrap(); // delete A and everything after
+        truncate_after(&conn, &a.id).unwrap();
 
         let msgs = list_for_conversation(&conn, &cid).unwrap();
         assert_eq!(msgs.len(), 1, "only root user message remains");
@@ -854,33 +612,121 @@ mod tests {
     }
 
     #[test]
+    fn navigate_sibling_switches_active() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let user_msg = create(&conn, new_msg(&cid, MessageRole::User, "Q")).unwrap();
+
+        let a1 = create(
+            &conn,
+            NewMessage {
+                parent_id: Some(user_msg.id.clone()),
+                ..new_msg(&cid, MessageRole::Assistant, "A1")
+            },
+        )
+        .unwrap();
+
+        let a2 = create(
+            &conn,
+            NewMessage {
+                parent_id: Some(user_msg.id.clone()),
+                sibling_order: 1,
+                is_active: false,
+                ..new_msg(&cid, MessageRole::Assistant, "A2")
+            },
+        )
+        .unwrap();
+
+        // Navigate forward: a1 (order 0) → a2 (order 1)
+        navigate_sibling(&conn, &a1.id, 1).unwrap();
+
+        let siblings = get_siblings(&conn, &user_msg.id).unwrap();
+        assert!(!siblings.iter().find(|s| s.id == a1.id).unwrap().is_active);
+        assert!(siblings.iter().find(|s| s.id == a2.id).unwrap().is_active);
+
+        // Navigate backward: a2 (order 1) → a1 (order 0)
+        navigate_sibling(&conn, &a2.id, -1).unwrap();
+
+        let siblings = get_siblings(&conn, &user_msg.id).unwrap();
+        assert!(siblings.iter().find(|s| s.id == a1.id).unwrap().is_active);
+        assert!(!siblings.iter().find(|s| s.id == a2.id).unwrap().is_active);
+    }
+
+    #[test]
+    fn navigate_sibling_errors_on_root_message() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let root = create(&conn, new_msg(&cid, MessageRole::User, "Root")).unwrap();
+
+        assert!(navigate_sibling(&conn, &root.id, 1).is_err());
+    }
+
+    #[test]
+    fn navigate_sibling_rejects_invalid_direction() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let msg = create(&conn, new_msg(&cid, MessageRole::User, "X")).unwrap();
+
+        assert!(navigate_sibling(&conn, &msg.id, 0).is_err());
+        assert!(navigate_sibling(&conn, &msg.id, 2).is_err());
+    }
+
+    #[test]
+    fn migration_v14_chains_orphaned_roots() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        // Insert messages with explicit distinct timestamps to simulate real-world
+        // pre-branching data (same-second timestamps don't exist in production data).
+        let u1_id = uuid::Uuid::new_v4().to_string();
+        let u2_id = uuid::Uuid::new_v4().to_string();
+        conn.execute_batch("PRAGMA foreign_keys = OFF;").unwrap();
+        conn.execute(
+            "INSERT INTO messages (id, conversation_id, role, content, images_json, files_json, created_at, parent_id, sibling_order, is_active)
+             VALUES (?1, ?2, 'user', 'First', '[]', '[]', '2024-01-01T00:00:00Z', NULL, 0, 1)",
+            params![u1_id, cid],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO messages (id, conversation_id, role, content, images_json, files_json, created_at, parent_id, sibling_order, is_active)
+             VALUES (?1, ?2, 'user', 'Second', '[]', '[]', '2024-01-01T00:00:01Z', NULL, 0, 1)",
+            params![u2_id, cid],
+        )
+        .unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+
+        // Re-run the migration SQL against this orphaned state.
+        conn.execute_batch(include_str!("sql/006_fix_orphan_parent_ids.sql"))
+            .unwrap();
+
+        let u2_parent: Option<String> = conn
+            .query_row(
+                "SELECT parent_id FROM messages WHERE id = ?1",
+                params![u2_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(u2_parent.as_deref(), Some(u1_id.as_str()));
+
+        let u1_parent: Option<String> = conn
+            .query_row(
+                "SELECT parent_id FROM messages WHERE id = ?1",
+                params![u1_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(u1_parent.is_none());
+    }
+
+    #[test]
     fn message_has_branching_fields() {
         let conn = in_memory_conn();
         let cid = make_conversation(&conn);
 
-        let msg = create(
-            &conn,
-            NewMessage {
-                conversation_id: cid.clone(),
-                role: MessageRole::User,
-                content: "hi".into(),
-                parent_id: None,
-                sibling_order: 0,
-                is_active: true,
-                images_json: None,
-                files_json: None,
-                tokens_used: None,
-                generation_time_ms: None,
-                prompt_tokens: None,
-                tokens_per_sec: None,
-                total_duration_ms: None,
-                load_duration_ms: None,
-                prompt_eval_duration_ms: None,
-                eval_duration_ms: None,
-                seed: None,
-            },
-        )
-        .unwrap();
+        let msg = create(&conn, new_msg(&cid, MessageRole::User, "hi")).unwrap();
 
         assert_eq!(msg.sibling_order, 0);
         assert!(msg.is_active);

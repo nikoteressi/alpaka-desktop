@@ -125,7 +125,7 @@
                       item.message.parentId
                   "
                   :class="item.outsideContext ? 'opacity-40' : ''"
-                  @edit="onEdit(item.message)"
+                  @edit-confirm="onEditConfirm(item.message, $event)"
                   @regenerate="onRegenerate"
                 />
               </DynamicScrollerItem>
@@ -222,38 +222,6 @@
       />
     </div>
   </div>
-
-  <BaseModal
-    :show="!!editingMessage"
-    title="Edit Message"
-    :show-close="true"
-    max-width="560px"
-    @close="onEditCancel"
-  >
-    <div class="p-5">
-      <textarea
-        v-model="editContent"
-        class="w-full bg-[var(--bg-base)] border border-[var(--border-strong)] rounded-lg p-3 text-sm text-[var(--text)] resize-none focus:outline-none focus:border-[var(--accent)]"
-        rows="6"
-        @keydown.ctrl.enter="onEditConfirm"
-      />
-    </div>
-    <template #footer>
-      <button
-        class="px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors rounded-lg"
-        @click="onEditCancel"
-      >
-        Cancel
-      </button>
-      <button
-        class="px-4 py-2 text-sm bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="!editContent.trim()"
-        @click="onEditConfirm"
-      >
-        Apply
-      </button>
-    </template>
-  </BaseModal>
 </template>
 
 <script setup lang="ts">
@@ -264,7 +232,6 @@ import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import MessageBubble from "./MessageBubble.vue";
 import ChatInput from "./ChatInput.vue";
 import SearchSidebar from "./SearchSidebar.vue";
-import BaseModal from "../shared/BaseModal.vue";
 import { useChatStore } from "../../stores/chat";
 import { useModelStore } from "../../stores/models";
 import { useSettingsStore } from "../../stores/settings";
@@ -314,8 +281,6 @@ const { sendMessage, stopGeneration } = useSendMessage();
 const scrollContainer = ref<HTMLElement | null>(null);
 const isAutoScrollEnabled = ref(true);
 const isSystemPromptExpanded = ref(false);
-const editingMessage = ref<Message | null>(null);
-const editContent = ref("");
 
 const messages = computed(() => chatStore.activeMessages);
 const nonSystemMessages = computed(() =>
@@ -329,12 +294,19 @@ const activePullProgress = computed(() => {
   return modelStore.pulling[currentModel] || null;
 });
 
-/** Global streaming flag, now narrowed to the active chat for the ChatInput component */
-const isStreamingForActiveChat = computed(
-  () =>
-    streaming.value.isStreaming &&
-    streaming.value.currentConversationId === chatStore.activeConversationId,
-);
+/** Global streaming flag, narrowed to the active chat and active branch.
+ *  When regenerating, hide the bubble if the regeneration's parent message is
+ *  no longer in the currently visible branch (user switched branches mid-regen). */
+const isStreamingForActiveChat = computed(() => {
+  if (!streaming.value.isStreaming) return false;
+  if (streaming.value.currentConversationId !== chatStore.activeConversationId)
+    return false;
+  const regenParentId = streaming.value.regeneratingMessageId;
+  if (regenParentId) {
+    return nonSystemMessages.value.some((m) => m.id === regenParentId);
+  }
+  return true;
+});
 
 // ---- Context boundary tracking ----
 const activeModelName = computed(
@@ -375,15 +347,30 @@ const contextBoundaryIndex = computed(() => {
 // NOT on every token during streaming.
 const pastMessageItems = computed<ScrollerItem[]>(() => {
   const boundary = contextBoundaryIndex.value;
-  return nonSystemMessages.value.map((msg, index) => ({
-    id: msg.id ? `dbmsg-${msg.id}` : `msg-${index}`,
-    message: msg,
-    isStreaming: false,
-    thinkingContent: "",
-    isThinking: false,
-    tokensPerSec: msg.tokens_per_sec ?? null,
-    outsideContext: boundary > 0 && index < boundary,
-  }));
+  const regenParentId = chatStore.streaming.regeneratingMessageId;
+  return nonSystemMessages.value
+    .map((msg, originalIndex) => ({ msg, originalIndex }))
+    .filter(({ msg }) => {
+      // Hide the old assistant response while regenerating so the new streaming
+      // bubble appears in its place rather than appending below it.
+      if (
+        regenParentId &&
+        msg.role === "assistant" &&
+        msg.parentId === regenParentId
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .map(({ msg, originalIndex }) => ({
+      id: msg.id ? `dbmsg-${msg.id}` : `msg-${originalIndex}`,
+      message: msg,
+      isStreaming: false,
+      thinkingContent: "",
+      isThinking: false,
+      tokensPerSec: msg.tokens_per_sec ?? null,
+      outsideContext: boundary > 0 && originalIndex < boundary,
+    }));
 });
 
 // Map standard messages + the currently streaming message for the scroller.
@@ -440,23 +427,9 @@ async function onStop() {
   await stopGeneration();
 }
 
-function onEdit(message: Message) {
-  editingMessage.value = message;
-  editContent.value = message.content;
-}
-
-function onEditCancel() {
-  editingMessage.value = null;
-  editContent.value = "";
-}
-
-async function onEditConfirm() {
-  const message = editingMessage.value;
-  const content = editContent.value.trim();
-  editingMessage.value = null;
-  editContent.value = "";
-
-  if (!message || !content) return;
+async function onEditConfirm(message: Message, content: string) {
+  const trimmed = content.trim();
+  if (!trimmed) return;
 
   const conversationId = chatStore.activeConversationId;
   if (!conversationId) return;
@@ -475,7 +448,7 @@ async function onEditConfirm() {
     await chatStore.refreshMessages(conversationId);
   }
 
-  await sendMessage(content);
+  await sendMessage(trimmed);
 }
 
 async function onRegenerate(messageId: string) {

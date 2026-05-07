@@ -28,7 +28,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  edit: [];
+  editConfirm: [content: string];
   regenerate: [messageId: string];
 }>();
 
@@ -36,8 +36,44 @@ const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
 const isUser = computed(() => props.message.role === "user");
 
-const { hasPrev, hasNext, versionLabel, prevVersion, nextVersion } =
-  useVersionSwitcher(props.message);
+// Inline edit state (user messages only)
+const isEditing = ref(false);
+const editContent = ref("");
+
+function startEdit() {
+  editContent.value = props.message.content;
+  isEditing.value = true;
+}
+
+function cancelEdit() {
+  isEditing.value = false;
+  editContent.value = "";
+}
+
+function applyEdit() {
+  const content = editContent.value.trim();
+  if (!content) return;
+  isEditing.value = false;
+  editContent.value = "";
+  emit("editConfirm", content);
+}
+
+// Child version switcher for user messages: navigate the active child assistant response
+const activeChild = computed<Message | null>(() => {
+  if (!isUser.value || !props.message.id) return null;
+  const convId = chatStore.activeConversationId;
+  if (!convId) return null;
+  const msgs = chatStore.messages[convId] ?? [];
+  return msgs.find((m) => m.parentId === props.message.id) ?? null;
+});
+
+const { prevVersion: childPrevVersion, nextVersion: childNextVersion } =
+  useVersionSwitcher(() => activeChild.value ?? props.message);
+
+const childCurrentVersion = computed(
+  () => (activeChild.value?.siblingOrder ?? 0) + 1,
+);
+const childTotalVersions = computed(() => activeChild.value?.siblingCount ?? 1);
 
 function onRegenerate() {
   emit("regenerate", props.message.parentId ?? "");
@@ -120,51 +156,63 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   <!-- User Message -->
   <article v-if="isUser" class="user-message group">
     <div class="user-bubble-container relative">
-      <div class="user-bubble">
+      <!-- Inline edit mode -->
+      <div v-if="isEditing" class="user-edit-container">
+        <textarea
+          v-model="editContent"
+          class="user-edit-textarea"
+          rows="4"
+          @keydown.ctrl.enter="applyEdit"
+          @keydown.escape="cancelEdit"
+        />
+        <div class="user-edit-actions">
+          <button
+            class="user-edit-btn user-edit-btn--cancel"
+            @click="cancelEdit"
+          >
+            Cancel
+          </button>
+          <button
+            class="user-edit-btn user-edit-btn--apply"
+            :disabled="!editContent.trim()"
+            @click="applyEdit"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
+      <!-- Normal display mode -->
+      <template v-else>
+        <div class="user-bubble">
+          <div
+            v-if="message.images && message.images.length > 0"
+            class="flex flex-wrap gap-2 mb-2"
+          >
+            <img
+              v-for="(img, idx) in message.images"
+              :key="idx"
+              :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
+              class="max-h-64 max-w-full rounded-lg border border-[var(--border-strong)]"
+            />
+          </div>
+          {{ message.content }}
+        </div>
         <div
-          v-if="message.images && message.images.length > 0"
-          class="flex flex-wrap gap-2 mb-2"
+          v-if="!isStreaming"
+          class="user-footer-actions opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         >
-          <img
-            v-for="(img, idx) in message.images"
-            :key="idx"
-            :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
-            class="max-h-64 max-w-full rounded-lg border border-[var(--border-strong)]"
+          <MessageActions
+            :message="message"
+            :is-user="true"
+            mode="all"
+            :current-version="childCurrentVersion"
+            :total-versions="childTotalVersions"
+            @edit="startEdit"
+            @prev-version="childPrevVersion"
+            @next-version="childNextVersion"
           />
         </div>
-        {{ message.content }}
-      </div>
-      <div
-        v-if="!isStreaming"
-        class="user-footer-actions opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-      >
-        <MessageActions
-          :message="message"
-          :is-user="true"
-          mode="all"
-          @edit="emit('edit')"
-        />
-        <div
-          v-if="versionLabel !== null"
-          class="flex items-center gap-1 text-xs text-neutral-400 mt-1 justify-end"
-        >
-          <button
-            :disabled="!hasPrev"
-            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-            @click="prevVersion"
-          >
-            &lt;
-          </button>
-          <span>{{ versionLabel }}</span>
-          <button
-            :disabled="!hasNext"
-            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-            @click="nextVersion"
-          >
-            &gt;
-          </button>
-        </div>
-      </div>
+      </template>
     </div>
   </article>
 
@@ -174,14 +222,6 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
     class="assistant-message group"
     :class="{ 'assistant-message--streaming': isStreaming }"
   >
-    <!-- Version switcher at the top right -->
-    <div
-      v-if="!isStreaming"
-      class="assistant-header-actions opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-    >
-      <MessageActions :message="message" :is-user="false" mode="version-only" />
-    </div>
-
     <div
       class="assistant-content rendered-markdown-container"
       :class="{ 'opacity-40': isRegenerating }"
@@ -272,26 +312,6 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           mode="actions-only"
           @regenerate="onRegenerate"
         />
-        <div
-          v-if="versionLabel !== null"
-          class="flex items-center gap-1 text-xs text-neutral-400 mt-1"
-        >
-          <button
-            :disabled="!hasPrev"
-            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-            @click="prevVersion"
-          >
-            &lt;
-          </button>
-          <span>{{ versionLabel }}</span>
-          <button
-            :disabled="!hasNext"
-            class="px-1 py-0.5 rounded hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-            @click="nextVersion"
-          >
-            &gt;
-          </button>
-        </div>
       </div>
     </div>
   </article>
@@ -334,17 +354,72 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   border: 1px solid var(--border-subtle);
 }
 
+.user-edit-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.user-edit-textarea {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+}
+
+.user-edit-textarea:focus {
+  border-color: var(--accent);
+}
+
+.user-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.user-edit-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.user-edit-btn--cancel {
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.user-edit-btn--cancel:hover {
+  color: var(--text);
+}
+
+.user-edit-btn--apply {
+  background: var(--accent);
+  color: white;
+}
+
+.user-edit-btn--apply:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.user-edit-btn--apply:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .assistant-message {
   padding: 12px 24px 24px;
   position: relative;
   max-width: 100%;
-}
-
-.assistant-header-actions {
-  position: absolute;
-  top: 12px;
-  right: 24px;
-  z-index: 20;
 }
 
 .assistant-footer {

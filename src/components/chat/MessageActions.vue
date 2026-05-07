@@ -6,40 +6,6 @@
       'message-actions--actions-only': mode === 'actions-only',
     }"
   >
-    <!-- Version Switcher (Branching) -->
-    <div
-      v-if="hasVersions && (mode === 'all' || mode === 'version-only')"
-      class="action-group version-switcher"
-    >
-      <button class="action-btn" @click="$emit('prev-version')">
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-        >
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-      </button>
-      <span class="version-label"
-        >{{ currentVersion }} / {{ totalVersions }}</span
-      >
-      <button class="action-btn" @click="$emit('next-version')">
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-        >
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-      </button>
-    </div>
-
     <!-- Main Actions -->
     <div
       v-if="mode === 'all' || mode === 'actions-only'"
@@ -125,6 +91,40 @@
         </svg>
       </button>
     </div>
+
+    <!-- Version Switcher (Branching) — rendered after action buttons -->
+    <div
+      v-if="hasVersions && (mode === 'all' || mode === 'version-only')"
+      class="action-group version-switcher"
+    >
+      <button class="action-btn" @click="$emit('prev-version')">
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3"
+        >
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <span class="version-label"
+        >{{ currentVersion }} / {{ totalVersions }}</span
+      >
+      <button class="action-btn" @click="$emit('next-version')">
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="3"
+        >
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -157,7 +157,12 @@ const hasVersions = computed(
 );
 
 async function handleCopy() {
-  await copy(props.message.content);
+  const content = props.isUser
+    ? props.message.content
+    : props.message.content
+        .replace(/<think[^>]*>[\s\S]*?<\/think>/g, "")
+        .trim();
+  await copy(content);
 }
 </script>
 

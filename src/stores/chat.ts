@@ -447,6 +447,15 @@ export const useChatStore = defineStore("chat", {
       }
     },
 
+    async navigateVersion(messageId: string, direction: 1 | -1): Promise<void> {
+      await invoke("navigate_version", { messageId, direction });
+      const id = this.activeConversationId;
+      if (id) {
+        delete this.messages[id];
+        await this.loadConversation(id);
+      }
+    },
+
     async refreshMessages(conversationId: string): Promise<void> {
       try {
         const rawMessages = await invoke<BackendMessage[]>("get_messages", {
