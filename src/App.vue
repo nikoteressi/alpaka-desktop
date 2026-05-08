@@ -126,6 +126,8 @@
     <main class="flex-1 min-w-0 overflow-hidden flex flex-col">
       <router-view />
     </main>
+
+    <HostManager />
   </div>
 </template>
 
@@ -150,6 +152,8 @@ import {
   IconModels,
   IconSettings,
 } from "./components/shared/icons";
+import HostManager from "./components/hosts/HostManager.vue";
+import { appEvents, APP_EVENT } from "./lib/appEvents";
 
 const route = useRoute();
 const router = useRouter();
@@ -162,7 +166,15 @@ const orchestration = useAppOrchestration();
 const { init: initStreamListeners } = useStreamingEvents();
 const { init: initCompactionListeners } = useCompactionEvents();
 const { cleanup: cleanupKeyboard } = useKeyboard();
-onUnmounted(() => cleanupKeyboard());
+
+function onOpenHostManager() {
+  hostStore.isHostManagerOpen = !hostStore.isHostManagerOpen;
+}
+
+onUnmounted(() => {
+  cleanupKeyboard();
+  appEvents.removeEventListener(APP_EVENT.OPEN_HOST_MANAGER, onOpenHostManager);
+});
 
 // Report active view to backend for smart notifications
 watch(
@@ -300,6 +312,8 @@ onMounted(async () => {
   } catch (err) {
     console.error("[App] Critical init failure:", err);
   }
+
+  appEvents.addEventListener(APP_EVENT.OPEN_HOST_MANAGER, onOpenHostManager);
 });
 </script>
 
