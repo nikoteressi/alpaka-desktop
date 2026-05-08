@@ -1350,12 +1350,16 @@ describe("ChatInput — folder file picker", () => {
       openFilePicker: (ctx: object) => void;
     };
 
-    expect(wrapper.findComponent({ name: "FolderFilePickerModal" }).exists()).toBe(false);
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
 
     vm.openFilePicker(makeLinkedContext());
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.findComponent({ name: "FolderFilePickerModal" }).exists()).toBe(true);
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(true);
   });
 
   it("FolderFilePickerModal @apply calls updateContextFiles and closes modal", async () => {
@@ -1385,7 +1389,9 @@ describe("ChatInput — folder file picker", () => {
       42,
       "new content",
     );
-    expect(wrapper.findComponent({ name: "FolderFilePickerModal" }).exists()).toBe(false);
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
   });
 
   it("FolderFilePickerModal @detach calls unlink_folder and closes modal", async () => {
@@ -1408,8 +1414,12 @@ describe("ChatInput — folder file picker", () => {
     await new Promise((r) => setTimeout(r, 0));
     await wrapper.vm.$nextTick();
 
-    expect(mockInvoke).toHaveBeenCalledWith("unlink_folder", { id: "ctx-picker-1" });
-    expect(wrapper.findComponent({ name: "FolderFilePickerModal" }).exists()).toBe(false);
+    expect(mockInvoke).toHaveBeenCalledWith("unlink_folder", {
+      id: "ctx-picker-1",
+    });
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
   });
 
   it("FolderFilePickerModal @close clears pickerContext and hides modal", async () => {
@@ -1426,12 +1436,16 @@ describe("ChatInput — folder file picker", () => {
     vm.openFilePicker(makeLinkedContext());
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.findComponent({ name: "FolderFilePickerModal" }).exists()).toBe(true);
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(true);
 
     const modal = wrapper.findComponent({ name: "FolderFilePickerModal" });
     await modal.vm.$emit("close");
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.findComponent({ name: "FolderFilePickerModal" }).exists()).toBe(false);
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
   });
 });
