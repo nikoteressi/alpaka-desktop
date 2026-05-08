@@ -106,7 +106,6 @@
                   item.isThinking,
                   item.tokensPerSec,
                   chatStore.expandedStats.has(item.id),
-                  chatStore.editingMessageId === item.id,
                 ]"
                 :data-index="index"
               >
@@ -126,7 +125,7 @@
                       item.message.parentId
                   "
                   :class="item.outsideContext ? 'opacity-40' : ''"
-                  @edit-confirm="onEditConfirm(item.message, $event)"
+                  @edit="onEdit(item.message)"
                   @regenerate="onRegenerate"
                 />
               </DynamicScrollerItem>
@@ -231,6 +230,13 @@
       />
     </div>
   </div>
+
+  <EditMessageModal
+    :open="editModalOpen"
+    :initial-content="editModalMessage?.content ?? ''"
+    @confirm="onEditConfirm"
+    @cancel="onEditCancel"
+  />
 </template>
 
 <script setup lang="ts">
@@ -241,6 +247,7 @@ import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import MessageBubble from "./MessageBubble.vue";
 import ChatInput from "./ChatInput.vue";
 import SearchSidebar from "./SearchSidebar.vue";
+import EditMessageModal from "./EditMessageModal.vue";
 import { useChatStore } from "../../stores/chat";
 import { useModelStore } from "../../stores/models";
 import { useSettingsStore } from "../../stores/settings";
@@ -290,6 +297,9 @@ const { sendMessage, stopGeneration } = useSendMessage();
 const scrollContainer = ref<HTMLElement | null>(null);
 const isAutoScrollEnabled = ref(true);
 const isSystemPromptExpanded = ref(false);
+
+const editModalOpen = ref(false);
+const editModalMessage = ref<Message | null>(null);
 
 const messages = computed(() => chatStore.activeMessages);
 const nonSystemMessages = computed(() =>
@@ -436,9 +446,16 @@ async function onStop() {
   await stopGeneration();
 }
 
-async function onEditConfirm(message: Message, content: string) {
-  const trimmed = content.trim();
-  if (!trimmed) return;
+function onEdit(message: Message) {
+  editModalMessage.value = message;
+  editModalOpen.value = true;
+}
+
+async function onEditConfirm(content: string) {
+  editModalOpen.value = false;
+  const message = editModalMessage.value;
+  editModalMessage.value = null;
+  if (!message) return;
 
   const conversationId = chatStore.activeConversationId;
   if (!conversationId) return;
@@ -457,7 +474,12 @@ async function onEditConfirm(message: Message, content: string) {
     await chatStore.refreshMessages(conversationId);
   }
 
-  await sendMessage(trimmed);
+  await sendMessage(content);
+}
+
+function onEditCancel() {
+  editModalOpen.value = false;
+  editModalMessage.value = null;
 }
 
 async function onRegenerate(messageId: string) {

@@ -12,14 +12,7 @@
       class="action-group main-actions-row"
     >
       <CustomTooltip v-if="isUser" text="Edit" wrapper-class="inline-flex">
-        <!-- pointerdown.prevent fires before focus-change events, making the
-             first click reliable on WebKitGTK/Wayland. prevent stops the
-             button from stealing focus from the page. -->
-        <button
-          class="action-btn"
-          aria-label="Edit"
-          @pointerdown.prevent="$emit('edit')"
-        >
+        <button class="action-btn" aria-label="Edit" @click="$emit('edit')">
           <svg
             width="14"
             height="14"

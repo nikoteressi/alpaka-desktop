@@ -13,7 +13,6 @@ import { useSettingsStore } from "../../stores/settings";
 import { uint8ArrayToBase64 } from "../../stores/chat";
 import { parseMessageParts } from "../../lib/messageParser";
 import { useVersionSwitcher } from "../../composables/useVersionSwitcher";
-import { useInlineEdit } from "../../composables/useInlineEdit";
 
 const props = defineProps<{
   message: Message;
@@ -29,47 +28,13 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  editConfirm: [content: string];
+  edit: [];
   regenerate: [messageId: string];
 }>();
 
 const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
 const isUser = computed(() => props.message.role === "user");
-
-// Inline edit state (user messages only).
-// useInlineEdit uses a module-level cache keyed by convId+messageId so the
-// state survives DynamicScroller pool-slot remounts (same pattern as useCollapsibleState).
-const {
-  isEditing,
-  editContent,
-  editContainerRef,
-  editTextareaRef,
-  startEdit: _startEdit,
-  cancelEdit: _cancelEdit,
-  applyEdit: _applyEdit,
-  onInput: onEditInput,
-} = useInlineEdit({
-  messageKey: props.messageId ?? props.message.id ?? null,
-  initialContent: () => props.message.content,
-});
-
-function startEdit() {
-  chatStore.setEditingMessage(props.messageId ?? props.message.id ?? null);
-  _startEdit();
-}
-
-function cancelEdit() {
-  chatStore.setEditingMessage(null);
-  _cancelEdit();
-}
-
-function applyEdit() {
-  const content = _applyEdit();
-  if (!content) return;
-  chatStore.setEditingMessage(null);
-  emit("editConfirm", content);
-}
 
 // Child version switcher for user messages: navigate the active child assistant response
 const activeChild = computed<Message | null>(() => {
@@ -169,70 +134,32 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   <!-- User Message -->
   <article v-if="isUser" data-role="user" class="user-message">
     <div class="user-bubble-container relative">
-      <!-- Inline edit mode -->
-      <div
-        ref="editContainerRef"
-        v-show="isEditing"
-        class="user-edit-container"
-      >
-        <textarea
-          ref="editTextareaRef"
-          v-model="editContent"
-          class="user-edit-textarea"
-          rows="4"
-          @input="onEditInput"
-          @keydown.ctrl.enter="applyEdit"
-          @keydown.escape="cancelEdit"
-        />
-        <div class="user-edit-actions">
-          <div class="edit-pill">
-            <!-- pointerdown.prevent fires before any focus/blur processing,
-                 making it reliable on WebKitGTK/Wayland where @click can
-                 miss when a textarea focus-change happens between mousedown
-                 and click. prevent stops the button from stealing focus. -->
-            <button class="edit-pill__btn" @pointerdown.prevent="cancelEdit">
-              Cancel
-            </button>
-            <span class="edit-pill__sep"></span>
-            <button
-              class="edit-pill__btn edit-pill__btn--apply"
-              :disabled="!editContent.trim() || editContent === message.content"
-              @click="applyEdit"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      </div>
-      <!-- Normal display mode -->
-      <template v-if="!isEditing">
-        <div class="user-bubble">
-          <div
-            v-if="message.images && message.images.length > 0"
-            class="flex flex-wrap gap-2 mb-2"
-          >
-            <img
-              v-for="(img, idx) in message.images"
-              :key="idx"
-              :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
-              class="max-h-64 max-w-full rounded-lg border border-[var(--border-strong)]"
-            />
-          </div>
-          {{ message.content }}
-        </div>
-        <div v-if="!isStreaming" class="user-footer-actions">
-          <MessageActions
-            :message="message"
-            :is-user="true"
-            mode="all"
-            :current-version="childCurrentVersion"
-            :total-versions="childTotalVersions"
-            @edit="startEdit"
-            @prev-version="childPrevVersion"
-            @next-version="childNextVersion"
+      <div class="user-bubble">
+        <div
+          v-if="message.images && message.images.length > 0"
+          class="flex flex-wrap gap-2 mb-2"
+        >
+          <img
+            v-for="(img, idx) in message.images"
+            :key="idx"
+            :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
+            class="max-h-64 max-w-full rounded-lg border border-[var(--border-strong)]"
           />
         </div>
-      </template>
+        {{ message.content }}
+      </div>
+      <div v-if="!isStreaming" class="user-footer-actions">
+        <MessageActions
+          :message="message"
+          :is-user="true"
+          mode="all"
+          :current-version="childCurrentVersion"
+          :total-versions="childTotalVersions"
+          @edit="emit('edit')"
+          @prev-version="childPrevVersion"
+          @next-version="childNextVersion"
+        />
+      </div>
     </div>
   </article>
 
@@ -369,79 +296,6 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
   white-space: pre-wrap;
   word-break: break-word;
   border: 1px solid var(--border-subtle);
-}
-
-.user-edit-container {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.user-edit-textarea {
-  width: 100%;
-  background: var(--bg-user-msg);
-  border: 1px solid var(--border-strong);
-  border-radius: 18px;
-  border-top-right-radius: 4px;
-  padding: 8px 14px;
-  font-size: 14px;
-  color: var(--text);
-  line-height: 1.5;
-  resize: none;
-  outline: none;
-  font-family: inherit;
-  overflow-y: auto;
-  max-height: 320px;
-}
-
-.user-edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-right: 2px;
-}
-
-.edit-pill {
-  display: inline-flex;
-  align-items: center;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.edit-pill__btn {
-  background: none;
-  border: none;
-  padding: 3px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-}
-
-.edit-pill__btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.edit-pill__btn--apply {
-  color: var(--text);
-  font-weight: 600;
-}
-
-.edit-pill__btn--apply:disabled {
-  color: var(--text-dim);
-  cursor: not-allowed;
-}
-
-.edit-pill__sep {
-  width: 1px;
-  height: 16px;
-  background: var(--border-strong);
-  flex-shrink: 0;
 }
 
 .assistant-message {

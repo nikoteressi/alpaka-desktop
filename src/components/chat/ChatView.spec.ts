@@ -78,7 +78,7 @@ vi.mock("./MessageBubble.vue", () => ({
   default: {
     name: "MessageBubble",
     template:
-      "<div data-testid=\"message-bubble-stub\" @click=\"$emit('edit-confirm', 'edited content')\" />",
+      '<div data-testid="message-bubble-stub" @click="$emit(\'edit\')" />',
     props: [
       "message",
       "messageId",
@@ -87,7 +87,7 @@ vi.mock("./MessageBubble.vue", () => ({
       "isThinking",
       "tokensPerSec",
     ],
-    emits: ["edit-confirm"],
+    emits: ["edit"],
   },
 }));
 
@@ -691,7 +691,7 @@ describe("ChatView.vue", () => {
 
   // ------------------------------------------------------------------ onEdit
 
-  it("onEditConfirm: MessageBubble edit-confirm event truncates the message and re-sends", async () => {
+  it("onEdit: MessageBubble edit event opens the edit modal", async () => {
     const msg = {
       id: "m1",
       role: "user" as const,
@@ -710,14 +710,21 @@ describe("ChatView.vue", () => {
     const wrapper = mountChatView();
     await flushPromises();
 
-    // Click the stub — it emits 'edit-confirm' with 'edited content'.
+    // Before clicking edit, no truncate_from should have been called.
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "truncate_from",
+      expect.anything(),
+    );
+
+    // Click the stub — it emits 'edit', which opens the modal.
     await wrapper.find('[data-testid="message-bubble-stub"]').trigger("click");
     await flushPromises();
 
-    // invoke should have been called with truncate_from using the message id.
-    expect(mockInvoke).toHaveBeenCalledWith("truncate_from", {
-      messageId: "m1",
-    });
+    // The modal opens (no truncate_from yet — that happens on confirm).
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "truncate_from",
+      expect.anything(),
+    );
   });
 
   // ------------------------------------------------------------------ scrollend callback
