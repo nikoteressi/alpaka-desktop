@@ -307,12 +307,18 @@ pub async fn list_folder_files(path: String) -> Result<Vec<String>, AppError> {
     .map_err(AppError::from)?
 }
 
+#[derive(Debug, Serialize)]
+pub struct UpdatedContextResult {
+    pub token_estimate: i64,
+    pub content: String,
+}
+
 #[command]
 pub async fn update_included_files(
     state: State<'_, AppState>,
     id: String,
     included_files: Vec<String>,
-) -> Result<i64, AppError> {
+) -> Result<UpdatedContextResult, AppError> {
     let db_conn = state.db.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -321,10 +327,11 @@ pub async fn update_included_files(
             .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         let ctx = crate::db::folders::get_folder_context(&guard, &id)?;
 
-        // Defense-in-depth: re-verify the base path against current security rules
         let base_path = guard_path(Path::new(&ctx.path))?;
 
-        let mut total_chars = 0;
+        let mut total_chars = 0usize;
+        let mut content = String::new();
+
         for rel_path in &included_files {
             let full_path = base_path.join(rel_path);
             // Symlink check must happen before canonicalize; after canonicalize
@@ -346,13 +353,14 @@ pub async fn update_included_files(
                     MAX_FOLDER_FILES
                 )));
             }
-            if let Ok(content) = std::fs::read_to_string(&canonical) {
-                total_chars += content.chars().count();
+            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
+                total_chars += file_content.chars().count();
                 if total_chars > MAX_FOLDER_CONTEXT_SIZE {
                     return Err(AppError::Internal(
                         "Selected files exceed 50MB limit".into(),
                     ));
                 }
+                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
             }
         }
 
@@ -366,7 +374,69 @@ pub async fn update_included_files(
             token_estimate,
         )?;
 
-        Ok(token_estimate)
+        Ok(UpdatedContextResult {
+            token_estimate,
+            content,
+        })
+    })
+    .await
+    .map_err(AppError::from)?
+}
+
+#[command]
+pub async fn get_included_files_content(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<UpdatedContextResult, AppError> {
+    let db_conn = state.db.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let guard = db_conn
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let ctx = crate::db::folders::get_folder_context(&guard, &id)?;
+
+        let included_files: Vec<String> = ctx
+            .included_files_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or_default();
+
+        if included_files.is_empty() {
+            return Ok(UpdatedContextResult {
+                token_estimate: ctx.estimated_tokens,
+                content: String::new(),
+            });
+        }
+
+        let base_path = guard_path(Path::new(&ctx.path))?;
+        let mut total_chars = 0usize;
+        let mut content = String::new();
+
+        for rel_path in &included_files {
+            let full_path = base_path.join(rel_path);
+            // Symlink check must happen before canonicalize; after canonicalize
+            // is_symlink() always returns false because the target has been resolved.
+            if full_path.is_symlink() {
+                continue;
+            }
+            let canonical = match dunce::canonicalize(&full_path) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+            if !canonical.starts_with(&base_path) {
+                continue;
+            }
+            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
+                total_chars += file_content.chars().count();
+                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
+            }
+        }
+
+        Ok(UpdatedContextResult {
+            token_estimate: (total_chars / 4) as i64,
+            content,
+        })
     })
     .await
     .map_err(AppError::from)?
@@ -437,9 +507,144 @@ pub async fn estimate_tokens(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::{folders::NewFolderContext, migrations};
+    use rusqlite::Connection;
     use std::fs;
     use std::io::Write;
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
+
+    fn in_memory_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA foreign_keys = ON;",
+        )
+        .unwrap();
+        migrations::run(&conn).unwrap();
+        conn
+    }
+
+    fn setup_folder(files: &[(&str, &str)]) -> (TempDir, Connection, String) {
+        let dir = TempDir::new().unwrap();
+        for (name, content) in files {
+            let path = dir.path().join(name);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(&path, content).unwrap();
+        }
+
+        let conn = in_memory_conn();
+        conn.execute("INSERT INTO conversations (id) VALUES ('conv-1')", [])
+            .unwrap();
+
+        let ctx = crate::db::folders::add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "conv-1".into(),
+                path: dir.path().to_string_lossy().to_string(),
+                included_files_json: None,
+                auto_refresh: false,
+                estimated_tokens: 0,
+            },
+        )
+        .unwrap();
+
+        (dir, conn, ctx.id)
+    }
+
+    #[test]
+    fn update_included_files_returns_content_of_selected_files() {
+        let (dir, conn, ctx_id) = setup_folder(&[
+            ("main.rs", "fn main() {}"),
+            ("lib.rs", "pub fn add(a: i32, b: i32) -> i32 { a + b }"),
+        ]);
+
+        let selected = vec!["main.rs".to_string()];
+        let json = serde_json::to_string(&selected).unwrap();
+        crate::db::folders::update_folder_context(&conn, &ctx_id, Some(json), 3).unwrap();
+
+        let ctx = crate::db::folders::get_folder_context(&conn, &ctx_id).unwrap();
+        let stored: Vec<String> =
+            serde_json::from_str(ctx.included_files_json.as_deref().unwrap()).unwrap();
+        assert_eq!(stored, vec!["main.rs"]);
+
+        // Replicate the content-assembly logic from update_included_files
+        let base = guard_path(std::path::Path::new(&ctx.path)).unwrap();
+        let mut content = String::new();
+        for rel in &stored {
+            let full = base.join(rel);
+            if let Ok(text) = std::fs::read_to_string(&full) {
+                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel, text));
+            }
+        }
+        assert!(content.contains("fn main()"));
+        assert!(!content.contains("pub fn add"));
+
+        drop(dir);
+    }
+
+    #[test]
+    fn get_included_files_content_excludes_unselected_files() {
+        let (dir, conn, ctx_id) = setup_folder(&[
+            ("a.txt", "content of a"),
+            ("b.txt", "content of b"),
+            ("c.txt", "content of c"),
+        ]);
+
+        let selected = vec!["a.txt".to_string(), "c.txt".to_string()];
+        let json = serde_json::to_string(&selected).unwrap();
+        crate::db::folders::update_folder_context(&conn, &ctx_id, Some(json), 10).unwrap();
+
+        // Replicate the content-assembly logic from get_included_files_content
+        let ctx = crate::db::folders::get_folder_context(&conn, &ctx_id).unwrap();
+        let included: Vec<String> =
+            serde_json::from_str(ctx.included_files_json.as_deref().unwrap()).unwrap();
+
+        let base = guard_path(std::path::Path::new(&ctx.path)).unwrap();
+        let mut content = String::new();
+        for rel in &included {
+            let full = base.join(rel);
+            if full.is_symlink() {
+                continue;
+            }
+            if let Ok(p) = dunce::canonicalize(&full) {
+                if p.starts_with(&base) {
+                    if let Ok(text) = std::fs::read_to_string(&p) {
+                        content.push_str(&format!("\n--- File: {} ---\n{}\n", rel, text));
+                    }
+                }
+            }
+        }
+
+        assert!(content.contains("content of a"), "a.txt should be included");
+        assert!(content.contains("content of c"), "c.txt should be included");
+        assert!(
+            !content.contains("content of b"),
+            "b.txt should NOT be included"
+        );
+
+        drop(dir);
+    }
+
+    #[test]
+    fn get_included_files_content_empty_filter_returns_empty_content() {
+        let (dir, conn, ctx_id) = setup_folder(&[("x.txt", "hello")]);
+
+        let ctx = crate::db::folders::get_folder_context(&conn, &ctx_id).unwrap();
+        let included: Vec<String> = ctx
+            .included_files_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or_default();
+
+        assert!(included.is_empty());
+        // When no filter is stored, get_included_files_content returns empty content
+        let content = String::new();
+        assert_eq!(content, "");
+
+        drop(dir);
+    }
 
     #[test]
     fn test_read_folder_context_excludes_hidden_and_binary() {

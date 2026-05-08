@@ -81,6 +81,7 @@ export interface LinkedContext {
   path: string;
   content: string;
   tokens: number;
+  includedFiles?: string[]; // undefined = all files included (no filter)
 }
 
 export interface ChatDraft {
@@ -176,6 +177,7 @@ export interface FolderContextPayload {
   path: string;
   name?: string;
   token_count?: number;
+  included_files_json?: string | null;
 }
 
 export interface StreamingCallbacks {

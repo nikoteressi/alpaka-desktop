@@ -1302,3 +1302,150 @@ describe("ChatInput — handleCompact", () => {
     expect(compactSpy).toHaveBeenCalled();
   });
 });
+
+describe("ChatInput — folder file picker", () => {
+  const folderPickerStub = {
+    name: "FolderFilePickerModal",
+    template: '<div data-test="picker-modal-stub" />',
+    emits: ["apply", "detach", "close"],
+  };
+
+  function mountWithPicker() {
+    return mount(ChatInput, {
+      props: { isStreaming: false },
+      global: {
+        stubs: { FolderFilePickerModal: folderPickerStub },
+      },
+    });
+  }
+
+  function makeLinkedContext() {
+    return {
+      id: "ctx-picker-1",
+      name: "notes.txt",
+      path: "/home/user/notes.txt",
+      content: "file content",
+      tokens: 20,
+    };
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      if (cmd === "unlink_folder") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("openFilePicker sets pickerContext and renders FolderFilePickerModal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(true);
+  });
+
+  it("FolderFilePickerModal @apply calls updateContextFiles and closes modal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const updateSpy = vi.spyOn(chatStore, "updateContextFiles");
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    const modal = wrapper.findComponent({ name: "FolderFilePickerModal" });
+    await modal.vm.$emit("apply", ["file-a.txt"], 42, "new content");
+    await wrapper.vm.$nextTick();
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      "conv-test-1",
+      "ctx-picker-1",
+      ["file-a.txt"],
+      42,
+      "new content",
+    );
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+  });
+
+  it("FolderFilePickerModal @detach calls unlink_folder and closes modal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    const modal = wrapper.findComponent({ name: "FolderFilePickerModal" });
+    await modal.vm.$emit("detach");
+    // handlePickerDetach is async — wait for unlink_folder to resolve
+    await new Promise((r) => setTimeout(r, 0));
+    await wrapper.vm.$nextTick();
+
+    expect(mockInvoke).toHaveBeenCalledWith("unlink_folder", {
+      id: "ctx-picker-1",
+    });
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+  });
+
+  it("FolderFilePickerModal @close clears pickerContext and hides modal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(true);
+
+    const modal = wrapper.findComponent({ name: "FolderFilePickerModal" });
+    await modal.vm.$emit("close");
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+  });
+});

@@ -12,6 +12,7 @@ import type {
   SearchResult,
 } from "../types/chat";
 import { DRAFT_ID_PREFIX } from "../lib/constants";
+import { tauriApi } from "../lib/tauri";
 
 export interface StreamFinalizeStats {
   totalTokens?: number;
@@ -377,21 +378,47 @@ export const useChatStore = defineStore("chat", {
         // Read contents of folders for the model context
         const populatedContexts = await Promise.all(
           (dbContexts || []).map(async (ctx) => {
-            const payload = await invoke<{
-              content: string;
-              token_estimate: number;
-            }>("link_folder", {
-              conversationId: id,
-              path: ctx.path,
-              // Optimization: if we already had a command to just read content, we'd use it.
-              // link_folder is safe and idempotent.
-            });
+            // Parse included files first
+            let includedFiles: string[] | undefined;
+            if (ctx.included_files_json) {
+              try {
+                const parsed = JSON.parse(ctx.included_files_json) as string[];
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  includedFiles = parsed;
+                }
+              } catch {
+                // malformed JSON — treat as no filter
+              }
+            }
+
+            let content: string;
+            let tokens: number;
+
+            if (includedFiles) {
+              // User has a file selection — fetch only those files' content
+              const filtered = await tauriApi.getIncludedFilesContent(ctx.id);
+              content = filtered.content;
+              tokens = filtered.token_estimate;
+            } else {
+              // No filter — read the whole folder
+              const payload = await invoke<{
+                content: string;
+                token_estimate: number;
+              }>("link_folder", {
+                conversationId: id,
+                path: ctx.path,
+              });
+              content = payload.content;
+              tokens = payload.token_estimate;
+            }
+
             return {
               id: ctx.id,
               name: ctx.path.split("/").pop() || ctx.path,
               path: ctx.path,
-              content: payload.content,
-              tokens: payload.token_estimate,
+              content,
+              tokens,
+              includedFiles,
             };
           }),
         );
@@ -423,6 +450,23 @@ export const useChatStore = defineStore("chat", {
         this.folderContexts[conversationId] = this.folderContexts[
           conversationId
         ].filter((c) => c.id !== contextId);
+      }
+    },
+
+    updateContextFiles(
+      conversationId: string,
+      contextId: string,
+      files: string[],
+      tokens: number,
+      content: string,
+    ) {
+      const ctx = this.folderContexts[conversationId]?.find(
+        (c) => c.id === contextId,
+      );
+      if (ctx) {
+        ctx.includedFiles = files.length > 0 ? files : undefined;
+        ctx.tokens = tokens;
+        ctx.content = content;
       }
     },
 

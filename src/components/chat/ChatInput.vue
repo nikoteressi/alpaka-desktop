@@ -14,6 +14,7 @@ import { useDraftSync } from "../../composables/useDraftSync";
 import { useUndoHistory } from "../../composables/useUndoHistory";
 import { appEvents, APP_EVENT } from "../../lib/appEvents";
 import type { ChatOptions } from "../../types/settings";
+import type { LinkedContext } from "../../types/chat";
 
 // Components
 import SystemPromptPanel from "./input/SystemPromptPanel.vue";
@@ -25,6 +26,7 @@ import AdvancedChatOptions from "./input/AdvancedChatOptions.vue";
 import CustomTooltip from "../shared/CustomTooltip.vue";
 import AttachMenu from "./input/AttachMenu.vue";
 import ChatInputComposer from "./input/ChatInputComposer.vue";
+import FolderFilePickerModal from "./input/FolderFilePickerModal.vue";
 
 const props = defineProps<{
   isStreaming: boolean;
@@ -118,6 +120,38 @@ async function removeContext(contextId: string) {
 const linkedContexts = computed(
   () => chatStore.folderContexts[activeConvId.value ?? ""] ?? [],
 );
+
+const pickerContext = ref<LinkedContext | null>(null);
+
+function openFilePicker(ctx: LinkedContext) {
+  pickerContext.value = ctx;
+}
+
+function closeFilePicker() {
+  pickerContext.value = null;
+}
+
+async function handlePickerApply(
+  files: string[],
+  tokens: number,
+  content: string,
+) {
+  if (!activeConvId.value || !pickerContext.value) return;
+  chatStore.updateContextFiles(
+    activeConvId.value,
+    pickerContext.value.id,
+    files,
+    tokens,
+    content,
+  );
+  closeFilePicker();
+}
+
+async function handlePickerDetach() {
+  if (!pickerContext.value) return;
+  await removeContext(pickerContext.value.id);
+  closeFilePicker();
+}
 
 // ---- System prompt ----
 const isSystemPromptOpen = ref(false);
@@ -555,7 +589,8 @@ onBeforeUnmount(() => {
         <div
           v-for="ctx in linkedContexts"
           :key="ctx.id"
-          class="flex items-center gap-1.5 px-2 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-lg"
+          class="flex items-center gap-1.5 px-2 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-lg cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+          @click="openFilePicker(ctx)"
         >
           <svg
             v-if="ctx.path.includes('.')"
@@ -590,7 +625,7 @@ onBeforeUnmount(() => {
             >~{{ ctx.tokens.toLocaleString() }}</span
           >
           <button
-            @click="removeContext(ctx.id)"
+            @click.stop="removeContext(ctx.id)"
             class="p-0.5 rounded hover:bg-[var(--bg-active)] text-[var(--text-dim)] hover:text-[var(--text-muted)] cursor-pointer transition-colors"
           >
             <svg
@@ -923,4 +958,18 @@ onBeforeUnmount(() => {
       </div>
     </div>
   </div>
+
+  <FolderFilePickerModal
+    v-if="pickerContext"
+    :show="!!pickerContext"
+    :contextId="pickerContext.id"
+    :contextName="pickerContext.name"
+    :contextPath="pickerContext.path"
+    :includedFiles="pickerContext.includedFiles"
+    @apply="
+      (files, tokens, content) => handlePickerApply(files, tokens, content)
+    "
+    @detach="handlePickerDetach"
+    @close="closeFilePicker"
+  />
 </template>

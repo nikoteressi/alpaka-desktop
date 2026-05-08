@@ -421,13 +421,18 @@ describe("tauriApi", () => {
     expect(invoke).toHaveBeenCalledWith("list_folder_files", { path: "/docs" });
   });
 
-  it("updateIncludedFiles calls invoke with folderId and includedFiles", async () => {
-    vi.mocked(invoke).mockResolvedValueOnce(undefined);
-    await tauriApi.updateIncludedFiles("f1", ["a.md", "b.md"]);
+  it("updateIncludedFiles calls invoke with id and includedFiles", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({
+      token_estimate: 50,
+      content: "file content",
+    });
+    const result = await tauriApi.updateIncludedFiles("f1", ["a.md", "b.md"]);
     expect(invoke).toHaveBeenCalledWith("update_included_files", {
-      folderId: "f1",
+      id: "f1",
       includedFiles: ["a.md", "b.md"],
     });
+    expect(result.token_estimate).toBe(50);
+    expect(result.content).toBe("file content");
   });
 
   it("estimateTokens calls invoke with folderId", async () => {
