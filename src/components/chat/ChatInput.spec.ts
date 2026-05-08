@@ -1289,7 +1289,7 @@ describe("ChatInput — handleCompact", () => {
 
     const compactSpy = vi
       .spyOn(chatStore, "compactConversation")
-      .mockResolvedValue("new-conv-id");
+      .mockResolvedValue();
     vi.spyOn(chatStore, "loadConversation").mockResolvedValue();
 
     const wrapper = mountInput();
