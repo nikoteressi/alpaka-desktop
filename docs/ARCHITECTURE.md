@@ -155,7 +155,7 @@ alpaka-desktop/
 │   │
 │   ├── stores/                   # Pinia state management
 │   │   ├── auth.ts               # Auth state, signin flow
-│   │   ├── chat.ts               # Conversations, messages, streaming state
+│   │   ├── chat.ts               # Conversations, messages, streaming state; `updateContextFiles(convId, ctxId, files, tokens, content)` updates `includedFiles`, `tokens`, and `content` on a linked context in place
 │   │   ├── hosts.ts              # Host list, active host, health status
 │   │   ├── models.ts             # Model list, pull progress
 │   │   ├── settings.ts           # User preferences
@@ -203,6 +203,7 @@ alpaka-desktop/
 │   │   │       ├── AttachmentList.vue
 │   │   │       ├── ContextBar.vue
 │   │   │       ├── ContextPill.vue
+│   │   │       ├── FolderFilePickerModal.vue  # Modal for selecting which files from a linked folder are included as LLM context
 │   │   │       ├── ModelSelector.vue
 │   │   │       └── SystemPromptPanel.vue
 │   │   ├── hosts/
@@ -376,7 +377,8 @@ tauri::generate_handler![
     commands::folders::unlink_folder,
     commands::folders::get_folder_contexts,
     commands::folders::list_folder_files,
-    commands::folders::update_included_files,
+    commands::folders::update_included_files,   // → UpdatedContextResult { token_estimate, content }
+    commands::folders::get_included_files_content, // read-only; returns filtered content from DB-persisted included_files_json
     commands::folders::estimate_tokens,
 
     // ── Ollama Library ────────────────────────────────────────────────────
