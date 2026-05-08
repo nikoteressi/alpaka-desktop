@@ -45,7 +45,7 @@ describe("parseMessageParts", () => {
     const parts = parseMessageParts(content, { renderMarkdown: rm });
     const think = parts.find((p) => p.type === "think");
     expect(think).toBeDefined();
-    expect(think?.language).toBe("2.5");
+    expect(think?.thinkDuration).toBe(2.5);
     expect(think?.content).toBe("inner reasoning");
   });
 
@@ -54,7 +54,7 @@ describe("parseMessageParts", () => {
     const parts = parseMessageParts(content, { renderMarkdown: rm });
     const think = parts.find((p) => p.type === "think");
     expect(think).toBeDefined();
-    expect(think?.language).toBeUndefined();
+    expect(think?.thinkDuration).toBeUndefined();
     expect(think?.content).toBe("some thought");
   });
 

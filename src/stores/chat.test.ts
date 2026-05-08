@@ -247,42 +247,34 @@ describe("useChatStore", () => {
 
   // --- compactConversation ---
 
-  it("compactConversation calls invoke('compact_conversation') and returns the new conversation ID", async () => {
+  it("compactConversation calls invoke('compact_conversation') with conversationId and model", async () => {
     const store = useChatStore();
     mockInvoke.mockImplementation(async (cmd, _args) => {
-      if (cmd === "compact_conversation") return "new-conv-id";
-      if (cmd === "list_conversations") return [];
-      if (cmd === "get_folder_contexts") return [];
-      return null;
-    });
-
-    const result = await store.compactConversation(
-      "old-conv-id",
-      "llama3:latest",
-      "Compacted",
-    );
-    expect(result).toBe("new-conv-id");
-    expect(mockInvoke).toHaveBeenCalledWith("compact_conversation", {
-      conversationId: "old-conv-id",
-      model: "llama3:latest",
-      title: "Compacted",
-    });
-  });
-
-  it("compactConversation calls loadConversations(true) after compacting", async () => {
-    const store = useChatStore();
-    mockInvoke.mockImplementation(async (cmd) => {
-      if (cmd === "compact_conversation") return "new-conv-id";
-      if (cmd === "list_conversations") return [];
+      if (cmd === "compact_conversation") return null;
+      if (cmd === "get_messages") return [];
       if (cmd === "get_folder_contexts") return [];
       return null;
     });
 
     await store.compactConversation("old-conv-id", "llama3:latest");
-    expect(mockInvoke).toHaveBeenCalledWith("list_conversations", {
-      limit: 20,
-      offset: 0,
+    expect(mockInvoke).toHaveBeenCalledWith("compact_conversation", {
+      conversationId: "old-conv-id",
+      model: "llama3:latest",
     });
+  });
+
+  it("compactConversation does not reload messages itself (compact:done event owns that)", async () => {
+    const store = useChatStore();
+    store.activeConversationId = "old-conv-id";
+    mockInvoke.mockResolvedValue(null);
+
+    await store.compactConversation("old-conv-id", "llama3:latest");
+
+    // Reload is delegated to the compact:done event handler, not done inline.
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "get_messages",
+      expect.anything(),
+    );
   });
 
   it("loadConversations handles pagination and appends to existing list", async () => {

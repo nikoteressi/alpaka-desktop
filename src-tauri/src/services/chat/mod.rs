@@ -31,11 +31,20 @@ pub struct SendParams {
     pub original_content: String,
 }
 
-/// Parameters for the `ChatService::compact()` lifecycle.
+/// Parameters for the `ChatService::compact_in_place()` lifecycle.
 pub struct CompactParams {
     pub conversation_id: String,
     pub model: String,
-    pub title: Option<String>,
+}
+
+/// Parameters for `ChatService::send_regenerate()`.
+pub struct RegenerateParams {
+    pub conversation_id: String,
+    pub parent_message_id: String,
+    pub model: String,
+    pub think_mode: Option<String>,
+    pub chat_options: Option<crate::ollama::types::ChatOptions>,
+    pub web_search_enabled: bool,
 }
 
 /// A service for orchestrating chat streams and the agent loop.
@@ -81,17 +90,26 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let msg_content = content.clone();
         let imgs = base64_images.clone();
 
-        let history = spawn_db(self.state.db.clone(), move |conn| {
+        let (history, user_msg_id) = spawn_db(self.state.db.clone(), move |conn| {
             let images_json = imgs
                 .map(|i| serde_json::to_string(&i).map_err(AppError::from))
                 .transpose()?;
 
-            messages::create(
+            // Chain the new user message to the last active message so it belongs
+            // to the current branch. If the history is empty (first message in a
+            // conversation) parent_id stays None and the message becomes the root.
+            let active_path = messages::list_for_conversation(conn, &conv_id)?;
+            let parent_id = active_path.last().map(|m| m.id.clone());
+
+            let user_msg = messages::create(
                 conn,
                 messages::NewMessage {
                     conversation_id: conv_id.clone(),
                     role: messages::MessageRole::User,
                     content: msg_content,
+                    parent_id,
+                    sibling_order: 0,
+                    is_active: true,
                     images_json,
                     files_json: None,
                     tokens_used: None,
@@ -106,7 +124,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 },
             )?;
 
-            messages::list_for_conversation(conn, &conv_id)
+            let history = messages::list_for_conversation(conn, &conv_id)?;
+            Ok((history, user_msg.id))
         })
         .await?;
 
@@ -156,9 +175,14 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 } else {
                     None
                 };
+            let content = if msg.role.as_str() == "assistant" {
+                context::strip_history_content(&msg.content)
+            } else {
+                msg.content
+            };
             initial_messages.push(Message {
                 role: msg.role.as_str().to_string(),
-                content: msg.content,
+                content,
                 images: msg_imgs,
                 thinking: None,
                 tool_calls: None,
@@ -279,6 +303,228 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         conversation_id: conv_id,
                         role: messages::MessageRole::Assistant,
                         content: final_content,
+                        parent_id: Some(user_msg_id),
+                        sibling_order: 0,
+                        is_active: true,
+                        images_json: None,
+                        files_json: None,
+                        tokens_used: m.tokens_used,
+                        generation_time_ms: m.generation_time_ms,
+                        prompt_tokens: m.prompt_tokens,
+                        tokens_per_sec: m.tokens_per_sec,
+                        total_duration_ms: m.total_duration_ms,
+                        load_duration_ms: m.load_duration_ms,
+                        prompt_eval_duration_ms: m.prompt_eval_duration_ms,
+                        eval_duration_ms: m.eval_duration_ms,
+                        seed: m.seed,
+                    },
+                )
+            })
+            .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Regenerate an assistant response as a sibling of the existing one.
+    ///
+    /// Loads history up to and including `parent_message_id`, streams a new
+    /// response, and persists it as a new sibling via `messages::create_sibling`.
+    pub async fn send_regenerate(&self, params: RegenerateParams) -> Result<(), AppError> {
+        let RegenerateParams {
+            conversation_id,
+            parent_message_id,
+            model,
+            think_mode,
+            chat_options,
+            web_search_enabled,
+        } = params;
+
+        if conversation_id.is_empty() {
+            return Err(AppError::Internal(
+                "conversation_id must not be empty".into(),
+            ));
+        }
+        if parent_message_id.is_empty() {
+            return Err(AppError::Internal(
+                "parent_message_id must not be empty".into(),
+            ));
+        }
+
+        // Load history and truncate to the parent message in one DB round-trip.
+        let conv_id = conversation_id.clone();
+        let pmid = parent_message_id.clone();
+        let history = spawn_db(self.state.db.clone(), move |conn| {
+            let mut msgs = messages::list_for_conversation(conn, &conv_id)?;
+            let idx = msgs.iter().position(|m| m.id == pmid).ok_or_else(|| {
+                AppError::Internal("parent_message_id not found in history".into())
+            })?;
+            msgs.truncate(idx + 1);
+            Ok(msgs)
+        })
+        .await?;
+
+        // Build initial messages (system prompt + history with stripping).
+        let mut initial_messages: Vec<Message> = Vec::new();
+
+        if web_search_enabled {
+            let date_str = Local::now().format("%B %d, %Y").to_string();
+            let system_content = format!(
+                "CRITICAL: The current real-world date is {}. \
+                You have active, real-time access to the web via the 'web_search' tool. \
+                ALWAYS trust search results and the current date over your internal knowledge cutoff. \
+                Answer the user's question directly and concisely based on the search results. \
+                If search results are irrelevant or provide contradictory information, prioritize the most recent and reliable sources.\n\n",
+                date_str
+            );
+            initial_messages.push(Message {
+                role: "system".to_string(),
+                content: system_content,
+                images: None,
+                thinking: None,
+                tool_calls: None,
+                name: None,
+            });
+        }
+
+        for msg in history {
+            let msg_imgs: Option<Vec<String>> =
+                if msg.images_json != "[]" && !msg.images_json.is_empty() {
+                    serde_json::from_str(&msg.images_json).map_err(|e| {
+                        AppError::Serialization(format!("Failed to parse image JSON: {e}"))
+                    })?
+                } else {
+                    None
+                };
+            let content = if msg.role.as_str() == "assistant" {
+                context::strip_history_content(&msg.content)
+            } else {
+                msg.content
+            };
+            initial_messages.push(Message {
+                role: msg.role.as_str().to_string(),
+                content,
+                images: msg_imgs,
+                thinking: None,
+                tool_calls: None,
+                name: None,
+            });
+        }
+
+        // Build think param.
+        let think = think_mode.as_ref().map(|s| match s.as_str() {
+            "false" => ThinkParam::Bool(false),
+            "true" => ThinkParam::Bool(true),
+            level => ThinkParam::Level(level.to_string()),
+        });
+
+        // Build tools + options.
+        let tools: Option<Vec<Tool>> = if web_search_enabled {
+            Some(vec![Tool {
+                tool_type: "function".to_string(),
+                function: crate::ollama::types::ToolFunctionDef {
+                    name: "web_search".to_string(),
+                    description: "Search the web for real-time information".to_string(),
+                    parameters: serde_json::json!({
+                        "type": "object",
+                        "properties": { "query": { "type": "string" } },
+                        "required": ["query"]
+                    }),
+                },
+            }])
+        } else {
+            None
+        };
+
+        let options = {
+            let global_options = spawn_db(self.state.db.clone(), |conn| {
+                Ok(crate::db::settings::get(conn, "chatOptions")
+                    .inspect_err(|e| log::warn!("Failed to load chatOptions from DB: {e}"))
+                    .ok()
+                    .flatten()
+                    .and_then(|json| {
+                        serde_json::from_str::<ChatOptions>(&json)
+                            .inspect_err(|e| log::warn!("Failed to parse chatOptions JSON: {e}"))
+                            .ok()
+                    })
+                    .unwrap_or_default())
+            })
+            .await?;
+
+            let mut final_options = if let Some(custom) = chat_options {
+                custom.merge_with_fallback(&global_options)
+            } else {
+                global_options.clone()
+            };
+
+            if web_search_enabled {
+                final_options.temperature = Some(0.2);
+                final_options.top_p = Some(0.1);
+            }
+
+            if final_options.temperature.is_none() {
+                final_options.temperature = Some(0.8);
+            }
+
+            Some(final_options)
+        };
+
+        // Sliding window.
+        if let Some(ref opts) = options {
+            if let Some(num_ctx) = opts.num_ctx {
+                let budget = (num_ctx as f32 * 0.85) as usize;
+                apply_sliding_window(&mut initial_messages, budget);
+            }
+        }
+
+        // Orchestrate.
+        let orchestrate_result = tokio::time::timeout(
+            Duration::from_secs(300),
+            self.orchestrate_stream_with_context(
+                conversation_id.clone(),
+                initial_messages,
+                model,
+                think,
+                tools,
+                options,
+                None,
+            ),
+        )
+        .await
+        .map_err(|_| {
+            log::error!("Agent loop timed out for conversation {}", conversation_id);
+            let _ = self.app.emit(
+                "chat:error",
+                serde_json::json!({
+                    "conversation_id": conversation_id,
+                    "error": "Request timed out after 5 minutes"
+                }),
+            );
+            AppError::Internal("Agent loop timed out after 300s".into())
+        })?;
+
+        let result = match orchestrate_result {
+            Ok(r) => r,
+            Err(AppError::Cancelled) => return Ok(()),
+            Err(e) => return Err(e),
+        };
+
+        // Persist as a sibling of the parent message.
+        if !result.content.is_empty() {
+            let conv_id = conversation_id.clone();
+            let m = result.metrics;
+            let final_content = result.content;
+            spawn_db(self.state.db.clone(), move |conn| {
+                messages::create_sibling(
+                    conn,
+                    &parent_message_id,
+                    messages::NewMessage {
+                        conversation_id: conv_id,
+                        role: messages::MessageRole::Assistant,
+                        content: final_content,
+                        parent_id: None,
+                        sibling_order: 0,
+                        is_active: true,
                         images_json: None,
                         files_json: None,
                         tokens_used: m.tokens_used,
@@ -322,16 +568,41 @@ mod tests {
         assert!(params.conversation_id.is_empty());
     }
 
+    #[tokio::test]
+    async fn regenerate_params_requires_non_empty_conversation_id() {
+        let params = RegenerateParams {
+            conversation_id: String::new(),
+            parent_message_id: "some-parent-id".to_string(),
+            model: "llama3".to_string(),
+            think_mode: None,
+            chat_options: None,
+            web_search_enabled: false,
+        };
+        assert!(params.conversation_id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn regenerate_params_requires_non_empty_parent_message_id() {
+        let params = RegenerateParams {
+            conversation_id: "some-conv-id".to_string(),
+            parent_message_id: String::new(),
+            model: "llama3".to_string(),
+            think_mode: None,
+            chat_options: None,
+            web_search_enabled: false,
+        };
+        assert!(params.parent_message_id.is_empty());
+    }
+
     #[test]
     fn compact_params_require_non_empty_conversation_id() {
         let params = super::CompactParams {
             conversation_id: String::new(),
             model: "llama3".to_string(),
-            title: None,
         };
         assert!(
             params.conversation_id.is_empty(),
-            "empty conversation_id should be caught by compact()"
+            "empty conversation_id should be caught by compact_in_place()"
         );
     }
 

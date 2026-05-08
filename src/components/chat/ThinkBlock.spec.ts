@@ -1,13 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { createPinia, setActivePinia } from "pinia";
 import ThinkBlock from "./ThinkBlock.vue";
+import type { MessagePart } from "../../types/chat";
 
-// Selector for the content panel — the innermost scrollable div.
-const CONTENT_PANEL = '[style*="max-height: 380px"]';
+const thinkPart = (content: string): MessagePart => ({
+  type: "think",
+  content,
+});
 
-// The grid accordion wrapper is the sibling of the toggle button.
-// When closed, it carries the 'think-accordion--closed' class.
 function isHidden(wrapper: ReturnType<typeof mount>): boolean {
   return wrapper
     .find(".think-accordion")
@@ -16,123 +17,173 @@ function isHidden(wrapper: ReturnType<typeof mount>): boolean {
 }
 
 describe("ThinkBlock", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
   it("starts expanded when mounted with isThinking: true", () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "reasoning here", isThinking: true },
+      props: {
+        parts: [thinkPart("reasoning here")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-
-    // Accordion must not have the closed class
     expect(isHidden(wrapper)).toBe(false);
   });
 
-  it('shows "Thinking..." label while isThinking is true', () => {
+  it('shows "Thinking..." label while isThinking and isOverallStreaming are true', () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "", isThinking: true },
+      props: {
+        parts: [thinkPart("")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-
-    expect(wrapper.find("button span").text()).toBe("Thinking...");
+    expect(wrapper.find(".think-header__label").text()).toBe("Thinking...");
   });
 
-  it('shows "Thought for X.X seconds" label when isThinking is false and thinkTime is provided', () => {
+  it('shows "Thought for N seconds" label when finished with thinkTime', () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "", isThinking: false, thinkTime: 3.5 },
+      props: { parts: [thinkPart("done")], isThinking: false, thinkTime: 3.5 },
     });
-
-    // Label reflects thinkTime formatted with one decimal place
-    expect(wrapper.find("button span").text()).toBe("Thought for 3.5 seconds");
+    expect(wrapper.find(".think-header__label").text()).toBe(
+      "Thought for 4 seconds",
+    );
   });
 
-  it('shows "Thoughts" fallback label when isThinking is false and thinkTime is absent', () => {
+  it('shows "Thought" fallback label when finished without thinkTime', () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "", isThinking: false },
+      props: { parts: [thinkPart("")], isThinking: false },
     });
-
-    expect(wrapper.find("button span").text()).toBe("Thoughts");
+    expect(wrapper.find(".think-header__label").text()).toBe("Thought");
   });
 
-  it("auto-collapses when isThinking transitions from true to false", async () => {
+  it("auto-collapses 1500ms after isThinking transitions to false", async () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "reasoning here", isThinking: true },
+      props: {
+        parts: [thinkPart("reasoning here")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-
-    // Panel must be visible before the transition
     expect(isHidden(wrapper)).toBe(false);
 
-    // Trigger the state transition
-    await wrapper.setProps({ isThinking: false });
-
-    // The watcher handler is async (`await nextTick()` inside its body). flushPromises
-    // drains all pending microtasks so the watcher body fully completes.
+    await wrapper.setProps({ isThinking: false, isOverallStreaming: false });
     await flushPromises();
+    // Not yet collapsed — timer hasn't fired
+    expect(isHidden(wrapper)).toBe(false);
 
+    vi.advanceTimersByTime(1500);
+    await flushPromises();
     expect(isHidden(wrapper)).toBe(true);
   });
 
   it("toggle click expands and re-collapses the panel", async () => {
-    // Mount while streaming so the component starts expanded
     const wrapper = mount(ThinkBlock, {
-      props: { content: "some thoughts", isThinking: true },
+      props: {
+        parts: [thinkPart("some thoughts")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-
     expect(isHidden(wrapper)).toBe(false);
 
-    // Drive a true→false transition so auto-collapse fires — leaving it collapsed
-    await wrapper.setProps({ isThinking: false });
+    await wrapper.setProps({ isThinking: false, isOverallStreaming: false });
+    vi.advanceTimersByTime(1500);
     await flushPromises();
     expect(isHidden(wrapper)).toBe(true);
 
-    // Click once → should expand
     await wrapper.find("button").trigger("click");
     expect(isHidden(wrapper)).toBe(false);
 
-    // Click again → should collapse
     await wrapper.find("button").trigger("click");
     expect(isHidden(wrapper)).toBe(true);
   });
 
-  it("renders content text inside the panel when expanded", () => {
+  it("renders step text inside the scroll area when expanded", () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "the internal reasoning text", isThinking: true },
+      props: {
+        parts: [thinkPart("the internal reasoning text")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-
-    const panel = wrapper.find(CONTENT_PANEL);
-    expect(panel.exists()).toBe(true);
-    expect(panel.text()).toContain("the internal reasoning text");
+    expect(wrapper.find(".think-scroll-area").text()).toContain(
+      "the internal reasoning text",
+    );
   });
 
-  // --- isOpen ref state assertions ---
-
-  it("isOpen ref is true on mount", () => {
+  it("shows plain text with cursor on the active (last) step while streaming", async () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "", isThinking: true },
+      props: {
+        parts: [thinkPart("**bold**")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
+    });
+    await flushPromises();
+    const active = wrapper.find(".think-step__active");
+    expect(active.exists()).toBe(true);
+    expect(active.text()).toContain("**bold**");
+    expect(active.html()).not.toContain("<strong>");
+    expect(wrapper.find(".think-cursor").exists()).toBe(true);
+  });
+
+  it("renders markdown HTML for completed steps", async () => {
+    const wrapper = mount(ThinkBlock, {
+      props: {
+        parts: [thinkPart("**bold**\n\nnext step")],
+        isThinking: false,
+        isOverallStreaming: false,
+      },
+    });
+    await flushPromises();
+    const contents = wrapper.findAll(".think-step__content");
+    expect(contents[0].html()).toContain("<strong>bold</strong>");
+  });
+
+  it("isOpen ref is true on mount when streaming", () => {
+    const wrapper = mount(ThinkBlock, {
+      props: {
+        parts: [thinkPart("")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
     expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(true);
   });
 
-  it("isOpen is true while isThinking is true", () => {
+  it("isOpen becomes false after auto-collapse timer", async () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "thoughts", isThinking: true },
+      props: {
+        parts: [thinkPart("thoughts")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-    expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(true);
-  });
-
-  it("isOpen becomes false when isThinking transitions from true to false", async () => {
-    const wrapper = mount(ThinkBlock, {
-      props: { content: "thoughts", isThinking: true },
-    });
-    expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(true); // before
-
-    await wrapper.setProps({ isThinking: false });
+    await wrapper.setProps({ isThinking: false, isOverallStreaming: false });
+    vi.advanceTimersByTime(1500);
     await flushPromises();
-
-    expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(false); // after
+    expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(false);
   });
 
   it("isOpen can be toggled back to true after auto-collapse", async () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "thoughts", isThinking: true },
+      props: {
+        parts: [thinkPart("thoughts")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-    await wrapper.setProps({ isThinking: false });
+    await wrapper.setProps({ isThinking: false, isOverallStreaming: false });
+    vi.advanceTimersByTime(1500);
     await flushPromises();
     expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(false);
 
@@ -142,38 +193,25 @@ describe("ThinkBlock", () => {
 
   it("toggle click works while isThinking is true (collapsible during streaming)", async () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "", isThinking: true },
+      props: {
+        parts: [thinkPart("")],
+        isThinking: true,
+        isOverallStreaming: true,
+      },
     });
-    // Default: open. Click should collapse it — toggling during thinking is intentional (bug #7).
     await wrapper.find("button").trigger("click");
     expect((wrapper.vm as unknown as { isOpen: boolean }).isOpen).toBe(false);
   });
 
-  it("shows plain text (no markdown) while isThinking is true", async () => {
+  it("splits content into multiple steps on double newlines", async () => {
     const wrapper = mount(ThinkBlock, {
-      props: { content: "**bold**", isThinking: true },
+      props: {
+        parts: [thinkPart("step one\n\nstep two\n\nstep three")],
+        isThinking: false,
+        isOverallStreaming: false,
+      },
     });
-    await nextTick();
-    const content = wrapper.find(".think-content");
-    expect(content.text()).toContain("**bold**");
-    expect(content.html()).not.toContain("<strong>");
-  });
-
-  it("renders markdown HTML once isThinking is false", async () => {
-    const wrapper = mount(ThinkBlock, {
-      props: { content: "some content", isThinking: false },
-    });
-    await nextTick();
-    const content = wrapper.find(".think-content--rendered");
-    expect(content.html()).toContain("<p>");
-  });
-
-  it("content container has max-height: 380px", async () => {
-    const wrapper = mount(ThinkBlock, {
-      props: { content: "test", isThinking: false },
-    });
-    await nextTick();
-    const panel = wrapper.find(CONTENT_PANEL);
-    expect(panel.exists()).toBe(true);
+    await flushPromises();
+    expect(wrapper.findAll(".think-step").length).toBe(3);
   });
 });

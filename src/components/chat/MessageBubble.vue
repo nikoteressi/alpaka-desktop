@@ -1,47 +1,69 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from "vue";
-import { useRafFn } from "@vueuse/core";
+import { ref, computed } from "vue";
 import { renderMarkdown } from "../../lib/markdown";
-import type { Message } from "../../types/chat";
+import type { Message, MessagePart } from "../../types/chat";
+import { useChatStore } from "../../stores/chat";
 import ThinkBlock from "./ThinkBlock.vue";
 import CodeBlock from "./CodeBlock.vue";
 import SearchBlock from "./SearchBlock.vue";
 import StatsBlock from "./StatsBlock.vue";
+import MessageActions from "./MessageActions.vue";
 import TypingIndicator from "./TypingIndicator.vue";
 import { useSettingsStore } from "../../stores/settings";
-import { useCopyToClipboard } from "../../composables/useCopyToClipboard";
 import { uint8ArrayToBase64 } from "../../stores/chat";
-import {
-  parseMessageParts,
-  parseBlockMatch,
-  type MessagePart,
-} from "../../lib/messageParser";
+import { parseMessageParts } from "../../lib/messageParser";
+import { useVersionSwitcher } from "../../composables/useVersionSwitcher";
 
 const props = defineProps<{
   message: Message;
   messageId?: string;
   isStreaming?: boolean;
-  thinkingContent?: string; // Streaming thinking
+  thinkingContent?: string;
   isThinking?: boolean;
   tokensPerSec?: number | null;
+  siblingCount?: number;
+  siblingOrder?: number;
+  parentId?: string | null;
+  isRegenerating?: boolean;
 }>();
 
+const emit = defineEmits<{
+  edit: [];
+  regenerate: [messageId: string];
+}>();
+
+const chatStore = useChatStore();
+const settingsStore = useSettingsStore();
 const isUser = computed(() => props.message.role === "user");
+
+// Child version switcher for user messages: navigate the active child assistant response
+const activeChild = computed<Message | null>(() => {
+  if (!isUser.value || !props.message.id) return null;
+  const convId = chatStore.activeConversationId;
+  if (!convId) return null;
+  const msgs = chatStore.messages[convId] ?? [];
+  return msgs.find((m) => m.parentId === props.message.id) ?? null;
+});
+
+const { prevVersion: childPrevVersion, nextVersion: childNextVersion } =
+  useVersionSwitcher(() => activeChild.value ?? props.message);
+
+const childCurrentVersion = computed(
+  () => (activeChild.value?.siblingOrder ?? 0) + 1,
+);
+const childTotalVersions = computed(() => activeChild.value?.siblingCount ?? 1);
+
+function onRegenerate() {
+  emit("regenerate", props.message.parentId ?? "");
+}
 
 // Memoization cache for finished messages
 const _parsedCache = ref<{ key: string; result: MessagePart[] } | null>(null);
 
-// Calculate parts immediately for finished messages, or use a throttled ref for streaming
 const staticParts = computed(() => {
   if (props.isStreaming) return null;
-
-  // Use content length + first 32 chars as a cheap cache key
   const cacheKey = `${props.message.content.length}:${props.message.content.slice(0, 32)}`;
-
-  if (_parsedCache.value?.key === cacheKey) {
-    return _parsedCache.value.result;
-  }
-
+  if (_parsedCache.value?.key === cacheKey) return _parsedCache.value.result;
   const result = parseMessageParts(props.message.content, {
     renderMarkdown,
     isUserMessage: isUser.value,
@@ -50,444 +72,276 @@ const staticParts = computed(() => {
   return result;
 });
 
-const streamingParts = ref<MessagePart[]>([]);
-const stableParts = ref<MessagePart[]>([]);
-let lastStableIndex = 0;
-
-// Final display parts: static if finished, streaming ref if active
 const displayParts = computed(() => {
-  return staticParts.value || streamingParts.value;
+  if (props.isStreaming) {
+    return chatStore.streaming.activeMessageParts;
+  }
+  return staticParts.value || [];
 });
 
-let frameCount = 0;
-const RENDER_EVERY_N_FRAMES = 4; // Approx 15fps during streaming for maximum smoothness/CPU balance
+// Unified Grouping Logic: sequential think/tool parts go together
+const unifiedGroups = computed(() => {
+  const parts = displayParts.value;
+  const groups: Array<{ type: "thought" | "content"; parts: MessagePart[] }> =
+    [];
 
-// Architectural Throttling for streaming only
-const { pause, resume, isActive } = useRafFn(
-  () => {
-    if (!props.isStreaming) return;
-    frameCount++;
-    if (frameCount % RENDER_EVERY_N_FRAMES !== 0) return;
+  for (const part of parts) {
+    const isThoughtRelated = part.type === "think" || part.type === "tool";
+    const lastGroup = groups[groups.length - 1];
 
-    const content = props.message.content;
-    if (!content) return;
-
-    // Incremental Update Logic — only look for *fully closed* blocks to stabilize them
-    const stableBlockRegex =
-      /```(\w+)?\n(.*?)```|<think.*?<\/think>|<tool_call\b[^>]*>.*?<\/tool_call>/gis;
-    stableBlockRegex.lastIndex = lastStableIndex;
-    let match;
-
-    while ((match = stableBlockRegex.exec(content)) !== null) {
-      if (match.index > lastStableIndex) {
-        const text = content.slice(lastStableIndex, match.index);
-        if (text.trim()) {
-          stableParts.value.push({
-            type: "markdown",
-            content: text,
-            rendered: renderMarkdown(text),
-          });
-        }
+    if (isThoughtRelated) {
+      if (lastGroup && lastGroup.type === "thought") {
+        lastGroup.parts.push(part);
+      } else {
+        groups.push({ type: "thought", parts: [part] });
       }
-      const part = parseBlockMatch(match);
-      if (part) stableParts.value.push(part);
-      lastStableIndex = stableBlockRegex.lastIndex;
-    }
-
-    // Parse the volatile tail (from lastStableIndex to end)
-    const volatileContent = content.slice(lastStableIndex);
-    streamingParts.value = [
-      ...stableParts.value,
-      ...parseMessageParts(volatileContent, {
-        renderMarkdown,
-        allowOpenFence: true,
-      }),
-    ];
-  },
-  { immediate: false },
-);
-
-watch(
-  () => props.isStreaming,
-  (streaming) => {
-    if (streaming) {
-      frameCount = 0;
-      stableParts.value = [];
-      lastStableIndex = 0;
-      resume();
     } else {
-      pause();
-      streamingParts.value = [];
-      stableParts.value = [];
-      lastStableIndex = 0;
+      groups.push({ type: "content", parts: [part] });
     }
-  },
-  { immediate: true },
-);
+  }
+  return groups;
+});
 
-// Watch for streaming content changes
-watch(
-  () => props.message.content,
-  () => {
-    if (props.isStreaming && !isActive.value) {
-      resume();
-    }
-  },
-);
+// Detect if any search results exist in the message for the final badge
+const finalSearchResults = computed(() => {
+  if (props.isStreaming) return chatStore.streaming.searchResults;
+  const toolParts = displayParts.value.filter(
+    (p) => p.type === "tool" && p.toolName === "web_search",
+  );
+  if (toolParts.length === 0) return [];
+  return toolParts[toolParts.length - 1].toolResults || [];
+});
 
-onUnmounted(() => pause());
+function isThoughtGroupVisible(
+  group: { parts: MessagePart[] },
+  gIdx: number,
+): boolean {
+  return (
+    group.parts.some((p) => p.content.trim().length > 0 || p.type === "tool") ||
+    (!!props.isStreaming &&
+      gIdx === unifiedGroups.value.length - 1 &&
+      !!chatStore.streaming.thinkingBuffer)
+  );
+}
 
-// Copy button state via composable
-const { copied, copy } = useCopyToClipboard(1500);
-
-const copyContent = async () => {
-  await copy(props.message.content);
-};
-
-const settingsStore = useSettingsStore();
+function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
+  const total = group.parts.reduce((acc, p) => acc + (p.thinkDuration ?? 0), 0);
+  return total > 0 ? total : null;
+}
 </script>
 
 <template>
-  <!-- User message: right-aligned bubble -->
-  <article
-    v-if="isUser"
-    aria-label="Your message"
-    class="user-message"
-    data-role="user"
-    style="display: flex; justify-content: flex-end; padding: 4px 24px"
-  >
-    <div
-      style="
-        background: var(--bg-user-msg);
-        border-radius: 18px;
-        border-top-right-radius: 4px;
-        padding: 8px 14px;
-        font-size: 14px;
-        color: var(--text);
-        max-width: 70%;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        word-break: break-word;
-        border: 1px solid var(--border-subtle);
-      "
-    >
-      <!-- Attached Images -->
-      <div
-        v-if="message.images && message.images.length > 0"
-        class="flex flex-wrap gap-2 mb-2"
-      >
-        <img
-          v-for="(img, idx) in message.images"
-          :key="idx"
-          :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
-          alt="Attached image"
-          class="max-h-64 max-w-full rounded-lg object-contain border border-[var(--border-strong)]"
+  <!-- User Message -->
+  <article v-if="isUser" data-role="user" class="user-message">
+    <div class="user-bubble-container relative">
+      <div class="user-bubble">
+        <div
+          v-if="message.images && message.images.length > 0"
+          class="flex flex-wrap gap-2 mb-2"
+        >
+          <img
+            v-for="(img, idx) in message.images"
+            :key="idx"
+            :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
+            class="max-h-64 max-w-full rounded-lg border border-[var(--border-strong)]"
+          />
+        </div>
+        {{ message.content }}
+      </div>
+      <div v-if="!isStreaming" class="user-footer-actions">
+        <MessageActions
+          :message="message"
+          :is-user="true"
+          mode="all"
+          :current-version="childCurrentVersion"
+          :total-versions="childTotalVersions"
+          @edit="emit('edit')"
+          @prev-version="childPrevVersion"
+          @next-version="childNextVersion"
         />
       </div>
-      {{ message.content }}
     </div>
   </article>
 
-  <!-- Assistant message: plain text area, no bubble -->
+  <!-- Assistant Message -->
   <article
     v-else
-    aria-label="Assistant response"
-    aria-live="polite"
-    aria-atomic="false"
-    class="assistant-message"
     data-role="assistant"
-    style="padding: 12px 24px 20px"
+    class="assistant-message"
+    :class="{ 'assistant-message--streaming': isStreaming }"
   >
-    <!-- Rendered Content Parts (including archived thinking and tool blocks) -->
     <div
-      class="prose dark:prose-invert prose-sm max-w-none rendered-markdown-container"
+      class="assistant-content rendered-markdown-container"
+      :class="{ 'opacity-40': isRegenerating }"
     >
-      <template v-for="(part, index) in displayParts" :key="index">
+      <template v-for="(group, gIdx) in unifiedGroups" :key="gIdx">
         <ThinkBlock
-          v-if="part.type === 'think'"
-          :key="messageId ? `${messageId}-think-${index}` : `think-${index}`"
-          :content="part.content"
-          :is-thinking="false"
-          :think-time="part.language ? parseFloat(part.language) : null"
-          :message-key="messageId ? `${messageId}-think-${index}` : undefined"
+          v-if="group.type === 'thought' && isThoughtGroupVisible(group, gIdx)"
+          :parts="group.parts"
+          :is-thinking="
+            isStreaming &&
+            gIdx === unifiedGroups.length - 1 &&
+            chatStore.streaming.isThinking
+          "
+          :is-overall-streaming="
+            isStreaming && gIdx === unifiedGroups.length - 1
+          "
+          :think-time="thinkTimeForGroup(group)"
+          :message-id="messageId"
+          :message-key="
+            messageId
+              ? `${messageId}-thought-${gIdx}`
+              : `thought-stable-${gIdx}`
+          "
         />
-        <div
-          v-else-if="part.type === 'markdown'"
-          class="rendered-markdown"
-          v-html="part.rendered"
-        ></div>
-        <CodeBlock
-          v-else-if="part.type === 'code'"
-          :code="part.content"
-          :language="part.language || ''"
-          :is-streaming="isStreaming"
-        />
-        <SearchBlock
-          v-else-if="part.type === 'tool'"
-          :query="part.toolQuery || ''"
-          :result="part.content"
-          :message-key="messageId ? `${messageId}-tool-${index}` : undefined"
-        />
-      </template>
 
-      <!-- Live streaming thinking (rendered at the end of the sequence) -->
-      <ThinkBlock
-        v-if="isThinking && thinkingContent"
-        key="streaming-think"
-        :content="thinkingContent"
-        :is-thinking="true"
-        message-key="msg-streaming-active"
-      />
+        <template v-else-if="group.type === 'content'">
+          <template v-for="(part, pIdx) in group.parts" :key="pIdx">
+            <div
+              v-if="part.type === 'markdown'"
+              class="rendered-markdown"
+              :class="{
+                'rendered-markdown--streaming':
+                  isStreaming &&
+                  gIdx === unifiedGroups.length - 1 &&
+                  pIdx === group.parts.length - 1 &&
+                  !chatStore.streaming.isThinking,
+              }"
+              v-html="
+                isStreaming ? renderMarkdown(part.content) : part.rendered
+              "
+            ></div>
+            <CodeBlock
+              v-else-if="part.type === 'code'"
+              :code="part.content"
+              :language="part.language || ''"
+              :is-streaming="isStreaming"
+            />
+          </template>
+        </template>
+      </template>
     </div>
 
-    <!-- Typing indicator: shown before first token arrives -->
-    <TypingIndicator
-      v-if="isStreaming && !isThinking && !message.content && !thinkingContent"
-    />
+    <TypingIndicator v-if="isStreaming && displayParts.length === 0" />
 
-    <!-- Blinking cursor: shown during streaming once content has started -->
-    <span
-      v-else-if="
-        isStreaming && !isThinking && (message.content || thinkingContent)
-      "
-      class="streaming-cursor"
-    ></span>
+    <!-- Final Search Badge & Stats & Actions -->
+    <div v-if="!isStreaming && !isRegenerating" class="assistant-footer">
+      <SearchBlock
+        v-if="finalSearchResults.length > 0"
+        type="final"
+        :message-id="messageId"
+        :results="finalSearchResults"
+      />
 
-    <!-- Copy button (shown only when not streaming) -->
-    <button
-      v-if="!isStreaming"
-      @click="copyContent"
-      :title="copied ? 'Copied!' : 'Copy'"
-      aria-label="Copy message"
-      class="copy-btn"
-    >
-      <!-- Checkmark icon when copied -->
-      <svg
-        v-if="copied"
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      <!-- Copy icon otherwise -->
-      <svg
-        v-else
-        width="13"
-        height="13"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-      </svg>
-      <span>{{ copied ? "Copied!" : "Copy" }}</span>
-    </button>
-
-    <!-- Full Stats Block (Isolated component) -->
-    <StatsBlock
-      v-if="
-        settingsStore.showPerformanceMetrics &&
-        (message.tokens_per_sec !== undefined ||
-          message.tokens !== undefined ||
-          tokensPerSec !== undefined) &&
-        !isStreaming
-      "
-      :metrics="{
-        total_duration_ms: message.total_duration_ms,
-        load_duration_ms: message.load_duration_ms,
-        prompt_eval_duration_ms: message.prompt_eval_duration_ms,
-        eval_duration_ms: message.eval_duration_ms,
-      }"
-      :tokens-per-sec="message.tokens_per_sec || tokensPerSec || 0"
-      :output-tokens="message.tokens || 0"
-      :input-tokens="message.prompt_tokens || 0"
-      :generation-time-ms="message.generation_time_ms || 0"
-      :message-key="messageId"
-      :seed="message.seed"
-    />
+      <div class="assistant-footer__stats mt-3">
+        <StatsBlock
+          v-if="settingsStore.showPerformanceMetrics && message.tokens_per_sec"
+          :metrics="{
+            total_duration_ms: message.total_duration_ms,
+            load_duration_ms: message.load_duration_ms,
+            prompt_eval_duration_ms: message.prompt_eval_duration_ms,
+            eval_duration_ms: message.eval_duration_ms,
+          }"
+          :tokens-per-sec="message.tokens_per_sec"
+          :output-tokens="message.tokens || 0"
+          :input-tokens="message.prompt_tokens || 0"
+          :generation-time-ms="message.generation_time_ms || 0"
+          :message-key="messageId"
+          :seed="message.seed"
+          class="w-full"
+        />
+      </div>
+      <div class="assistant-footer__actions">
+        <MessageActions
+          :message="message"
+          :is-user="false"
+          mode="actions-only"
+          @regenerate="onRegenerate"
+        />
+      </div>
+    </div>
   </article>
 </template>
 
 <style scoped>
-/* ── Container typography ─────────────────────────────── */
-.rendered-markdown-container {
-  font-family: var(--sans);
-  font-size: 15px;
+.user-message {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 24px 8px;
+  position: relative;
+}
+
+.user-bubble-container {
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.user-footer-actions {
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.user-bubble {
+  background: var(--bg-user-msg);
+  border-radius: 18px;
+  border-top-right-radius: 4px;
+  padding: 8px 14px;
+  font-size: 14px;
   color: var(--text);
-  line-height: 1.65;
-  text-align: left;
-}
-
-/* Hide raw <pre> from markdown-it — CodeBlock handles code rendering */
-.rendered-markdown :deep(pre) {
-  display: none !important;
-}
-
-/* ── Headings ─────────────────────────────────────────── */
-.rendered-markdown-container :deep(h1),
-.rendered-markdown-container :deep(h2),
-.rendered-markdown-container :deep(h3) {
-  font-family: var(--heading);
-  color: var(--text-heading);
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
-  font-weight: 600;
-}
-
-/* ── Paragraphs & lists ───────────────────────────────── */
-.rendered-markdown-container :deep(p) {
-  margin-bottom: 1.25em;
-}
-
-.rendered-markdown-container :deep(ul),
-.rendered-markdown-container :deep(ol) {
-  margin-bottom: 1.25em;
-  padding-left: 1.5em;
-}
-
-.rendered-markdown-container :deep(li) {
-  margin-bottom: 0.25em;
-}
-
-.rendered-markdown-container :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-/* ── Horizontal rule ──────────────────────────────────── */
-.rendered-markdown-container :deep(hr) {
-  border: none;
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 2em 0;
-}
-
-/* ── Bold ─────────────────────────────────────────────── */
-.rendered-markdown-container :deep(strong) {
-  color: var(--text-heading);
-  font-weight: 600;
-}
-
-/* ── Inline code ──────────────────────────────────────── */
-.rendered-markdown :deep(code:not(pre code)) {
-  background-color: var(--bg-code-hdr);
-  color: var(--text-code);
-  padding: 2px 5px;
-  border-radius: 4px;
-  font-family: var(--mono);
-  font-size: 0.88em;
-  font-weight: 500;
-}
-
-/* ── Blockquotes ──────────────────────────────────────── */
-.rendered-markdown-container :deep(blockquote) {
-  margin: 1.25em 0;
-  padding: 0.1em 0 0.1em 0.75em;
-  border-left: 3px solid var(--accent-border);
-  background: var(--bg-hover);
-  border-radius: 0 6px 6px 0;
-  color: var(--text-muted);
-}
-
-.rendered-markdown-container :deep(blockquote p) {
-  margin-bottom: 0.5em;
-  color: var(--text-muted);
-}
-
-.rendered-markdown-container :deep(blockquote p:last-child) {
-  margin-bottom: 0;
-}
-
-/* ── Tables ───────────────────────────────────────────── */
-.rendered-markdown-container :deep(.table-scroll-wrapper) {
-  overflow-x: auto;
-  margin: 1.5em 0;
-  border-radius: 8px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
   border: 1px solid var(--border-subtle);
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar) transparent;
 }
 
-.rendered-markdown-container :deep(.table-scroll-wrapper)::-webkit-scrollbar {
-  height: 4px;
+.assistant-message {
+  padding: 12px 24px 24px;
+  position: relative;
+  max-width: 100%;
 }
 
-.rendered-markdown-container
-  :deep(.table-scroll-wrapper)::-webkit-scrollbar-thumb {
-  background: var(--scrollbar);
-  border-radius: 2px;
+.assistant-footer {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.rendered-markdown-container :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-  background: transparent;
+.assistant-footer__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.rendered-markdown-container :deep(th) {
-  color: var(--text-muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  text-align: left;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+.assistant-footer__actions {
+  margin-top: 4px;
 }
 
-.rendered-markdown-container :deep(th:first-child) {
-  padding-left: 16px;
+.rendered-markdown--streaming :deep(p:last-child),
+.rendered-markdown--streaming :deep(li:last-child),
+.rendered-markdown--streaming :deep(h1:last-child),
+.rendered-markdown--streaming :deep(h2:last-child),
+.rendered-markdown--streaming :deep(h3:last-child) {
+  display: inline; /* Make it inline so the cursor follows the text */
 }
 
-.rendered-markdown-container :deep(th:last-child) {
-  padding-right: 16px;
+.rendered-markdown--streaming :deep(> *:last-child)::after {
+  content: "";
+  display: inline-block;
+  width: 1.5px;
+  height: 14px;
+  background: var(--accent);
+  margin-left: 2px;
+  vertical-align: baseline;
+  animation: cursor-blink 0.9s infinite;
+  position: relative;
+  top: 1px;
 }
 
-.rendered-markdown-container :deep(td) {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text);
-}
-
-.rendered-markdown-container :deep(td:first-child) {
-  padding-left: 16px;
-}
-
-.rendered-markdown-container :deep(td:last-child) {
-  padding-right: 16px;
-}
-
-.rendered-markdown-container :deep(tr:last-child td) {
-  border-bottom: none;
-}
-
-.rendered-markdown-container :deep(tr:nth-child(even) td) {
-  background: var(--bg-active);
-}
-
-.rendered-markdown-container :deep(tr:hover td) {
-  background: var(--bg-hover);
-}
-
-/* ── KaTeX math ───────────────────────────────────────── */
-.rendered-markdown-container :deep(.katex-display) {
-  margin: 1.5em 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0.5em 0;
-}
-
-/* ── Streaming cursor ─────────────────────────────────── */
 @keyframes cursor-blink {
   0%,
   100% {
@@ -498,42 +352,33 @@ const settingsStore = useSettingsStore();
   }
 }
 
-.streaming-cursor {
-  display: inline-block;
-  width: 1.5px;
-  height: 14px;
-  background: var(--accent);
-  border-radius: 1px;
-  margin-left: 2px;
-  vertical-align: middle;
-  animation: cursor-blink 0.9s ease-in-out infinite;
+.rendered-markdown-container :deep(pre) {
+  display: none !important;
 }
 
-/* ── Copy button ──────────────────────────────────────── */
-.copy-btn {
-  background: none;
-  border: 1px solid transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 8px;
+/* Citation Pills */
+.rendered-markdown-container :deep(.citation-pill) {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-  margin-top: 12px;
-  font-size: 11px;
-  font-family: var(--sans);
-  font-weight: 500;
-}
-
-.copy-btn:hover {
-  background: var(--bg-hover);
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: var(--bg-active);
+  border: 1px solid var(--border-strong);
   color: var(--text-muted);
-  border-color: var(--border);
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 50%;
+  margin: 0 2px;
+  vertical-align: top;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.copy-btn svg {
-  opacity: 0.7;
+.rendered-markdown-container :deep(.citation-pill:hover) {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(1.1);
 }
 </style>

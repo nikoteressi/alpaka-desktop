@@ -9,6 +9,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
+
+### Added
+- Host Manager quick-switch (#155): `Ctrl+H` opens/closes the Host Manager modal from anywhere; modal uses `BaseModal` with CSS variables; other shortcuts are suppressed while it is open
+- Arrow-key navigation in model selector: `↑`/`↓` move through installed models, `Enter` selects, `Escape` closes; `Ctrl+M` is suppressed when the model selector is already open
+- In-place chat compaction (#158): compact button always visible (not gated on 70% context); messages soft-archived with `is_archived` flag; streaming summary saved as `compact_summary` message in the same conversation; streaming status bar shows tokens as they arrive with a Cancel button; sidebar spinner when compacting a background conversation; desktop notification on completion; expandable "Show history" toggle on the summary bubble; "Compaction model" setting in Settings → General
+- DeepSeek-inspired chat visual styling (#149): thinking blocks now render as a collapsible timeline with step-by-step reasoning, animated brain icon, dot markers, and auto-collapse after generation; web search shown as an inline pill inside the timeline during streaming, then as a post-message favicon-stack badge that opens a 320 px source sidebar (`SearchSidebar.vue`); `chat:tool-reading` Tauri event streams preview results before the LLM finishes reading
+- `MessageActions.vue` — copy, edit, regenerate, like/dislike, and version-switcher controls per message; shown on hover
+- Message branching (#150): regenerate an assistant response to create an alternative version; navigate between versions with `<` / `>` controls and a `1/N` counter directly in the message bubble (`useVersionSwitcher` composable)
+- `regenerate_message` Tauri command — streams a new assistant response as a sibling branch of the existing message
+- `switch_version` Tauri command — activates a sibling message, updating the active conversation path
+- `truncate_from` Tauri command — removes a message and all its descendants (used by edit-message to reset from the edited point)
+- History stripping: `<think>` and `<tool_call>` blocks are stripped from assistant messages before they are included in LLM history context (`strip_history_content` in `services/chat/mod.rs`)
+
+### Changed
+- Edit message now calls `truncate_from` before setting the draft, so the conversation resets cleanly from the edited point instead of appending after stale messages
+- Like, Dislike, and Share buttons removed from `MessageActions.vue`
+
+### Fixed
+- `message.id` was always `undefined` in the store message mapping, causing edit/index lookups to silently fail
+- `--bg-elevated-rgb` CSS variable was undefined, breaking `rgba()` usage in `SearchBlock.vue` and `MessageActions.vue`
+- Comprehensive `.rendered-markdown` typography stylesheet — Tailwind v4 Preflight stripped all browser defaults; headings, lists, inline code, blockquotes, and links now render correctly without `@tailwindcss/typography`
+
 ---
 
 ## [1.3.0] - 2026-05-06

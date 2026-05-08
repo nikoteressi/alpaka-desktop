@@ -1,3 +1,4 @@
+pub mod compaction_events;
 pub mod conversations;
 pub mod folders;
 pub mod hosts;

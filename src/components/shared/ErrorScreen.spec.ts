@@ -77,4 +77,36 @@ describe("ErrorScreen", () => {
       "curl -fsSL https://ollama.com/install.sh | sh",
     );
   });
+
+  it("displays the provided hostUrl instead of the hardcoded default", () => {
+    const wrapper = mount(ErrorScreen, {
+      props: { hostUrl: "192.168.1.50:11434" },
+    });
+    expect(wrapper.text()).toContain("192.168.1.50:11434");
+  });
+
+  it("shows Start Ollama Service button when showServiceControls is true (default)", () => {
+    const wrapper = mount(ErrorScreen);
+    const startBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Start Ollama"));
+    expect(startBtn).toBeDefined();
+  });
+
+  it("hides Start Ollama Service button when showServiceControls is false", () => {
+    const wrapper = mount(ErrorScreen, {
+      props: { showServiceControls: false },
+    });
+    const startBtn = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Start Ollama"));
+    expect(startBtn).toBeUndefined();
+  });
+
+  it("hides the footer note when showServiceControls is false", () => {
+    const wrapper = mount(ErrorScreen, {
+      props: { showServiceControls: false },
+    });
+    expect(wrapper.text()).not.toContain('Start Ollama Service" to run');
+  });
 });

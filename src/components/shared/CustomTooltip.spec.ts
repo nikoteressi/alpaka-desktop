@@ -96,7 +96,7 @@ describe("CustomTooltip", () => {
     wrapper.unmount();
   });
 
-  it("clamps x when tooltip would overflow the right edge", async () => {
+  it("uses right-edge positioning when tooltip would overflow the right edge", async () => {
     window.innerWidth = 350;
     const wrapper = mkWrapper();
     const trigger = wrapper.find("div");
@@ -118,8 +118,9 @@ describe("CustomTooltip", () => {
 
     const tooltip = getTooltip() as HTMLElement;
     expect(tooltip).not.toBeNull();
-    const left = parseInt(tooltip.style.left);
-    expect(left).toBeLessThan(200);
+    // When near the right edge, tooltip uses CSS `right` (not `left`) to align
+    expect(tooltip.style.right).not.toBe("");
+    expect(tooltip.style.left).toBe("");
     wrapper.unmount();
   });
 
