@@ -189,6 +189,11 @@ async function selectModel(model: string) {
     // ignore — chatOptions stays as-is on IPC failure
   }
   presetId.value = "";
+  if (!chatStore.isDraft && activeConvId.value) {
+    tauriApi
+      .updateConversationSettings(activeConvId.value, chatOptions.value)
+      .catch(() => {});
+  }
 }
 
 async function selectLibraryModel(name: string) {
@@ -261,12 +266,6 @@ watch(
       try {
         chatOptions.value = await applyModelDefaults(name);
         presetId.value = "";
-        if (!chatStore.isDraft && activeConvId.value) {
-          await tauriApi.updateConversationSettings(
-            activeConvId.value,
-            chatOptions.value,
-          );
-        }
       } catch {
         // ignore IPC failure
       }

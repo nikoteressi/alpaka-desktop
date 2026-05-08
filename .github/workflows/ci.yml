@@ -130,7 +130,7 @@ jobs:
           cache: pnpm
 
       - name: Install npm dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run pnpm audit
         run: pnpm audit --audit-level=high --prod
@@ -246,7 +246,7 @@ jobs:
 
       - name: Install npm dependencies
         if: needs.changes.outputs.frontend == 'true'
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: TypeScript check
         if: needs.changes.outputs.frontend == 'true'
@@ -354,7 +354,7 @@ jobs:
           cache: pnpm
 
       - name: Install npm dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run Vitest with coverage
         if: needs.changes.outputs.frontend == 'true'
@@ -448,7 +448,7 @@ jobs:
           cache: pnpm
 
       - name: Install npm dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build test binary
         run: pnpm e2e:build
@@ -530,13 +530,13 @@ jobs:
           cache: pnpm
 
       - name: Install npm dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Install Ollama
         env:
           OLLAMA_VERSION: "0.23.0"
         run: |
-          curl -fsSL "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst" \
+          curl -fsSL --proto '=https' --tlsv1.2 "https://github.com/ollama/ollama/releases/download/v${OLLAMA_VERSION}/ollama-linux-amd64.tar.zst" \
             | zstd -d | tar -xf - -C /usr/local bin/ollama
           chmod +x /usr/local/bin/ollama
 
