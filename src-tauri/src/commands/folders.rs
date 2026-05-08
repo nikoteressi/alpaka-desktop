@@ -34,7 +34,7 @@ fn is_text_file(path: &Path) -> Result<bool, std::io::Error> {
 
 /// MED-05: Validate that the resolved path does not point to a restricted
 /// system directory. Uses `dunce::canonicalize` to resolve symlinks first.
-fn guard_path(raw: &Path) -> Result<std::path::PathBuf, AppError> {
+pub(crate) fn guard_path(raw: &Path) -> Result<std::path::PathBuf, AppError> {
     let canonical = dunce::canonicalize(raw)
         .map_err(|e| AppError::Io(format!("Cannot resolve path: {}", e)))?;
 

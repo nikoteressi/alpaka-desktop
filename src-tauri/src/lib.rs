@@ -2,6 +2,7 @@ pub mod auth;
 pub mod commands;
 pub mod db;
 pub mod error;
+mod folder_watcher;
 pub mod ollama;
 pub mod services;
 pub mod state;
