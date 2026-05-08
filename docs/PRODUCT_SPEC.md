@@ -162,7 +162,7 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 | LFC-02 | **File parsing** | P1 | ⚠️ | Reads **all text files recursively** with `ignore::WalkBuilder` (respects `.gitignore`, skips hidden files and binaries via null-byte check). No file-extension allow-list. Caps: 50 MB total, 1000 files |
 | LFC-03 | **Selective file inclusion** | P1 | ✅ | `FolderFilePickerModal.vue` — clicking a linked folder pill opens a modal with a full file tree; users toggle individual files; Apply calls `update_included_files` and updates the pill token count. Unchecking all files and applying removes the folder link. |
 | LFC-04 | **Context size indicator** | P1 | ✅ | Token estimate (`chars / 4`) returned by `link_folder` and shown on the pill; full context bar shows `prompt_eval_count + eval_count` while streaming |
-| LFC-05 | **Auto-refresh** | P2 | 🔲 Backlog | `auto_refresh` column exists in DB schema but is always `false` |
+| LFC-05 | **Auto-refresh** | P2 | ✅ | Per-context toggle (default off); inotify watcher via `notify-debouncer-mini`; ↻ pill flash on refresh; watcher lifecycle tied to active conversation |
 | LFC-06 | **Path safety** | P0 | ✅ | `guard_path` rejects `/proc /sys /dev /etc /root /boot /var /usr/bin /usr/sbin` and `~/.ssh /.gnupg /.aws /.kube`; canonicalise-then-prefix-check defends against traversal |
 
 > **Design note:** No vector DB, no embedding model. Files are read, parsed to text, and
