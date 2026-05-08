@@ -307,12 +307,18 @@ pub async fn list_folder_files(path: String) -> Result<Vec<String>, AppError> {
     .map_err(AppError::from)?
 }
 
+#[derive(Debug, Serialize)]
+pub struct UpdatedContextResult {
+    pub token_estimate: i64,
+    pub content: String,
+}
+
 #[command]
 pub async fn update_included_files(
     state: State<'_, AppState>,
     id: String,
     included_files: Vec<String>,
-) -> Result<i64, AppError> {
+) -> Result<UpdatedContextResult, AppError> {
     let db_conn = state.db.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -321,14 +327,13 @@ pub async fn update_included_files(
             .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
         let ctx = crate::db::folders::get_folder_context(&guard, &id)?;
 
-        // Defense-in-depth: re-verify the base path against current security rules
         let base_path = guard_path(Path::new(&ctx.path))?;
 
-        let mut total_chars = 0;
+        let mut total_chars = 0usize;
+        let mut content = String::new();
+
         for rel_path in &included_files {
             let full_path = base_path.join(rel_path);
-            // Symlink check must happen before canonicalize; after canonicalize
-            // is_symlink() always returns false because the target has been resolved.
             if full_path.is_symlink() {
                 log::warn!("Skipping symlink in included files: {:?}", full_path);
                 continue;
@@ -346,13 +351,17 @@ pub async fn update_included_files(
                     MAX_FOLDER_FILES
                 )));
             }
-            if let Ok(content) = std::fs::read_to_string(&canonical) {
-                total_chars += content.chars().count();
+            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
+                total_chars += file_content.chars().count();
                 if total_chars > MAX_FOLDER_CONTEXT_SIZE {
                     return Err(AppError::Internal(
                         "Selected files exceed 50MB limit".into(),
                     ));
                 }
+                content.push_str(&format!(
+                    "\n--- File: {} ---\n{}\n",
+                    rel_path, file_content
+                ));
             }
         }
 
@@ -366,7 +375,7 @@ pub async fn update_included_files(
             token_estimate,
         )?;
 
-        Ok(token_estimate)
+        Ok(UpdatedContextResult { token_estimate, content })
     })
     .await
     .map_err(AppError::from)?
