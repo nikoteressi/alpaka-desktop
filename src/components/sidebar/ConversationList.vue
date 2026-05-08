@@ -253,6 +253,40 @@
             {{ menuConv?.pinned ? "Unpin" : "Pin" }}
           </span>
         </button>
+        <button
+          ref="exportItemRef"
+          class="w-full text-left px-3 py-1.5 text-[var(--text)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)] transition-colors cursor-pointer"
+          @mouseenter="openSubmenu"
+          @mouseleave="scheduleCloseSubmenu"
+        >
+          <span class="flex items-center gap-2">
+            <svg
+              class="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export
+            <svg
+              class="w-3 h-3 ml-auto"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </span>
+        </button>
         <div class="my-0.5 border-t border-[var(--border-strong)]"></div>
         <button
           class="w-full text-left px-3 py-1.5 text-[var(--danger)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
@@ -274,6 +308,69 @@
               />
             </svg>
             Delete
+          </span>
+        </button>
+      </div>
+    </Teleport>
+
+    <!-- Export format submenu -->
+    <Teleport to="body">
+      <div
+        v-if="submenuOpen && submenuPosition"
+        class="fixed z-[9999] w-40 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.5)] py-1 text-[12px]"
+        :style="{
+          top: submenuPosition.y + 'px',
+          left: submenuPosition.x + 'px',
+        }"
+        @mouseenter="cancelCloseSubmenu"
+        @mouseleave="scheduleCloseSubmenu"
+        @click.stop
+        @mousedown.stop
+      >
+        <button
+          class="w-full text-left px-3 py-1.5 text-[var(--text)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+          @click="doExportJson"
+        >
+          <span class="flex items-center gap-2">
+            <svg
+              class="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
+            </svg>
+            JSON
+          </span>
+        </button>
+        <button
+          class="w-full text-left px-3 py-1.5 text-[var(--text)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+          @click="doExportMarkdown"
+        >
+          <span class="flex items-center gap-2">
+            <svg
+              class="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+              <line x1="9" y1="12" x2="15" y2="12" />
+            </svg>
+            Markdown
           </span>
         </button>
       </div>
@@ -302,6 +399,7 @@ import { useChatStore } from "../../stores/chat";
 import { useConversationLifecycle } from "../../composables/useConversationLifecycle";
 import { useConfirmationModal } from "../../composables/useConfirmationModal";
 import { appEvents, APP_EVENT } from "../../lib/appEvents";
+import { tauriApi } from "../../lib/tauri";
 import type { Conversation } from "../../types/chat";
 
 interface ScrollerItem {
@@ -443,6 +541,10 @@ function closeSearch() {
 const menuOpenId = ref<string | null>(null);
 const menuPosition = ref<{ x: number; y: number } | null>(null);
 const menuRef = ref<HTMLElement | null>(null);
+const exportItemRef = ref<HTMLElement | null>(null);
+const submenuOpen = ref(false);
+const submenuPosition = ref<{ x: number; y: number } | null>(null);
+let submenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 let observer: IntersectionObserver | null = null;
 
@@ -511,6 +613,37 @@ function openContextMenu(e: MouseEvent, conv: Conversation) {
 function closeMenuNow() {
   menuOpenId.value = null;
   menuPosition.value = null;
+  submenuOpen.value = false;
+  submenuPosition.value = null;
+  if (submenuCloseTimer) {
+    clearTimeout(submenuCloseTimer);
+    submenuCloseTimer = null;
+  }
+}
+
+function openSubmenu() {
+  if (submenuCloseTimer) {
+    clearTimeout(submenuCloseTimer);
+    submenuCloseTimer = null;
+  }
+  if (!exportItemRef.value) return;
+  const rect = exportItemRef.value.getBoundingClientRect();
+  submenuPosition.value = { x: rect.right + 2, y: rect.top };
+  submenuOpen.value = true;
+}
+
+function scheduleCloseSubmenu() {
+  submenuCloseTimer = setTimeout(() => {
+    submenuOpen.value = false;
+    submenuPosition.value = null;
+  }, 150);
+}
+
+function cancelCloseSubmenu() {
+  if (submenuCloseTimer) {
+    clearTimeout(submenuCloseTimer);
+    submenuCloseTimer = null;
+  }
 }
 
 function doRename() {
@@ -537,6 +670,28 @@ function doDelete() {
     kind: "danger",
     onConfirm: () => deleteConversation(conv.id),
   });
+}
+
+async function doExportJson() {
+  if (!menuConv.value) return;
+  const id = menuConv.value.id;
+  closeMenuNow();
+  try {
+    await tauriApi.exportConversation(id);
+  } catch (err) {
+    console.error("Export failed:", err);
+  }
+}
+
+async function doExportMarkdown() {
+  if (!menuConv.value) return;
+  const id = menuConv.value.id;
+  closeMenuNow();
+  try {
+    await tauriApi.exportConversationMarkdown(id);
+  } catch (err) {
+    console.error("Export failed:", err);
+  }
 }
 
 function closeMenu(e: MouseEvent) {
@@ -578,5 +733,6 @@ onBeforeUnmount(() => {
   document.removeEventListener("mousedown", closeMenu);
   appEvents.removeEventListener(APP_EVENT.FOCUS_SEARCH, openSearch);
   if (observer) observer.disconnect();
+  if (submenuCloseTimer) clearTimeout(submenuCloseTimer);
 });
 </script>

@@ -320,6 +320,7 @@ tauri::generate_handler![
     commands::chat::send_message,          // delegates to ChatService::send()
     commands::chat::stop_generation,
     commands::chat::export_conversation,
+    commands::chat::export_conversation_markdown,
     commands::chat::backup_database,
     commands::chat::restore_database,
     commands::chat::compact_conversation,  // delegates to ChatService::compact_in_place()

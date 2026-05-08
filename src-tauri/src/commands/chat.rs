@@ -239,32 +239,80 @@ pub async fn stop_generation(state: State<'_, AppState>) -> Result<(), AppError>
     Ok(())
 }
 
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => c,
+        })
+        .collect()
+}
+
+/// Shared file-dialog helper for export commands. Returns None if the user cancels.
+async fn run_export_dialog<R: Runtime>(
+    app: &AppHandle<R>,
+    filter_name: &str,
+    extensions: &[&str],
+    default_name: Option<&str>,
+) -> Result<Option<std::path::PathBuf>, AppError> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut builder = app.dialog().file().add_filter(filter_name, extensions);
+    if let Some(name) = default_name {
+        builder = builder.set_file_name(name);
+    }
+    builder.save_file(move |file_path| {
+        let _ = tx.send(file_path);
+    });
+    let file_path = rx.await.map_err(|e| AppError::Internal(e.to_string()))?;
+    match file_path {
+        Some(fp) => Ok(Some(
+            fp.into_path().map_err(|e| AppError::Io(e.to_string()))?,
+        )),
+        None => Ok(None),
+    }
+}
+
 #[tauri::command]
 pub async fn export_conversation<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
     conversation_id: String,
 ) -> Result<(), AppError> {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    app.dialog()
-        .file()
-        .add_filter("JSON", &["json"])
-        .save_file(move |file_path| {
-            let _ = tx.send(file_path);
-        });
+    let id = conversation_id.clone();
+    let title = spawn_db(state.db.clone(), move |conn| {
+        conversations::get_by_id(conn, &id).map(|c| c.title)
+    })
+    .await?;
+    let default_name = format!("{}.json", sanitize_filename(&title));
+    let Some(path) = run_export_dialog(&app, "JSON", &["json"], Some(&default_name)).await? else {
+        return Ok(());
+    };
+    spawn_db(state.db.clone(), move |conn| {
+        conversations::export_to_path(conn, &conversation_id, &path)
+    })
+    .await
+}
 
-    let default_path = rx.await.map_err(|e| AppError::Internal(e.to_string()))?;
-
-    if let Some(file_path) = default_path {
-        let path = file_path
-            .into_path()
-            .map_err(|e| AppError::Io(e.to_string()))?;
-        spawn_db(state.db.clone(), move |conn| {
-            conversations::export_to_path(conn, &conversation_id, &path)
-        })
-        .await?;
-    }
-    Ok(())
+#[tauri::command]
+pub async fn export_conversation_markdown<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    conversation_id: String,
+) -> Result<(), AppError> {
+    let id = conversation_id.clone();
+    let title = spawn_db(state.db.clone(), move |conn| {
+        conversations::get_by_id(conn, &id).map(|c| c.title)
+    })
+    .await?;
+    let default_name = format!("{}.md", sanitize_filename(&title));
+    let Some(path) = run_export_dialog(&app, "Markdown", &["md"], Some(&default_name)).await?
+    else {
+        return Ok(());
+    };
+    spawn_db(state.db.clone(), move |conn| {
+        conversations::export_to_markdown_path(conn, &conversation_id, &path)
+    })
+    .await
 }
 
 #[tauri::command]

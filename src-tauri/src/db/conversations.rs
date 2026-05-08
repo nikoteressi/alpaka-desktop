@@ -274,22 +274,53 @@ pub fn search(conn: &Connection, query: &str) -> Result<Vec<Conversation>, AppEr
         .collect::<Result<Vec<_>, _>>()
 }
 
-/// Export a conversation and all its messages to a JSON file.
+/// Fetch the conversation and its active messages — shared by all export formats.
+pub(crate) fn fetch_export_data(
+    conn: &Connection,
+    conversation_id: &str,
+) -> Result<(Conversation, Vec<crate::db::messages::Message>), AppError> {
+    let conv = get_by_id(conn, conversation_id)?;
+    let msgs = crate::db::messages::list_for_conversation(conn, conversation_id)?;
+    Ok((conv, msgs))
+}
+
+/// Export a conversation to a JSON file.
 pub fn export_to_path(
     conn: &Connection,
     conversation_id: &str,
     path: &std::path::Path,
 ) -> Result<(), AppError> {
-    let conv = get_by_id(conn, conversation_id)?;
-    let msgs = crate::db::messages::list_for_conversation(conn, conversation_id)?;
-
-    let export_data = serde_json::json!({
+    let (conv, msgs) = fetch_export_data(conn, conversation_id)?;
+    let json_str = serde_json::to_string_pretty(&serde_json::json!({
         "conversation": conv,
         "messages": msgs,
-    });
-
-    let json_str = serde_json::to_string_pretty(&export_data)?;
+    }))?;
     std::fs::write(path, json_str)?;
+    Ok(())
+}
+
+/// Export a conversation to a Markdown file.
+pub fn export_to_markdown_path(
+    conn: &Connection,
+    conversation_id: &str,
+    path: &std::path::Path,
+) -> Result<(), AppError> {
+    let (conv, msgs) = fetch_export_data(conn, conversation_id)?;
+    let mut out = format!(
+        "# {}\n\nModel: {}\nDate: {}\n\n---\n\n",
+        conv.title, conv.model, conv.created_at
+    );
+    for msg in &msgs {
+        let label = match msg.role {
+            crate::db::messages::MessageRole::User => "User",
+            crate::db::messages::MessageRole::Assistant => "Assistant",
+            crate::db::messages::MessageRole::System => "System",
+            crate::db::messages::MessageRole::CompactSummary => continue,
+        };
+        let clean = crate::services::chat::strip_history_content(&msg.content);
+        out.push_str(&format!("**{}:**\n\n{}\n\n---\n\n", label, clean));
+    }
+    std::fs::write(path, out)?;
     Ok(())
 }
 
@@ -416,5 +447,129 @@ mod tests {
 
         let empty = search(&conn, "Python").unwrap();
         assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn fetch_export_data_returns_conversation_and_messages() {
+        let conn = in_memory_conn();
+        let conv = create(
+            &conn,
+            NewConversation {
+                title: "Export Test".into(),
+                model: "llama3".into(),
+                settings_json: None,
+                tags: None,
+            },
+        )
+        .unwrap();
+        crate::db::messages::create(
+            &conn,
+            crate::db::messages::NewMessage {
+                conversation_id: conv.id.clone(),
+                role: crate::db::messages::MessageRole::User,
+                content: "Hello".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let (fetched_conv, msgs) = fetch_export_data(&conn, &conv.id).unwrap();
+        assert_eq!(fetched_conv.title, "Export Test");
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].content, "Hello");
+    }
+
+    #[test]
+    fn export_to_markdown_path_creates_file() {
+        let conn = in_memory_conn();
+        let conv = create(
+            &conn,
+            NewConversation {
+                title: "MD Export".into(),
+                model: "gemma3".into(),
+                settings_json: None,
+                tags: None,
+            },
+        )
+        .unwrap();
+        crate::db::messages::create(
+            &conn,
+            crate::db::messages::NewMessage {
+                conversation_id: conv.id.clone(),
+                role: crate::db::messages::MessageRole::User,
+                content: "Hi there".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        crate::db::messages::create(
+            &conn,
+            crate::db::messages::NewMessage {
+                conversation_id: conv.id.clone(),
+                role: crate::db::messages::MessageRole::Assistant,
+                content: "Hello!".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        crate::db::messages::create(
+            &conn,
+            crate::db::messages::NewMessage {
+                conversation_id: conv.id.clone(),
+                role: crate::db::messages::MessageRole::CompactSummary,
+                content: "should_be_skipped".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("out.md");
+        export_to_markdown_path(&conn, &conv.id, &path).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("# MD Export"));
+        assert!(content.contains("**User:**"));
+        assert!(content.contains("Hi there"));
+        assert!(content.contains("**Assistant:**"));
+        assert!(content.contains("Hello!"));
+        assert!(!content.contains("should_be_skipped"));
+    }
+
+    #[test]
+    fn export_to_markdown_strips_think_and_tool_call_tags() {
+        let conn = in_memory_conn();
+        let conv = create(
+            &conn,
+            NewConversation {
+                title: "Strip Test".into(),
+                model: "llama3".into(),
+                settings_json: None,
+                tags: None,
+            },
+        )
+        .unwrap();
+        crate::db::messages::create(
+            &conn,
+            crate::db::messages::NewMessage {
+                conversation_id: conv.id.clone(),
+                role: crate::db::messages::MessageRole::Assistant,
+                content: "<think>internal reasoning</think>Answer<tool_call>{}</tool_call>".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("strip.md");
+        export_to_markdown_path(&conn, &conv.id, &path).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("Answer"));
+        assert!(!content.contains("<think>"));
+        assert!(!content.contains("</think>"));
+        assert!(!content.contains("<tool_call>"));
+        assert!(!content.contains("</tool_call>"));
+        assert!(!content.contains("internal reasoning"));
     }
 }

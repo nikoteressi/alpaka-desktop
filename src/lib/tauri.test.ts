@@ -145,6 +145,14 @@ describe("tauriApi", () => {
     });
   });
 
+  it("exportConversationMarkdown calls invoke correctly", async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(undefined);
+    await tauriApi.exportConversationMarkdown("c1");
+    expect(invoke).toHaveBeenCalledWith("export_conversation_markdown", {
+      conversationId: "c1",
+    });
+  });
+
   it("backupDatabase calls invoke correctly", async () => {
     vi.mocked(invoke).mockResolvedValueOnce(undefined);
     await tauriApi.backupDatabase();

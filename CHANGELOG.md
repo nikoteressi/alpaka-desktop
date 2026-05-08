@@ -13,6 +13,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
 
 ### Added
+- C-08/C-08b: Conversation export via sidebar context menu — right-click a conversation → Export → JSON or Markdown; dialog pre-filled with conversation title as default filename; Markdown export strips `<think>` and `<tool_call>` blocks for clean output (#156)
 - Host Manager quick-switch (#155): `Ctrl+H` opens/closes the Host Manager modal from anywhere; modal uses `BaseModal` with CSS variables; other shortcuts are suppressed while it is open
 - Arrow-key navigation in model selector: `↑`/`↓` move through installed models, `Enter` selects, `Escape` closes; `Ctrl+M` is suppressed when the model selector is already open
 - In-place chat compaction (#158): compact button always visible (not gated on 70% context); messages soft-archived with `is_archived` flag; streaming summary saved as `compact_summary` message in the same conversation; streaming status bar shows tokens as they arrive with a Cancel button; sidebar spinner when compacting a background conversation; desktop notification on completion; expandable "Show history" toggle on the summary bubble; "Compaction model" setting in Settings → General
