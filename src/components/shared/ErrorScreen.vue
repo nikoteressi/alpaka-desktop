@@ -186,6 +186,7 @@
 
       <!-- Footer Note -->
       <div
+        v-if="props.showServiceControls"
         class="bg-neutral-50 dark:bg-neutral-900/50 p-6 border-t border-neutral-100 dark:border-neutral-800 text-[13px] text-neutral-500 dark:text-neutral-400"
       >
         <p class="mb-2">

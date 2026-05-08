@@ -102,4 +102,11 @@ describe("ErrorScreen", () => {
       .find((b) => b.text().includes("Start Ollama"));
     expect(startBtn).toBeUndefined();
   });
+
+  it("hides the footer note when showServiceControls is false", () => {
+    const wrapper = mount(ErrorScreen, {
+      props: { showServiceControls: false },
+    });
+    expect(wrapper.text()).not.toContain('Start Ollama Service" to run');
+  });
 });
