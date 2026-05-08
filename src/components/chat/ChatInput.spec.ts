@@ -1,5 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { listen as listenMock } from "@tauri-apps/api/event";
 import { setActivePinia, createPinia } from "pinia";
 import ChatInput from "./ChatInput.vue";
 import { useChatStore } from "../../stores/chat";
@@ -1447,5 +1456,89 @@ describe("ChatInput — folder file picker", () => {
     expect(
       wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
     ).toBe(false);
+  });
+});
+
+describe("ChatInput — folder:refreshed event", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      return Promise.resolve(undefined);
+    });
+    (listenMock as unknown as Mock).mockResolvedValue(() => {});
+  });
+
+  function getRefreshedCallback() {
+    const calls = (listenMock as unknown as Mock).mock.calls as [
+      string,
+      (e: { payload: { context_id: string; token_estimate: number } }) => void,
+    ][];
+    const call = calls.find(([event]) => event === "folder:refreshed");
+    return call?.[1];
+  }
+
+  it("calls updateContextTokens when folder:refreshed fires", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", {
+      id: "ctx-1",
+      name: "MyFolder",
+      path: "/home/user/MyFolder",
+      content: "content",
+      tokens: 10,
+    });
+
+    mountInput();
+    await flushPromises();
+
+    const cb = getRefreshedCallback();
+    expect(cb).toBeDefined();
+
+    const updateSpy = vi.spyOn(chatStore, "updateContextTokens");
+    cb!({ payload: { context_id: "ctx-1", token_estimate: 99 } });
+
+    expect(updateSpy).toHaveBeenCalledWith("ctx-1", 99);
+  });
+
+  it("applies is-refreshing class to the matching pill and removes it after 2s", async () => {
+    vi.useFakeTimers();
+    try {
+      const chatStore = useChatStore();
+      chatStore.conversations.push(makeConversation("llama3"));
+      chatStore.activeConversationId = "conv-test-1";
+      chatStore.addFolderContext("conv-test-1", {
+        id: "ctx-flash",
+        name: "MyFolder",
+        path: "/home/user/MyFolder",
+        content: "content",
+        tokens: 10,
+      });
+
+      const wrapper = mountInput();
+      // Flush the listen() promise with fake timers active
+      await vi.runAllTimersAsync();
+      await wrapper.vm.$nextTick();
+
+      const cb = getRefreshedCallback();
+      expect(cb).toBeDefined();
+
+      cb!({ payload: { context_id: "ctx-flash", token_estimate: 55 } });
+      await wrapper.vm.$nextTick();
+
+      const pill = wrapper.find('[data-testid="refresh-flash-ctx-flash"]');
+      expect(pill.exists()).toBe(true);
+      expect(pill.classes()).toContain("is-refreshing");
+
+      vi.advanceTimersByTime(2000);
+      await wrapper.vm.$nextTick();
+
+      expect(pill.classes()).not.toContain("is-refreshing");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
