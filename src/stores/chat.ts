@@ -34,6 +34,39 @@ export function base64ToUint8Array(base64: string) {
   return bytes;
 }
 
+function decodeImages(imagesJson: string): Uint8Array[] {
+  try {
+    if (!imagesJson) return [];
+    return (JSON.parse(imagesJson) as string[]).map(base64ToUint8Array);
+  } catch {
+    return [];
+  }
+}
+
+export function mapBackendMessage(m: BackendMessage): Message {
+  return {
+    id: m.id,
+    conversation_id: m.conversation_id,
+    role: m.role,
+    content: m.content,
+    images: decodeImages(m.images_json),
+    tokens: m.tokens_used ?? undefined,
+    prompt_tokens: m.prompt_tokens ?? undefined,
+    tokens_per_sec: m.tokens_per_sec ?? undefined,
+    generation_time_ms: m.generation_time_ms ?? undefined,
+    total_duration_ms: m.total_duration_ms ?? undefined,
+    load_duration_ms: m.load_duration_ms ?? undefined,
+    prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? undefined,
+    eval_duration_ms: m.eval_duration_ms ?? undefined,
+    seed: m.seed ?? undefined,
+    created_at: m.created_at,
+    parentId: m.parent_id ?? null,
+    siblingOrder: m.sibling_order ?? 0,
+    siblingCount: m.sibling_count ?? 1,
+    isActive: m.is_active ?? true,
+  };
+}
+
 export function uint8ArrayToBase64(bytes: Uint8Array) {
   let binary = "";
   const len = bytes.byteLength;
@@ -339,37 +372,7 @@ export const useChatStore = defineStore("chat", {
 
         if (this.activeConversationId !== id) return;
 
-        this.messages[id] = (rawMessages || []).map((m) => {
-          let images: Uint8Array[] = [];
-          try {
-            if (m.images_json) {
-              const base64s = JSON.parse(m.images_json) as string[];
-              images = base64s.map(base64ToUint8Array);
-            }
-          } catch (e) {
-            console.warn("Failed to parse message images", e);
-          }
-
-          return {
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            images,
-            tokens: m.tokens_used ?? 0,
-            prompt_tokens: m.prompt_tokens ?? 0,
-            tokens_per_sec: m.tokens_per_sec ?? 0,
-            generation_time_ms: m.generation_time_ms ?? 0,
-            total_duration_ms: m.total_duration_ms ?? 0,
-            load_duration_ms: m.load_duration_ms ?? 0,
-            prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
-            eval_duration_ms: m.eval_duration_ms ?? 0,
-            seed: m.seed ?? undefined,
-            parentId: m.parent_id ?? null,
-            siblingOrder: m.sibling_order ?? 0,
-            siblingCount: m.sibling_count ?? 1,
-            isActive: m.is_active ?? true,
-          };
-        });
+        this.messages[id] = (rawMessages || []).map(mapBackendMessage);
 
         // Read contents of folders for the model context
         const populatedContexts = await Promise.all(
@@ -459,47 +462,15 @@ export const useChatStore = defineStore("chat", {
     },
 
     async loadArchivedMessages(conversationId: string): Promise<void> {
-      const rawMessages = await invoke<
-        import("../types/chat").BackendMessage[]
-      >("get_archived_messages", { conversationId });
-      this.archivedMessages[conversationId] = (rawMessages || []).map((m) => {
-        let images: Uint8Array[] = [];
-        try {
-          if (m.images_json) {
-            const base64s = JSON.parse(m.images_json) as string[];
-            images = base64s.map((b) => {
-              const bin = atob(b);
-              const arr = new Uint8Array(bin.length);
-              for (let i = 0; i < bin.length; i++)
-                arr[i] = bin.codePointAt(i) ?? 0;
-              return arr;
-            });
-          }
-        } catch {
-          // image decoding is best-effort; skip on failure
-        }
-        return {
-          id: m.id,
-          conversation_id: m.conversation_id,
-          role: m.role,
-          content: m.content,
-          images,
-          tokens: m.tokens_used ?? undefined,
-          prompt_tokens: m.prompt_tokens ?? undefined,
-          tokens_per_sec: m.tokens_per_sec ?? undefined,
-          generation_time_ms: m.generation_time_ms ?? undefined,
-          total_duration_ms: m.total_duration_ms ?? undefined,
-          load_duration_ms: m.load_duration_ms ?? undefined,
-          prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? undefined,
-          eval_duration_ms: m.eval_duration_ms ?? undefined,
-          seed: m.seed ?? undefined,
-          created_at: m.created_at,
-          parentId: m.parent_id ?? null,
-          siblingOrder: m.sibling_order,
-          siblingCount: m.sibling_count,
-          isActive: m.is_active,
-        };
-      });
+      const rawMessages = await invoke<BackendMessage[]>(
+        "get_archived_messages",
+        {
+          conversationId,
+        },
+      );
+      this.archivedMessages[conversationId] = (rawMessages || []).map(
+        mapBackendMessage,
+      );
     },
 
     async toggleHistory(conversationId: string): Promise<void> {
@@ -542,36 +513,9 @@ export const useChatStore = defineStore("chat", {
           conversationId,
         });
         if (this.activeConversationId !== conversationId) return;
-        this.messages[conversationId] = (rawMessages || []).map((m) => {
-          let images: Uint8Array[] = [];
-          try {
-            if (m.images_json) {
-              const base64s = JSON.parse(m.images_json) as string[];
-              images = base64s.map(base64ToUint8Array);
-            }
-          } catch {
-            // ignore malformed image data
-          }
-          return {
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            images,
-            tokens: m.tokens_used ?? 0,
-            prompt_tokens: m.prompt_tokens ?? 0,
-            tokens_per_sec: m.tokens_per_sec ?? 0,
-            generation_time_ms: m.generation_time_ms ?? 0,
-            total_duration_ms: m.total_duration_ms ?? 0,
-            load_duration_ms: m.load_duration_ms ?? 0,
-            prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
-            eval_duration_ms: m.eval_duration_ms ?? 0,
-            seed: m.seed ?? undefined,
-            parentId: m.parent_id ?? null,
-            siblingOrder: m.sibling_order ?? 0,
-            siblingCount: m.sibling_count ?? 1,
-            isActive: m.is_active ?? true,
-          };
-        });
+        this.messages[conversationId] = (rawMessages || []).map(
+          mapBackendMessage,
+        );
       } catch (err) {
         console.warn("Could not refresh messages", err);
       }
