@@ -8,8 +8,6 @@ import type {
   ChatDraft,
   LinkedContext,
   FolderContextPayload,
-  MessagePart,
-  SearchResult,
 } from "../types/chat";
 import { DRAFT_ID_PREFIX } from "../lib/constants";
 
@@ -34,39 +32,6 @@ export function base64ToUint8Array(base64: string) {
   return bytes;
 }
 
-function decodeImages(imagesJson: string): Uint8Array[] {
-  try {
-    if (!imagesJson) return [];
-    return (JSON.parse(imagesJson) as string[]).map(base64ToUint8Array);
-  } catch {
-    return [];
-  }
-}
-
-export function mapBackendMessage(m: BackendMessage): Message {
-  return {
-    id: m.id,
-    conversation_id: m.conversation_id,
-    role: m.role,
-    content: m.content,
-    images: decodeImages(m.images_json),
-    tokens: m.tokens_used ?? undefined,
-    prompt_tokens: m.prompt_tokens ?? undefined,
-    tokens_per_sec: m.tokens_per_sec ?? undefined,
-    generation_time_ms: m.generation_time_ms ?? undefined,
-    total_duration_ms: m.total_duration_ms ?? undefined,
-    load_duration_ms: m.load_duration_ms ?? undefined,
-    prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? undefined,
-    eval_duration_ms: m.eval_duration_ms ?? undefined,
-    seed: m.seed ?? undefined,
-    created_at: m.created_at,
-    parentId: m.parent_id ?? null,
-    siblingOrder: m.sibling_order ?? 0,
-    siblingCount: m.sibling_count ?? 1,
-    isActive: m.is_active ?? true,
-  };
-}
-
 export function uint8ArrayToBase64(bytes: Uint8Array) {
   let binary = "";
   const len = bytes.byteLength;
@@ -76,36 +41,25 @@ export function uint8ArrayToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-function initialStreaming(): StreamingState {
-  return {
-    isStreaming: false,
-    currentConversationId: null,
-    buffer: "",
-    thinkingBuffer: "",
-    isThinking: false,
-    tokensPerSec: null,
-    thinkTime: null,
-    toolCalls: [],
-    searchState: null,
-    searchResults: [],
-    sidebarOpen: false,
-    activeSearchMessageId: null,
-    activeSearchData: [],
-    promptTokens: 0,
-    evalTokens: 0,
-    activeMessageParts: [],
-    regeneratingMessageId: null,
-  };
-}
-
 export const useChatStore = defineStore("chat", {
   state: () => ({
     conversations: [] as Conversation[],
     activeConversationId: null as string | null,
-    messages: {} as Record<string, Message[]>, // NOSONAR
-    folderContexts: {} as Record<string, LinkedContext[]>, // NOSONAR
-    expandedStats: new Set<string>(),
-    streaming: initialStreaming(),
+    messages: {} as Record<string, Message[]>,
+    folderContexts: {} as Record<string, LinkedContext[]>,
+    expandedStats: new Set<string>(), // Track which message IDs have full stats visible
+    streaming: {
+      isStreaming: false,
+      currentConversationId: null,
+      buffer: "",
+      thinkingBuffer: "",
+      isThinking: false,
+      tokensPerSec: null,
+      thinkTime: null,
+      toolCalls: [],
+      promptTokens: 0,
+      evalTokens: 0,
+    } as StreamingState,
     _listenersInitialized: false,
     /** Draft conversation — local-only, not yet persisted to DB */
     draftConversation: null as Conversation | null,
@@ -114,13 +68,9 @@ export const useChatStore = defineStore("chat", {
     isLoadingMore: false,
     nextOffset: 0,
     /** In-memory cache of drafts for loaded conversations */
-    drafts: {} as Record<string, ChatDraft>, // NOSONAR
+    drafts: {} as Record<string, ChatDraft>,
     /** Temporary system prompt for drafts or newly created chats */
-    draftSystemPrompt: "",
-    compactionInProgress: {} as Record<string, boolean>, // NOSONAR
-    compactionTokens: {} as Record<string, string>, // NOSONAR
-    archivedMessages: {} as Record<string, import("../types/chat").Message[]>, // NOSONAR
-    showingHistory: new Set<string>(),
+    draftSystemPrompt: "" as string,
   }),
 
   getters: {
@@ -240,58 +190,6 @@ export const useChatStore = defineStore("chat", {
       this.streaming.isThinking = false;
       this.streaming.thinkTime = null;
       this.streaming.toolCalls = [];
-      this.streaming.searchState = null;
-      this.streaming.searchResults = [];
-      this.streaming.activeMessageParts = [];
-      this.streaming.regeneratingMessageId = null;
-    },
-
-    // Avoids re-parsing the entire buffer on every token.
-    updateActivePart(
-      type: MessagePart["type"],
-      content: string,
-      metadata: Partial<MessagePart> = {},
-    ) {
-      const parts = this.streaming.activeMessageParts;
-      const lastPart = parts[parts.length - 1];
-
-      // If we're continuing the same part type, append content
-      if (
-        lastPart &&
-        lastPart.type === type &&
-        (type === "markdown" || type === "think")
-      ) {
-        lastPart.content += content;
-        return;
-      }
-
-      // Otherwise, create a new part
-      parts.push({ type, content, ...metadata } as MessagePart); // NOSONAR
-    },
-
-    updatePartMetadata(
-      type: MessagePart["type"],
-      metadata: Partial<MessagePart>,
-    ) {
-      const parts = this.streaming.activeMessageParts;
-      for (let i = parts.length - 1; i >= 0; i--) {
-        if (parts[i].type === type) {
-          Object.assign(parts[i], metadata);
-          break;
-        }
-      }
-    },
-
-    openSearchSidebar(messageId: string | null, results: SearchResult[]) {
-      this.streaming.sidebarOpen = true;
-      this.streaming.activeSearchMessageId = messageId;
-      this.streaming.activeSearchData = results;
-    },
-
-    closeSearchSidebar() {
-      this.streaming.sidebarOpen = false;
-      this.streaming.activeSearchMessageId = null;
-      this.streaming.activeSearchData = [];
     },
 
     async loadConversations(reset = false) {
@@ -372,7 +270,32 @@ export const useChatStore = defineStore("chat", {
 
         if (this.activeConversationId !== id) return;
 
-        this.messages[id] = (rawMessages || []).map(mapBackendMessage);
+        this.messages[id] = (rawMessages || []).map((m) => {
+          let images: Uint8Array[] = [];
+          try {
+            if (m.images_json) {
+              const base64s = JSON.parse(m.images_json) as string[];
+              images = base64s.map(base64ToUint8Array);
+            }
+          } catch (e) {
+            console.warn("Failed to parse message images", e);
+          }
+
+          return {
+            role: m.role,
+            content: m.content,
+            images,
+            tokens: m.tokens_used ?? 0,
+            prompt_tokens: m.prompt_tokens ?? 0,
+            tokens_per_sec: m.tokens_per_sec ?? 0,
+            generation_time_ms: m.generation_time_ms ?? 0,
+            total_duration_ms: m.total_duration_ms ?? 0,
+            load_duration_ms: m.load_duration_ms ?? 0,
+            prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
+            eval_duration_ms: m.eval_duration_ms ?? 0,
+            seed: m.seed ?? undefined,
+          };
+        });
 
         // Read contents of folders for the model context
         const populatedContexts = await Promise.all(
@@ -433,131 +356,15 @@ export const useChatStore = defineStore("chat", {
     async compactConversation(
       conversationId: string,
       model: string,
-    ): Promise<void> {
-      this.compactionInProgress[conversationId] = true;
-      this.compactionTokens[conversationId] = "";
-      try {
-        await invoke<void>("compact_conversation", { conversationId, model });
-        // compact:done event is the single owner of cache-clear + reload for both
-        // UI-triggered and future background-triggered compaction paths.
-      } catch (e) {
-        console.error("Compact failed:", e);
-        this.finishCompaction(conversationId);
-      }
-    },
-
-    appendCompactionToken(conversationId: string, content: string) {
-      this.compactionTokens[conversationId] =
-        (this.compactionTokens[conversationId] ?? "") + content;
-    },
-
-    finishCompaction(conversationId: string) {
-      delete this.compactionInProgress[conversationId];
-      delete this.compactionTokens[conversationId];
-      delete this.archivedMessages[conversationId];
-    },
-
-    async cancelCompaction(): Promise<void> {
-      await invoke("cancel_compaction");
-    },
-
-    async loadArchivedMessages(conversationId: string): Promise<void> {
-      const rawMessages = await invoke<BackendMessage[]>(
-        "get_archived_messages",
-        {
-          conversationId,
-        },
-      );
-      this.archivedMessages[conversationId] = (rawMessages || []).map(
-        mapBackendMessage,
-      );
-    },
-
-    async toggleHistory(conversationId: string): Promise<void> {
-      if (this.showingHistory.has(conversationId)) {
-        this.showingHistory.delete(conversationId);
-      } else {
-        this.showingHistory.add(conversationId);
-        if (!this.archivedMessages[conversationId]) {
-          await this.loadArchivedMessages(conversationId);
-        }
-      }
-    },
-
-    async switchVersion(siblingId: string): Promise<void> {
-      await invoke("switch_version", { siblingId });
-      const id = this.activeConversationId;
-      if (id) {
-        // Clear cached messages to bypass the early-return guard in loadConversation.
-        delete this.messages[id];
-        await this.loadConversation(id);
-      }
-    },
-
-    async navigateVersion(messageId: string, direction: 1 | -1): Promise<void> {
-      await invoke("navigate_version", { messageId, direction });
-      const id = this.activeConversationId;
-      if (id) {
-        delete this.messages[id];
-        await this.loadConversation(id);
-      }
-    },
-
-    clearMessages(conversationId: string): void {
-      delete this.messages[conversationId];
-    },
-
-    async refreshMessages(conversationId: string): Promise<void> {
-      try {
-        const rawMessages = await invoke<BackendMessage[]>("get_messages", {
-          conversationId,
-        });
-        if (this.activeConversationId !== conversationId) return;
-        this.messages[conversationId] = (rawMessages || []).map(
-          mapBackendMessage,
-        );
-      } catch (err) {
-        console.warn("Could not refresh messages", err);
-      }
-    },
-
-    async regenerateMessage(parentMessageId: string): Promise<void> {
-      const conversationId = this.activeConversationId;
-      if (!conversationId) return;
-      const conv = this.conversations.find((c) => c.id === conversationId);
-      if (!conv) return;
-
-      // Mirror streaming setup so the send button is blocked and the streaming bubble appears
-      this.streaming.isStreaming = true;
-      this.streaming.currentConversationId = conversationId;
-      this.streaming.buffer = "";
-      this.streaming.thinkingBuffer = "";
-      this.streaming.isThinking = false;
-      this.streaming.tokensPerSec = null;
-      this.streaming.promptTokens = 0;
-      this.streaming.evalTokens = 0;
-      this.streaming.searchState = null;
-      this.streaming.searchResults = [];
-      this.streaming.activeMessageParts = [];
-      this.streaming.regeneratingMessageId = parentMessageId;
-
-      try {
-        await invoke("regenerate_message", {
-          conversationId,
-          parentMessageId,
-          model: conv.model,
-          thinkMode: null,
-          chatOptions: null,
-          webSearchEnabled: false,
-        });
-      } catch (err) {
-        // invoke failed before streaming started; clean up
-        this.streaming.isStreaming = false;
-        this.streaming.regeneratingMessageId = null;
-        throw err;
-      }
-      // isStreaming is reset by onDone event handler; just clear the regen flag
-      this.streaming.regeneratingMessageId = null;
+      title?: string,
+    ): Promise<string> {
+      const newConvId = await invoke<string>("compact_conversation", {
+        conversationId,
+        model,
+        title,
+      });
+      await this.loadConversations(true);
+      return newConvId;
     },
   },
 });

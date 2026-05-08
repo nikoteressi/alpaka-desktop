@@ -58,7 +58,6 @@ export interface SettingsState {
   systemFolderTemplate: string;
   presets: Preset[];
   defaultPresetId: string;
-  compactionModel: string; // "" means "same as conversation model"
 }
 
 export interface AppSettings {

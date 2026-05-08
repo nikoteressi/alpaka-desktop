@@ -1,182 +1,344 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { createPinia, setActivePinia } from "pinia";
-import SearchBlock from "./SearchBlock.vue";
-import { useChatStore } from "../../stores/chat";
+import { ref } from "vue";
 
-const twoResults = [
+let isOpenRef = ref(false);
+const toggleMock = vi.fn();
+
+vi.mock("../../composables/useCollapsibleState", () => ({
+  useCollapsibleState: vi.fn(() => ({
+    isOpen: isOpenRef,
+    toggle: toggleMock,
+    setOpen: vi.fn(),
+  })),
+}));
+
+// SearchBlock imports openUrl from ../../lib/urlOpener — mock that directly
+const openUrlMock = vi.fn().mockResolvedValue(undefined);
+vi.mock("../../lib/urlOpener", () => ({ openUrl: openUrlMock }));
+
+const { default: SearchBlock } = await import("./SearchBlock.vue");
+
+// Helper: a well-formed result with a single source
+const singleSourceResult = JSON.stringify([
   {
     url: "https://example.com/page",
     title: "Example Page",
-    content: "Some content",
+    content: "Some content here",
   },
-  {
-    url: "https://github.com/user/repo",
-    title: "GitHub Repo",
-    content: "Readme",
-  },
-];
+]);
 
-describe("SearchBlock — found type", () => {
+// Helper: the {results: [...]} wrapper shape
+const wrappedSourceResult = JSON.stringify({
+  results: [
+    {
+      url: "https://github.com/user/repo",
+      title: "GitHub Repo",
+      content: "Readme content",
+    },
+  ],
+});
+
+describe("SearchBlock — basic rendering", () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    isOpenRef = ref(false);
+    vi.clearAllMocks();
   });
 
-  it("shows 'Searching web...' label when state is reading", () => {
+  it("renders the query text", () => {
     const wrapper = mount(SearchBlock, {
-      props: {
-        type: "found",
-        query: "AI news",
-        state: "reading",
-        isStreaming: true,
-      },
+      props: { query: "latest AI news" },
     });
-    expect(wrapper.text()).toContain("Searching web...");
+    expect(wrapper.text()).toContain("latest AI news");
   });
 
-  it("shows 'Found N web pages' label when results are provided", () => {
+  it("shows 'Searching for' label when no result", () => {
     const wrapper = mount(SearchBlock, {
-      props: {
-        type: "found",
-        query: "test",
-        results: twoResults,
-        state: "done",
-      },
+      props: { query: "something" },
     });
-    expect(wrapper.text()).toContain("Found 2 web pages");
+    expect(wrapper.text()).toContain("Searching for");
   });
 
-  it("shows spinner svg when state is reading", () => {
-    const wrapper = mount(SearchBlock, {
-      props: { type: "found", state: "reading", isStreaming: true },
-    });
+  it("shows spinner svg (animate-spin) when result is absent", () => {
+    const wrapper = mount(SearchBlock, { props: { query: "test" } });
     expect(wrapper.find(".animate-spin").exists()).toBe(true);
   });
 
-  it("does not show spinner when state is done", () => {
+  it("shows 'Sourced N references for' label when result is provided", () => {
     const wrapper = mount(SearchBlock, {
-      props: { type: "found", results: twoResults, state: "done" },
+      props: { query: "test", result: singleSourceResult },
+    });
+    expect(wrapper.text()).toContain("Sourced");
+    expect(wrapper.text()).toContain("references for");
+  });
+
+  it("does not show spinner when result is present", () => {
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: singleSourceResult },
     });
     expect(wrapper.find(".animate-spin").exists()).toBe(false);
   });
 
-  it("renders favicons for unique domains", () => {
-    const wrapper = mount(SearchBlock, {
-      props: { type: "found", results: twoResults, state: "done" },
+  it("shows chevron svg only when result is present", () => {
+    const withResult = mount(SearchBlock, {
+      props: { query: "test", result: singleSourceResult },
     });
-    const imgs = wrapper.findAll("img.search-badge__favicon");
-    expect(imgs.length).toBe(2);
-    expect(imgs[0].attributes("src")).toContain("google.com/s2/favicons");
-    expect(imgs[0].attributes("src")).toContain("example.com");
-  });
-
-  it("deduplicates favicons for same domain", () => {
-    const sameHost = [
-      { url: "https://example.com/a", title: "A", content: "" },
-      { url: "https://example.com/b", title: "B", content: "" },
-    ];
-    const wrapper = mount(SearchBlock, {
-      props: { type: "found", results: sameHost, state: "done" },
-    });
-    expect(wrapper.findAll("img.search-badge__favicon").length).toBe(1);
+    const withoutResult = mount(SearchBlock, { props: { query: "test" } });
+    // Chevron is rendered with v-if="result"
+    // Both have rotate-180 class conditionally — check for the chevron container div
+    // The header div always exists; the chevron svg is a sibling only when result is set
+    expect(withResult.text()).toContain("Sourced");
+    expect(withoutResult.text()).not.toContain("Sourced");
   });
 });
 
-describe("SearchBlock — final type", () => {
+describe("SearchBlock — toggleCollapse", () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    isOpenRef = ref(false);
+    vi.clearAllMocks();
   });
 
-  it("shows count label", () => {
-    const wrapper = mount(SearchBlock, {
-      props: { type: "final", results: twoResults },
-    });
-    expect(wrapper.text()).toContain("2 web pages");
+  it("does not call toggle when header is clicked but result is absent", async () => {
+    const wrapper = mount(SearchBlock, { props: { query: "test" } });
+    await wrapper.find(".search-block > div").trigger("click");
+    expect(toggleMock).not.toHaveBeenCalled();
   });
 
-  it("shows chevron", () => {
+  it("calls toggle when header is clicked and result is present", async () => {
     const wrapper = mount(SearchBlock, {
-      props: { type: "final", results: twoResults },
+      props: { query: "test", result: singleSourceResult },
     });
-    expect(wrapper.find(".search-badge__chevron").exists()).toBe(true);
+    await wrapper.find(".search-block > div").trigger("click");
+    expect(toggleMock).toHaveBeenCalledOnce();
+  });
+
+  it("accordion has closed class when isOpen is false", () => {
+    isOpenRef = ref(false);
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: singleSourceResult },
+    });
+    expect(wrapper.find(".search-accordion").classes()).toContain(
+      "search-accordion--closed",
+    );
+  });
+
+  it("accordion does not have closed class when isOpen is true", () => {
+    isOpenRef = ref(true);
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: singleSourceResult },
+    });
+    expect(wrapper.find(".search-accordion").classes()).not.toContain(
+      "search-accordion--closed",
+    );
   });
 });
 
-describe("SearchBlock — sidebar toggle", () => {
+describe("SearchBlock — parsedResults (bare-array shape)", () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    isOpenRef = ref(true);
+    vi.clearAllMocks();
   });
 
-  it("opens sidebar when badge is clicked", async () => {
-    const chatStore = useChatStore();
+  it("renders source cards for bare-array result shape", () => {
     const wrapper = mount(SearchBlock, {
-      props: { type: "final", messageId: "msg-1", results: twoResults },
+      props: { query: "test", result: singleSourceResult },
     });
-    await wrapper.find(".search-badge").trigger("click");
-    expect(chatStore.streaming.sidebarOpen).toBe(true);
-    expect(chatStore.streaming.activeSearchMessageId).toBe("msg-1");
+    // Source cards exist as clickable divs inside the accordion
+    const cards = wrapper.findAll(".search-accordion .cursor-pointer");
+    expect(cards.length).toBe(1);
   });
 
-  it("closes sidebar when badge is clicked while active", async () => {
-    const chatStore = useChatStore();
-    chatStore.openSearchSidebar("msg-1", twoResults);
+  it("renders source cards for {results:[...]} wrapper shape", () => {
     const wrapper = mount(SearchBlock, {
-      props: { type: "final", messageId: "msg-1", results: twoResults },
+      props: { query: "test", result: wrappedSourceResult },
     });
-    await wrapper.find(".search-badge").trigger("click");
-    expect(chatStore.streaming.sidebarOpen).toBe(false);
+    const cards = wrapper.findAll(".search-accordion .cursor-pointer");
+    expect(cards.length).toBe(1);
   });
 
-  it("applies active class when sidebar is open for this message", () => {
-    const chatStore = useChatStore();
-    chatStore.openSearchSidebar("msg-1", twoResults);
+  it("shows sourcesCount equal to number of parsed results", () => {
+    const multiResult = JSON.stringify([
+      { url: "https://a.com", title: "A", content: "a" },
+      { url: "https://b.com", title: "B", content: "b" },
+    ]);
     const wrapper = mount(SearchBlock, {
-      props: { type: "final", messageId: "msg-1", results: twoResults },
+      props: { query: "test", result: multiResult },
     });
-    expect(wrapper.find(".search-badge--active").exists()).toBe(true);
+    expect(wrapper.text()).toContain("Sourced 2 references for");
   });
 
-  it("does not apply active class for a different messageId", () => {
-    const chatStore = useChatStore();
-    chatStore.openSearchSidebar("msg-OTHER", twoResults);
+  it("shows fallback raw text when JSON is valid but yields no array", () => {
+    // Neither array nor {results:[]} — falls into neither branch → rawResults=[]
+    // The filter then removes all, so parsedResults is empty and fallback div renders
+    const emptyObjResult = JSON.stringify({ data: "nothing" });
     const wrapper = mount(SearchBlock, {
-      props: { type: "final", messageId: "msg-1", results: twoResults },
+      props: { query: "test", result: emptyObjResult },
     });
-    expect(wrapper.find(".search-badge--active").exists()).toBe(false);
+    // parsedResults.length === 0, so fallback div renders the raw result string
+    expect(wrapper.find(".font-mono.whitespace-pre-wrap").exists()).toBe(true);
+  });
+
+  it("shows fallback raw text when result is invalid JSON", () => {
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: "not-json{{{" },
+    });
+    expect(wrapper.find(".font-mono.whitespace-pre-wrap").exists()).toBe(true);
+  });
+
+  it("filters out results with url '#'", () => {
+    const resultWithHash = JSON.stringify([
+      { url: "#", title: "No URL", content: "filtered out" },
+      { url: "https://valid.com", title: "Valid", content: "kept" },
+    ]);
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: resultWithHash },
+    });
+    // Only 1 card (the valid one) — the '#' entry is filtered
+    const cards = wrapper.findAll(".search-accordion .cursor-pointer");
+    expect(cards.length).toBe(1);
+  });
+
+  it("uses 'Untitled Result' when title is missing", () => {
+    const resultNoTitle = JSON.stringify([
+      { url: "https://example.com", content: "desc" },
+    ]);
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: resultNoTitle },
+    });
+    expect(wrapper.find(".search-accordion").text()).toContain("Example");
   });
 });
 
-describe("SearchBlock — favicon error handling", () => {
+describe("SearchBlock — extractSiteName", () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    isOpenRef = ref(true);
+    vi.clearAllMocks();
   });
 
-  it("handleFaviconError hides the parent element of a broken favicon", async () => {
+  const mkResult = (url: string) =>
+    JSON.stringify([{ url, title: "A Title", content: "c" }]);
+
+  it("returns 'GitHub' for github.com URLs", () => {
     const wrapper = mount(SearchBlock, {
-      props: { type: "final", results: twoResults },
+      props: {
+        query: "test",
+        result: mkResult("https://github.com/user/repo"),
+      },
     });
-    const img = wrapper.find("img.search-badge__favicon");
-    expect(img.exists()).toBe(true);
-
-    const parent = img.element.parentElement as HTMLElement;
-    parent.style.display = "flex";
-
-    await img.trigger("error");
-
-    expect(parent.style.display).toBe("none");
+    expect(wrapper.find(".search-accordion").text()).toContain("GitHub");
   });
 
-  it("favicon URL computation skips results with invalid URLs", () => {
-    const badResult = [
-      { url: "not-a-valid-url", title: "Bad", content: "" },
-      { url: "https://valid.com/page", title: "Good", content: "" },
-    ];
+  it("returns 'Wikipedia' for wikipedia.org URLs", () => {
+    // en.wikipedia.org → hostname.replace("www.","") is "en.wikipedia.org"
+    // split(".")[0] is "en" which doesn't match — use wikipedia.org directly
     const wrapper = mount(SearchBlock, {
-      props: { type: "final", results: badResult },
+      props: {
+        query: "test",
+        result: mkResult("https://wikipedia.org/wiki/Test"),
+      },
     });
-    const imgs = wrapper.findAll("img.search-badge__favicon");
-    // Only the valid URL produces a favicon
-    expect(imgs.length).toBe(1);
-    expect(imgs[0].attributes("src")).toContain("valid.com");
+    expect(wrapper.find(".search-accordion").text()).toContain("Wikipedia");
+  });
+
+  it("returns 'Reddit' for reddit.com URLs", () => {
+    const wrapper = mount(SearchBlock, {
+      props: {
+        query: "test",
+        result: mkResult("https://www.reddit.com/r/test"),
+      },
+    });
+    expect(wrapper.find(".search-accordion").text()).toContain("Reddit");
+  });
+
+  it("returns 'Medium' for medium.com URLs", () => {
+    const wrapper = mount(SearchBlock, {
+      props: {
+        query: "test",
+        result: mkResult("https://medium.com/@author/article"),
+      },
+    });
+    expect(wrapper.find(".search-accordion").text()).toContain("Medium");
+  });
+
+  it("returns 'arXiv' for arxiv.org URLs", () => {
+    const wrapper = mount(SearchBlock, {
+      props: {
+        query: "test",
+        result: mkResult("https://arxiv.org/abs/1234.5678"),
+      },
+    });
+    expect(wrapper.find(".search-accordion").text()).toContain("arXiv");
+  });
+
+  it("capitalizes first letter for unknown domains", () => {
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: mkResult("https://openai.com/blog") },
+    });
+    expect(wrapper.find(".search-accordion").text()).toContain("Openai");
+  });
+
+  it("falls back to title first word when URL is invalid", () => {
+    const resultBadUrl = JSON.stringify([
+      { url: "not-a-url", title: "FallbackTitle here", content: "c" },
+    ]);
+    // Invalid URL is filtered by the url !== '#' filter — it passes since url is not "#"
+    // extractSiteName catches the URL parse error and returns title.split(" ")[0]
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: resultBadUrl },
+    });
+    expect(wrapper.find(".search-accordion").text()).toContain("FallbackTitle");
+  });
+});
+
+describe("SearchBlock — openUrl", () => {
+  beforeEach(() => {
+    isOpenRef = ref(true);
+    vi.clearAllMocks();
+  });
+
+  it("calls openUrl with the source URL when a source card is clicked", async () => {
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: singleSourceResult },
+    });
+    const card = wrapper.find(".search-accordion .cursor-pointer");
+    await card.trigger("click");
+    expect(openUrlMock).toHaveBeenCalledWith("https://example.com/page");
+  });
+});
+
+describe("SearchBlock — getFaviconUrl / cleanUrl / handleIconError", () => {
+  beforeEach(() => {
+    isOpenRef = ref(true);
+    vi.clearAllMocks();
+  });
+
+  it("renders a favicon img with google s2 favicons URL", () => {
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: singleSourceResult },
+    });
+    const img = wrapper.find(".search-accordion img");
+    expect(img.attributes("src")).toContain("google.com/s2/favicons");
+    expect(img.attributes("src")).toContain("example.com");
+  });
+
+  it("renders the cleaned URL (no www.) as subdomain label", () => {
+    const withWww = JSON.stringify([
+      { url: "https://www.example.com/page", title: "Ex", content: "c" },
+    ]);
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: withWww },
+    });
+    const urlLabel = wrapper.find(".search-accordion .font-mono");
+    expect(urlLabel.text()).toBe("example.com");
+    expect(urlLabel.text()).not.toContain("www.");
+  });
+
+  it("handleIconError hides the img when it fails to load", () => {
+    const wrapper = mount(SearchBlock, {
+      props: { query: "test", result: singleSourceResult },
+    });
+    const img = wrapper.find(".search-accordion img");
+    img.trigger("error");
+    expect((img.element as HTMLImageElement).style.display).toBe("none");
   });
 });

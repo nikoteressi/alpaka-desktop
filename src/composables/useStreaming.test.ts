@@ -32,7 +32,7 @@ describe("useStreaming", () => {
 
     await listenersReady;
 
-    expect(mockListen).toHaveBeenCalledTimes(10);
+    expect(mockListen).toHaveBeenCalledTimes(9);
     const events = mockListen.mock.calls.map(([event]) => event);
     expect(events).toContain("chat:token");
     expect(events).toContain("chat:thinking-start");
@@ -40,7 +40,6 @@ describe("useStreaming", () => {
     expect(events).toContain("chat:thinking-end");
     expect(events).toContain("chat:done");
     expect(events).toContain("chat:tool-call");
-    expect(events).toContain("chat:tool-reading");
     expect(events).toContain("chat:tool-result");
     expect(events).toContain("chat:error");
     expect(events).toContain("chat:cancelled");

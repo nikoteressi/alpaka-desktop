@@ -20,7 +20,6 @@ const isModelDropdownOpen = ref(false);
 const modelSearch = ref("");
 const modelSelectorRef = ref<HTMLElement | null>(null);
 const modelSearchInput = ref<HTMLInputElement | null>(null);
-const focusedIndex = ref(-1);
 
 const selectorTagFilter = ref<string | null>(null);
 
@@ -65,35 +64,7 @@ function openModelDropdown() {
 }
 
 function onModelSearchInput() {
-  focusedIndex.value = -1;
   modelStore.searchLibrary(modelSearch.value);
-}
-
-function onSearchKeydown(e: KeyboardEvent) {
-  const models = filteredInstalledModels.value;
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    focusedIndex.value = Math.min(focusedIndex.value + 1, models.length - 1);
-    scrollFocusedIntoView();
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    focusedIndex.value = Math.max(focusedIndex.value - 1, -1);
-    scrollFocusedIntoView();
-  } else if (e.key === "Enter" && focusedIndex.value >= 0) {
-    e.preventDefault();
-    selectModel(models[focusedIndex.value].name);
-  } else if (e.key === "Escape") {
-    closeModelDropdown();
-  }
-}
-
-function scrollFocusedIntoView() {
-  nextTick(() => {
-    const el = modelSelectorRef.value?.querySelector(
-      `[data-model-index="${focusedIndex.value}"]`,
-    );
-    (el as HTMLElement)?.scrollIntoView({ block: "nearest" });
-  });
 }
 
 function selectModel(name: string) {
@@ -144,15 +115,10 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
 </script>
 
 <template>
-  <div
-    class="relative"
-    ref="modelSelectorRef"
-    data-testid="model-selector"
-    :data-model-selector-open="isModelDropdownOpen ? '' : null"
-  >
+  <div class="relative" ref="modelSelectorRef" data-testid="model-selector">
     <button
       @click="openModelDropdown"
-      class="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-full px-3 h-7 text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors flex-shrink-0 whitespace-nowrap"
+      class="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-2xl px-2.5 py-1 text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors flex-shrink-0 whitespace-nowrap"
       :class="
         isModelDropdownOpen
           ? 'bg-[var(--bg-active)] ring-1 ring-[var(--accent)]/30'
@@ -169,7 +135,7 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
       >
         <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke-linecap="round" />
       </svg>
-      <span class="max-w-[200px] truncate leading-none">{{
+      <span class="max-w-[140px] truncate leading-none">{{
         activeModelName
       }}</span>
       <svg
@@ -197,7 +163,6 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
           ref="modelSearchInput"
           v-model="modelSearch"
           @input="onModelSearchInput"
-          @keydown="onSearchKeydown"
           placeholder="Search models..."
           class="w-full bg-[var(--bg-input)] rounded-lg px-3 py-2 text-[13px] text-[var(--text)] border border-transparent focus:border-[var(--accent)]/50 outline-none placeholder-[var(--text-dim)] transition-all"
         />
@@ -244,17 +209,14 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
           </div>
           <div class="flex flex-col">
             <div
-              v-for="(m, idx) in filteredInstalledModels"
+              v-for="m in filteredInstalledModels"
               :key="'installed-' + m.name"
               :data-testid="'model-option-' + m.name"
-              :data-model-index="idx"
               class="group flex flex-col px-4 py-3 cursor-pointer transition-colors border-b border-[var(--border-subtle)] last:border-b-0"
               :class="
-                focusedIndex === idx
-                  ? 'bg-[var(--bg-active)]'
-                  : m.name === activeModelName
-                    ? 'bg-[var(--accent-muted)]/10'
-                    : 'hover:bg-[var(--bg-hover)]'
+                m.name === activeModelName
+                  ? 'bg-[var(--accent-muted)]/10'
+                  : 'hover:bg-[var(--bg-hover)]'
               "
               @click="selectModel(m.name)"
             >

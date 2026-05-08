@@ -217,8 +217,7 @@ function toggle(event: MouseEvent) {
 
 <style scoped>
 .stats-block {
-  margin-top: 0;
-  width: 100%;
+  margin-top: 16px;
 }
 
 .stats-toggle-btn {

@@ -1,35 +1,30 @@
 <template>
-  <div
-    class="search-block"
-    :class="{
-      'search-block--found': type === 'found',
-      'search-block--final': type === 'final',
-      'search-block--streaming': isStreaming,
-    }"
-  >
-    <button
-      class="search-badge"
-      :class="{ 'search-badge--active': isActive }"
-      @click="handleToggle"
+  <div class="search-block" :class="{ 'search-block--complete': !!result }">
+    <!-- Header: Compact & Integrated -->
+    <div
+      class="flex items-center gap-3 py-1.5 px-3 rounded-full bg-[var(--bg-active)]/40 border border-[var(--border-subtle)] w-fit mb-3 transition-all duration-300 hover:bg-[var(--bg-active)]/60 cursor-pointer group"
+      @click="toggleCollapse"
     >
-      <div v-if="type === 'found'" class="search-badge__icon">
+      <div v-if="!result" class="flex items-center justify-center">
         <svg
-          v-if="isStreaming && state === 'reading'"
-          class="animate-spin"
-          width="14"
-          height="14"
+          class="w-3.5 h-3.5 animate-spin text-[var(--accent)]"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
           stroke-width="3"
         >
-          <circle cx="12" cy="12" r="10" stroke-opacity="0.2" />
-          <path d="M12 2a10 10 0 0 1 10 10" />
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+            stroke-dasharray="12 40"
+            stroke-linecap="round"
+          />
         </svg>
+      </div>
+      <div v-else class="flex items-center justify-center">
         <svg
-          v-else
-          width="14"
-          height="14"
+          class="w-3.5 h-3.5 text-[var(--accent)]"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -37,279 +32,218 @@
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.3-4.3" />
+          <circle cx="12" cy="12" r="10" />
+          <path d="m8 12 3 3 5-5" />
         </svg>
       </div>
-
-      <div class="search-badge__content">
-        <!-- For Final, favicons go first, no search icon -->
-        <template v-if="type === 'final'">
-          <div v-if="favicons.length > 0" class="search-badge__favicons">
-            <div
-              v-for="(src, idx) in favicons.slice(0, 4)"
-              :key="idx"
-              class="favicon-stack-item"
-              :style="{
-                zIndex: 10 - idx,
-                marginLeft: idx === 0 ? '0' : '-6px',
-              }"
-            >
-              <img
-                :src="src"
-                class="search-badge__favicon"
-                @error="handleFaviconError"
-              />
-            </div>
-          </div>
-          <span class="search-badge__text">{{ label }}</span>
-        </template>
-
-        <!-- For Found, text goes first -->
-        <template v-else>
-          <span class="search-badge__text">{{ label }}</span>
-          <div v-if="favicons.length > 0" class="search-badge__favicons">
-            <div
-              v-for="(src, idx) in favicons.slice(0, 4)"
-              :key="idx"
-              class="favicon-stack-item"
-              :style="{
-                zIndex: 10 - idx,
-                marginLeft: idx === 0 ? '0' : '-6px',
-              }"
-            >
-              <img
-                :src="src"
-                class="search-badge__favicon"
-                @error="handleFaviconError"
-              />
-            </div>
-          </div>
-        </template>
-      </div>
-
-      <div v-if="type === 'final'" class="search-badge__chevron">
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+      <div class="flex items-center gap-1.5 overflow-hidden">
+        <span
+          class="text-[12px] font-medium text-[var(--text-muted)] whitespace-nowrap"
         >
-          <path d="m9 18 6-6-6-6" />
-        </svg>
+          {{
+            !result ? "Searching for" : `Sourced ${sourcesCount} references for`
+          }}
+        </span>
+        <span
+          class="text-[12px] font-bold text-[var(--text)] truncate max-w-[140px] md:max-w-[300px]"
+          >{{ query }}</span
+        >
       </div>
-    </button>
+      <svg
+        v-if="result"
+        class="w-3 h-3 text-[var(--text-dim)] transition-transform duration-300"
+        :class="{ 'rotate-180': isOpen }"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="3"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </div>
+
+    <!-- Sources Grid -->
+    <div
+      class="search-accordion"
+      :class="{ 'search-accordion--closed': !isOpen }"
+    >
+      <div class="search-accordion__inner">
+        <div v-if="result" class="pb-2">
+          <div v-if="parsedResults.length > 0" class="flex flex-wrap gap-2">
+            <div
+              v-for="(item, index) in parsedResults"
+              :key="index"
+              @click="openUrl(item.url)"
+              class="group relative flex items-center gap-2.5 px-3 py-1.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--accent)]/40 rounded-lg cursor-pointer transition-all duration-200 hover:bg-[var(--bg-hover)] hover:-translate-y-0.5"
+              :title="item.title + '\\n\\n' + item.content"
+            >
+              <!-- Favicon Wrapper -->
+              <div
+                class="w-5 h-5 rounded bg-[var(--bg-base)] flex items-center justify-center border border-[var(--border-subtle)] flex-shrink-0"
+              >
+                <img
+                  :src="getFaviconUrl(item.url)"
+                  class="w-3 h-3 grayscale group-hover:grayscale-0 transition-all opacity-70 group-hover:opacity-100"
+                  alt=""
+                  @error="handleIconError"
+                />
+              </div>
+
+              <div class="flex flex-col min-w-0 max-w-[120px] md:max-w-[180px]">
+                <span
+                  class="text-[11.5px] font-bold text-[var(--text)] truncate leading-tight group-hover:text-[var(--accent)] transition-colors"
+                  >{{ extractSiteName(item.url, item.title) }}</span
+                >
+                <span
+                  class="text-[9px] font-mono text-[var(--text-dim)] truncate opacity-60"
+                  >{{ cleanUrl(item.url) }}</span
+                >
+              </div>
+
+              <!-- Index Circle -->
+              <div
+                class="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[var(--bg-active)] border border-[var(--border-subtle)] text-[8.5px] font-bold text-[var(--text-muted)] flex-shrink-0"
+              >
+                {{ index + 1 }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Fallback raw result -->
+          <div
+            v-else
+            class="text-[12px] text-[var(--text-muted)] font-mono bg-[var(--bg-surface)] p-3 rounded-xl border border-[var(--border-subtle)] whitespace-pre-wrap"
+          >
+            {{ result }}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useChatStore } from "../../stores/chat";
-import type { SearchResult } from "../../types/chat";
+import { openUrl as tauriOpenUrl } from "../../lib/urlOpener";
+import { useCollapsibleState } from "../../composables/useCollapsibleState";
 
 const props = defineProps<{
-  type: "found" | "final";
-  messageId?: string;
-  query?: string;
-  results?: SearchResult[];
-  state?: "found" | "reading" | "done";
-  isStreaming?: boolean;
+  query: string;
+  result?: string;
+  messageKey?: string;
 }>();
 
-const chatStore = useChatStore();
-
-const isActive = computed(() => {
-  return (
-    chatStore.streaming.sidebarOpen &&
-    chatStore.streaming.activeSearchMessageId === props.messageId
-  );
+const { isOpen, toggle: _toggle } = useCollapsibleState({
+  messageKey: props.messageKey,
+  suffix: "search",
+  initialOpen: false,
 });
 
-const label = computed(() => {
-  const count = props.results?.length || 0;
-  if (props.type === "found") {
-    if (props.state === "reading") return `Searching web...`;
-    return `Found ${count} web pages`;
+const toggleCollapse = (event: MouseEvent) => {
+  if (props.result) {
+    event.stopPropagation();
+    _toggle();
   }
-  return `${count} web pages`;
-});
+};
 
-const favicons = computed(() => {
-  if (!props.results) return [];
-  const seen = new Set<string>();
-  return props.results
-    .map((r) => {
-      try {
-        const url = new URL(r.url);
-        if (seen.has(url.hostname)) return null;
-        seen.add(url.hostname);
-        return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
-      } catch {
-        return null;
-      }
-    })
-    .filter(Boolean) as string[];
-});
+const openUrl = async (url: string) => {
+  await tauriOpenUrl(url);
+};
 
-function handleToggle() {
-  if (isActive.value) {
-    chatStore.closeSearchSidebar();
-  } else {
-    chatStore.openSearchSidebar(props.messageId || null, props.results || []);
+const extractSiteName = (url: string, title: string) => {
+  try {
+    const hostname = new URL(url).hostname.replace("www.", "");
+    const mainPart = hostname.split(".")[0];
+    // If it's a known service, use a pretty name
+    if (mainPart === "github") return "GitHub";
+    if (mainPart === "wikipedia") return "Wikipedia";
+    if (mainPart === "reddit") return "Reddit";
+    if (mainPart === "medium") return "Medium";
+    if (mainPart === "arxiv") return "arXiv";
+
+    // Otherwise try to capitalize or use the first word of the title if it's short
+    return mainPart.charAt(0).toUpperCase() + mainPart.slice(1);
+  } catch {
+    return title.split(" ")[0];
   }
+};
+
+const cleanUrl = (url: string) => {
+  try {
+    const d = new URL(url).hostname;
+    return d.replace("www.", "");
+  } catch {
+    return url;
+  }
+};
+
+const getFaviconUrl = (url: string) => {
+  try {
+    const domain = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  } catch {
+    return "";
+  }
+};
+
+const handleIconError = (e: Event) => {
+  (e.target as HTMLImageElement).style.display = "none";
+};
+
+interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
 }
 
-function handleFaviconError(e: Event) {
-  const parent = (e.target as HTMLImageElement).parentElement;
-  if (parent) parent.style.display = "none";
-}
+const sourcesCount = computed(() => parsedResults.value.length);
+
+const parsedResults = computed<SearchResult[]>(() => {
+  if (!props.result) return [];
+  try {
+    const parsed = JSON.parse(props.result);
+    let rawResults: SearchResult[];
+    if (parsed.results && Array.isArray(parsed.results)) {
+      rawResults = parsed.results;
+    } else if (Array.isArray(parsed)) {
+      rawResults = parsed;
+    } else {
+      rawResults = [];
+    }
+
+    return rawResults
+      .map((r: SearchResult) => ({
+        title: r.title || "Untitled Result",
+        url: r.url || "#",
+        content: r.content || "No description available.",
+      }))
+      .filter((r: SearchResult) => r.url !== "#");
+  } catch {
+    return [];
+  }
+});
 </script>
 
 <style scoped>
 .search-block {
-  margin: 4px 0;
+  margin: 12px 0 20px -4px;
+  width: 100%;
 }
 
-.search-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px;
-  background: var(--bg-surface);
-  border: 1px solid transparent;
-  border-radius: 99px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: var(--text-muted);
+/* Transition for expanding/collapsing */
+.search-accordion {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.search-block--found {
-  position: relative;
-  z-index: 5;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
+.search-accordion--closed {
+  grid-template-rows: 0fr;
 }
 
-.search-block--found .search-badge {
-  background: transparent;
-  padding: 4px 0;
-  gap: 12px;
-  position: relative;
-  border: 1px solid transparent;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-}
-
-.search-block--found .search-badge__icon {
-  position: absolute;
-  left: -20.5px;
-  transform: translateX(-50%); /* Perfectly center a 14px icon on the line */
-  width: 14px;
-  height: 14px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: var(--bg-surface);
-  color: var(--accent);
-  border-radius: 50%;
-  z-index: 10;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 0 2px var(--bg-chat); /* Mask the line behind it */
-}
-
-.search-block--found .search-badge:hover {
-  background: var(--bg-hover);
-  padding: 4px 12px;
-  padding-left: 32px; /* Space for the icon */
-  margin-left: -12px;
-  border-color: var(--border-muted);
-  border-radius: 99px;
-}
-
-.search-block--found .search-badge:hover .search-badge__icon {
-  left: 12px;
-  transform: none;
-  box-shadow: none;
-}
-
-.search-block--final .search-badge {
-  background: rgba(var(--bg-elevated-rgb), 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border-strong);
-}
-
-.search-badge:hover {
-  border-color: var(--accent);
-  background: var(--bg-hover);
-  color: var(--text);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.search-badge--active {
-  border-color: var(--accent);
-  background: var(--accent-muted);
-  color: var(--accent);
-}
-
-.search-badge__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent);
-}
-
-.search-badge__content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.search-badge__favicons {
-  display: flex;
-  align-items: center;
-}
-
-.favicon-stack-item {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.search-accordion__inner {
   overflow: hidden;
-  border: 1px solid var(--border-muted);
-}
-
-.search-badge__favicon {
-  width: 11px;
-  height: 11px;
-  object-fit: contain;
-}
-
-.search-badge__chevron {
-  opacity: 0.4;
-  margin-left: 2px;
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

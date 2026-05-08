@@ -49,13 +49,4 @@ export class ChatPage extends BasePage {
     if (messages.length === 0) throw new Error('No assistant messages found')
     return messages[messages.length - 1].getText()
   }
-
-  async selectModel(modelName: string): Promise<void> {
-    const selector = $('[data-testid="model-selector"]')
-    await selector.waitForDisplayed({ timeout: 5000 })
-    await selector.click()
-    const option = $(`[data-testid="model-option-${modelName}"]`)
-    await option.waitForDisplayed({ timeout: 5000 })
-    await option.click()
-  }
 }

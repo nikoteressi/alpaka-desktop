@@ -31,6 +31,18 @@ describe("ChatInputComposer", () => {
     expect(wrapper.find("textarea").attributes("disabled")).toBeUndefined();
   });
 
+  it("renders send button with correct aria-label when not streaming", () => {
+    const wrapper = mkWrapper();
+    const btn = wrapper.find("[data-testid='send-btn']");
+    expect(btn.attributes("aria-label")).toBe("Send message");
+  });
+
+  it("renders send button with stop aria-label when streaming", () => {
+    const wrapper = mkWrapper({ isStreaming: true });
+    const btn = wrapper.find("[data-testid='send-btn']");
+    expect(btn.attributes("aria-label")).toBe("Stop generation");
+  });
+
   it("emits update:modelValue on textarea input", async () => {
     const wrapper = mkWrapper({ modelValue: "" });
     const ta = wrapper.find("textarea");
@@ -40,9 +52,41 @@ describe("ChatInputComposer", () => {
     expect(emitted![0][0]).toBe("hello");
   });
 
+  it("emits submit when send button is clicked while streaming", async () => {
+    const wrapper = mkWrapper({ isStreaming: true });
+    await wrapper.find("[data-testid='send-btn']").trigger("click");
+    expect(wrapper.emitted("submit")).toBeTruthy();
+  });
+
+  it("emits submit when send button clicked with content", async () => {
+    const wrapper = mkWrapper({ modelValue: "hello" });
+    await wrapper.find("[data-testid='send-btn']").trigger("click");
+    expect(wrapper.emitted("submit")).toBeTruthy();
+  });
+
   it("emits keydown events from textarea", async () => {
     const wrapper = mkWrapper();
     await wrapper.find("textarea").trigger("keydown", { key: "Enter" });
     expect(wrapper.emitted("keydown")).toBeTruthy();
+  });
+
+  it("send button is disabled when no content and no attachments and not streaming", () => {
+    const wrapper = mkWrapper({
+      modelValue: "",
+      hasAttachments: false,
+      isStreaming: false,
+    });
+    const btn = wrapper.find("[data-testid='send-btn']");
+    expect(btn.attributes("disabled")).toBeDefined();
+  });
+
+  it("send button is enabled when hasAttachments is true", () => {
+    const wrapper = mkWrapper({
+      modelValue: "",
+      hasAttachments: true,
+      isStreaming: false,
+    });
+    const btn = wrapper.find("[data-testid='send-btn']");
+    expect(btn.attributes("disabled")).toBeUndefined();
   });
 });

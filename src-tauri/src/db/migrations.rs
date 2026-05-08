@@ -36,26 +36,6 @@ const MIGRATIONS: &[Migration] = &[
         description: "message seed column",
         sql: include_str!("sql/004_message_seed.sql"),
     },
-    Migration {
-        version: 13,
-        description: "message branching (parent_id, sibling_order, is_active)",
-        sql: include_str!("sql/005_message_branching.sql"),
-    },
-    Migration {
-        version: 14,
-        description: "repair orphaned root user messages for branch isolation",
-        sql: include_str!("sql/006_fix_orphan_parent_ids.sql"),
-    },
-    Migration {
-        version: 15,
-        description: "in-place compaction: is_archived column + compaction_events table",
-        sql: include_str!("sql/007_compaction.sql"),
-    },
-    Migration {
-        version: 16,
-        description: "fix role CHECK constraint to include compact_summary",
-        sql: include_str!("sql/008_fix_role_check.sql"),
-    },
 ];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────

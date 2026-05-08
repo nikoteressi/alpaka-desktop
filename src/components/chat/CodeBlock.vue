@@ -38,14 +38,15 @@
       :class="{ 'code-body--collapsed': shouldCollapse && isCollapsed }"
     >
       <div class="code-scroll scrollbar-custom">
-        <div v-if="highlightedHtml" class="shiki-render-container">
-          <div v-html="highlightedHtml" class="shiki-render"></div>
-          <span v-if="isStreaming" class="code-cursor"></span>
-        </div>
+        <div
+          v-if="highlightedHtml"
+          v-html="highlightedHtml"
+          class="shiki-render"
+        ></div>
         <pre
           v-else
           class="fallback-code"
-        ><code>{{ code || '// No content' }}<span v-if="isStreaming" class="code-cursor"></span></code></pre>
+        ><code>{{ code || '// No content' }}</code></pre>
       </div>
       <div v-if="shouldCollapse && isCollapsed" class="collapse-fade"></div>
     </div>
@@ -238,15 +239,6 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
 }
 
-.shiki-render-container {
-  display: flex;
-  align-items: flex-end;
-}
-
-.shiki-render {
-  flex: 1;
-}
-
 /* Custom Scrollbar */
 .scrollbar-custom::-webkit-scrollbar {
   height: 6px;
@@ -282,25 +274,5 @@ onBeforeUnmount(() => {
   color: var(--border-strong);
   user-select: none;
   font-size: 11px;
-}
-
-.code-cursor {
-  display: inline-block;
-  width: 1.5px;
-  height: 14px;
-  background: var(--accent);
-  margin-left: 2px;
-  vertical-align: middle;
-  animation: cursor-blink 0.9s infinite;
-}
-
-@keyframes cursor-blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0;
-  }
 }
 </style>

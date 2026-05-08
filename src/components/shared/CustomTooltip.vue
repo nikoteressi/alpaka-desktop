@@ -32,17 +32,12 @@ const props = defineProps<{
 
 const triggerRef = ref<HTMLElement | null>(null);
 const isVisible = ref(false);
-const position = ref({
-  left: 0,
-  right: 0,
-  y: 0,
-  triggerTop: 0,
-  nearRightEdge: false,
-});
+const position = ref({ x: 0, y: 0, above: false, triggerTop: 0 });
 
 const handleMouseEnter = () => {
   if (!triggerRef.value) return;
 
+  // Check for truncation if requested
   if (props.onlyIfTruncated) {
     const el =
       triggerRef.value.querySelector(".truncate") ||
@@ -53,14 +48,12 @@ const handleMouseEnter = () => {
   }
 
   const rect = triggerRef.value.getBoundingClientRect();
-  const nearRightEdge = rect.left + 300 > window.innerWidth;
 
   position.value = {
-    left: rect.left,
-    right: window.innerWidth - rect.right,
+    x: rect.left,
     y: rect.bottom + 8,
+    above: false,
     triggerTop: rect.top,
-    nearRightEdge,
   };
 
   isVisible.value = true;
@@ -69,21 +62,20 @@ const handleMouseEnter = () => {
 const TOOLTIP_HEIGHT_EST = 36;
 
 const tooltipStyle = computed(() => {
+  let x = position.value.x;
   let y = position.value.y;
 
+  if (x + 300 > window.innerWidth) {
+    x = Math.max(10, window.innerWidth - 310);
+  }
+
+  // If below viewport, flip above the trigger element
   if (y + TOOLTIP_HEIGHT_EST > window.innerHeight) {
     y = position.value.triggerTop - TOOLTIP_HEIGHT_EST - 8;
   }
 
-  if (position.value.nearRightEdge) {
-    return {
-      right: `${Math.max(8, position.value.right)}px`,
-      top: `${y}px`,
-    };
-  }
-
   return {
-    left: `${position.value.left}px`,
+    left: `${x}px`,
     top: `${y}px`,
   };
 });

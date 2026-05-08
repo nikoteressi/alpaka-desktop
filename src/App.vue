@@ -8,14 +8,6 @@
       font-family: var(--sans);
     "
   >
-    <ErrorScreen
-      v-if="activeHostIsOffline"
-      :host-url="activeHostUrl"
-      :show-service-controls="activeHostIsLocal"
-      @retry="handleRetry"
-      @open-settings="handleOpenSettings"
-    />
-
     <!-- 48px Icon strip — hidden in compact mode -->
     <div
       class="flex-shrink-0 flex flex-col items-center pt-2 pb-2 gap-1 select-none overflow-hidden transition-[width] duration-[180ms]"
@@ -134,8 +126,6 @@
     <main class="flex-1 min-w-0 overflow-hidden flex flex-col">
       <router-view />
     </main>
-
-    <HostManager />
   </div>
 </template>
 
@@ -152,7 +142,6 @@ import { useSettingsStore } from "./stores/settings";
 import { useAuthStore } from "./stores/auth";
 import { useAppOrchestration } from "./composables/useAppOrchestration";
 import { useStreamingEvents } from "./composables/useStreamingEvents";
-import { useCompactionEvents } from "./composables/useCompactionEvents";
 import { useKeyboard } from "./composables/useKeyboard";
 import {
   IconNewChat,
@@ -160,9 +149,6 @@ import {
   IconModels,
   IconSettings,
 } from "./components/shared/icons";
-import HostManager from "./components/hosts/HostManager.vue";
-import ErrorScreen from "./components/shared/ErrorScreen.vue";
-import { appEvents, APP_EVENT } from "./lib/appEvents";
 
 const route = useRoute();
 const router = useRouter();
@@ -173,17 +159,8 @@ const settingsStore = useSettingsStore();
 const authStore = useAuthStore();
 const orchestration = useAppOrchestration();
 const { init: initStreamListeners } = useStreamingEvents();
-const { init: initCompactionListeners } = useCompactionEvents();
 const { cleanup: cleanupKeyboard } = useKeyboard();
-
-function onOpenHostManager() {
-  hostStore.isHostManagerOpen = !hostStore.isHostManagerOpen;
-}
-
-onUnmounted(() => {
-  cleanupKeyboard();
-  appEvents.removeEventListener(APP_EVENT.OPEN_HOST_MANAGER, onOpenHostManager);
-});
+onUnmounted(() => cleanupKeyboard());
 
 // Report active view to backend for smart notifications
 watch(
@@ -212,30 +189,6 @@ const sidebarOpen = computed({
   get: () => !settingsStore.sidebarCollapsed && !settingsStore.compactMode,
   set: (val: boolean) => settingsStore.updateSetting("sidebarCollapsed", !val),
 });
-
-const activeHostIsOffline = computed(
-  () => hostStore.activeHost?.last_ping_status === "offline",
-);
-
-const activeHostUrl = computed(() => {
-  const raw = hostStore.activeHost?.url ?? "localhost:11434";
-  return raw.replace(/^https?:\/\//, "");
-});
-
-const activeHostIsLocal = computed(
-  () => hostStore.activeHost?.kind === "local",
-);
-
-async function handleRetry() {
-  if (hostStore.activeHostId) {
-    await tauriApi.pingHost(hostStore.activeHostId).catch(() => {});
-  }
-}
-
-function handleOpenSettings() {
-  router.push("/settings");
-}
-
 const sidebarWidth = ref(220);
 const isResizing = ref(false);
 
@@ -326,9 +279,6 @@ onMounted(async () => {
       initStreamListeners().catch((err: unknown) => {
         console.error("[App] Stream listeners failed:", err);
       }),
-      initCompactionListeners().catch((err: unknown) => {
-        console.error("[App] Compaction listeners failed:", err);
-      }),
       modelStore.fetchInitialUpdateStatus().catch((err: unknown) => {
         console.error("[App] Model update status fetch failed:", err);
       }),
@@ -345,8 +295,6 @@ onMounted(async () => {
   } catch (err) {
     console.error("[App] Critical init failure:", err);
   }
-
-  appEvents.addEventListener(APP_EVENT.OPEN_HOST_MANAGER, onOpenHostManager);
 });
 </script>
 

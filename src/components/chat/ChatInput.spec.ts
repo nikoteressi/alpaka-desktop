@@ -1120,39 +1120,6 @@ describe("ChatInput — resetChatOptions", () => {
   });
 });
 
-describe("ChatInput — linked context icon rendering", () => {
-  beforeEach(() => {
-    setActivePinia(createPinia());
-    mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_model_capabilities")
-        return Promise.reject(new Error("mock"));
-      return Promise.resolve(undefined);
-    });
-  });
-
-  it("renders folder icon when linked context path has no file extension", async () => {
-    const chatStore = useChatStore();
-    chatStore.conversations.push(makeConversation("llama3"));
-    chatStore.activeConversationId = "conv-test-1";
-    chatStore.addFolderContext("conv-test-1", {
-      id: "ctx-folder",
-      name: "MyFolder",
-      path: "/home/user/MyFolder",
-      content: "folder content",
-      tokens: 10,
-    });
-
-    const wrapper = mountInput();
-    await wrapper.vm.$nextTick();
-
-    // The folder SVG (v-else branch) should render for a path without a dot
-    const folderIcon = wrapper.find(
-      "svg path[d='M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z']",
-    );
-    expect(folderIcon.exists()).toBe(true);
-  });
-});
-
 describe("ChatInput — removeContext", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -1266,15 +1233,15 @@ describe("ChatInput — handleCompact", () => {
     const wrapper = mountInput();
     const vm = wrapper.vm as unknown as {
       handleCompact: () => Promise<void>;
+      isCompacting: boolean;
     };
-    const chatStore = useChatStore();
 
     await vm.handleCompact();
-    // No compaction should be in progress since there's no active conversation
-    expect(chatStore.compactionInProgress).toEqual({});
+    // Should not set isCompacting if no conversation
+    expect(vm.isCompacting).toBe(false);
   });
 
-  it("calls compactConversation after compact completes", async () => {
+  it("sets isCompacting to false after compact completes", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "get_model_capabilities")
         return Promise.reject(new Error("mock"));
@@ -1289,16 +1256,18 @@ describe("ChatInput — handleCompact", () => {
 
     const compactSpy = vi
       .spyOn(chatStore, "compactConversation")
-      .mockResolvedValue();
+      .mockResolvedValue("new-conv-id");
     vi.spyOn(chatStore, "loadConversation").mockResolvedValue();
 
     const wrapper = mountInput();
     const vm = wrapper.vm as unknown as {
       handleCompact: () => Promise<void>;
+      isCompacting: boolean;
     };
 
     await vm.handleCompact();
 
     expect(compactSpy).toHaveBeenCalled();
+    expect(vm.isCompacting).toBe(false);
   });
 });

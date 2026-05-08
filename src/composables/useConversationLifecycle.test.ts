@@ -127,8 +127,11 @@ describe("useConversationLifecycle", () => {
         role: "system",
         content: "old",
         created_at: "",
-        images: undefined,
-        tokens_per_sec: undefined,
+        images: null,
+        tokens_per_sec: null,
+        thinking: null,
+        tool_calls: null,
+        tool_results: null,
       },
     ];
     vi.mocked(invoke).mockResolvedValue(undefined);
@@ -147,8 +150,11 @@ describe("useConversationLifecycle", () => {
         role: "user",
         content: "hi",
         created_at: "",
-        images: undefined,
-        tokens_per_sec: undefined,
+        images: null,
+        tokens_per_sec: null,
+        thinking: null,
+        tool_calls: null,
+        tool_results: null,
       },
     ];
     vi.mocked(invoke).mockResolvedValue([]);

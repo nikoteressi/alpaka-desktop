@@ -53,17 +53,17 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 |---|---|---|---|---|
 | C-01 | **Multi-turn chat** | P0 | ✅ | Persistent conversation threads with full history |
 | C-02 | **Streaming text rendering** | P0 | ✅ | Token-by-token display via `chat:token` Tauri events with typing cursor |
-| C-03 | **Reasoning/thinking blocks** | P0 | ✅ | DeepSeek-inspired collapsible timeline (`ThinkBlock.vue`): step-by-step reasoning with dot markers, inline web-search pills, animated brain icon while streaming, auto-collapse 1.5 s after generation ends |
+| C-03 | **Reasoning/thinking blocks** | P0 | ✅ | Collapsible `<think>` panels with console-style rendering and pulsing border (`ThinkBlock.vue`) |
 | C-04 | **Markdown rendering** | P0 | ✅ | Full GFM via `markdown-it` + KaTeX (`lib/markdown.ts`) |
 | C-05 | **Code blocks with copy button** | P0 | ✅ | Language detection, Shiki syntax highlighting, one-click copy (`CodeBlock.vue`) |
 | C-06 | **Chat history persistence** | P0 | ✅ | SQLite-backed; pin, rename, delete, and search by title (`Ctrl+K` inside `ConversationList.vue`) |
 | C-07 | **Multi-chat tabs/panels** | P1 | 🔲 Backlog | Side-by-side or tabbed conversations |
 | C-08 | **Chat export to JSON** | P1 | 🟡 | `export_conversation` Tauri command implemented and exposed in `lib/tauri.ts`, but no UI button calls it |
 | C-08b | **Chat export to Markdown** | P1 | 🔲 Backlog | Not implemented in backend or UI |
-| C-09 | **Chat branching** | P2 | ✅ | Regenerate assistant responses to create sibling branches; navigate between versions with `<` / `>` controls in `MessageBubble.vue` (`useVersionSwitcher`). Edit message truncates conversation from the edited point before resending. |
+| C-09 | **Chat branching** | P2 | 🔲 Backlog | Fork conversation at any message |
 | C-10 | **Chat backup & restore** | P1 | ⚠️ | Raw SQLite backup/restore wired in `Settings → Maintenance`; no per-conversation JSON import/export UI |
 | C-11 | **Compact / TWM mode** | P1 | ⚠️ | `Ctrl+Shift+M` collapses the 48 px icon strip (`App.vue:14`). Padding, font sizes and the top-bar layout described in §3.6 are **not** implemented |
-| C-12 | **Conversation summarisation (Compact)** | P1 | ✅ | In-place compaction: messages soft-archived (migration v15 `is_archived` + `compaction_events` table), streaming summary progress bar in ChatInput, expandable history toggle via `CompactSummaryBubble.vue`, background support with sidebar spinner, cancel button, compaction model setting in Settings → General (`services/chat/compact.rs`) |
+| C-12 | **Conversation summarisation (Compact)** | P1 | ✅ | Button at ≥70 % context usage; summarises history with `temperature=0.3`, creates a new conversation with the summary as a system prompt + last 4 turns (`services/chat/compact.rs`) |
 | C-13 | **Sliding-window context truncation** | P0 | ✅ | Automatic on every send; trims oldest user/assistant messages to fit `0.85 × num_ctx` (`services/chat/context.rs`) |
 | C-14 | **Stop generation** | P0 | ✅ | `Escape` key + Send button toggles to "Stop" while streaming; cancel via `tokio::broadcast` channel |
 | C-15 | **Drafts per-conversation** | P1 | ✅ | Input + advanced options auto-saved per conversation (`useDraftSync`) |
@@ -140,8 +140,8 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
 | N-01 | **LAN mode (multi-host)** | P0 | ✅ | Multiple Ollama endpoints including LAN servers; one active at a time |
-| N-02 | **Hosts Manager** | P0 | ✅ | Modal at `components/hosts/HostManager.vue`; mounted in `App.vue`; opened via `Ctrl+H` |
-| N-03 | **Quick host switching** | P0 | ✅ | `Ctrl+H` opens `HostManager` modal directly; host switch takes effect on next API call |
+| N-02 | **Hosts Manager** | P0 | ⚠️ | Implemented inside `Settings → Connection` (`HostSettings.vue`). Standalone modal `HostManager.vue` exists but is **never imported** anywhere |
+| N-03 | **Quick host switching** | P0 | ⚠️ | No top-bar dropdown — `components/shared/TopBar.vue` is a 0-byte file. Host switching reachable via `Ctrl+H` → Settings → Connection. Active-host change takes effect on the next API call (`OllamaClient` reads active host from DB on each call) |
 | N-04 | **Host health indicator** | P1 | ✅ | Background ping every 30 s; `host:status-change` event (`commands/hosts.rs::start_host_health_loop`) |
 | N-05 | **Proxy support** | P1 | ✅ | HTTP/SOCKS5 proxy URL + optional username/password (keyring); Test button; Settings → Connection (`ProxySettings.vue`, `commands/proxy.rs`) |
 | N-06 | **Per-host bearer token** | P1 | ✅ | Optional auth token stored in keyring (never in DB) |
@@ -152,7 +152,7 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 |---|---|---|---|---|
 | CT-01 | **`ollama launch` support** | P1 | ⚠️ | `LaunchPage.vue` is a static reference card list (Claude / Codex / OpenCode / Droid / Pi) with copyable `ollama launch <tool>` commands. No actual launching from inside the app |
 | CT-02 | **Anthropic Messages API compat** | P1 | 🔲 Backlog | Local models with Claude Code–compatible tools |
-| CT-03 | **Tool calling visualization** | P1 | ✅ | `chat:tool-call`, `chat:tool-reading`, and `chat:tool-result` events; search shown as inline pill in ThinkBlock timeline during streaming, then as a post-message favicon-stack badge (`SearchBlock.vue`); clicking badge opens `SearchSidebar.vue` (320 px source cards) |
+| CT-03 | **Tool calling visualization** | P1 | ✅ | `chat:tool-call` and `chat:tool-result` events; `<tool_call>` markers parsed and rendered inline by `MessageBubble.vue:75` and `SearchBlock.vue` |
 
 ### 2.9 Local Folder Context (Lightweight RAG)
 
@@ -179,8 +179,8 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 | L-04 | **Wayland support** | P0 | ✅ | WebKitGTK 4.1 native Wayland backend |
 | L-05 | **Secret Service (KWallet / GNOME Keyring / KeePassXC)** | P0 | ✅ | API keys, OAuth tokens, per-host bearers — all via `keyring` crate, never on disk |
 | L-06 | **xdg-desktop-portal file dialogs** | P0 | ✅ | Tauri dialog plugin |
-| L-07 | **Systemd Ollama service control** | P1 | ✅ | `start_ollama` / `stop_ollama` / `ollama_service_status` commands reachable via `ErrorScreen.vue` overlay (shown when active host goes offline); "Start Ollama Service" button hidden for remote hosts |
-| L-08 | **Connection error screen with retry** | P1 | ✅ | `ErrorScreen.vue` mounted in `App.vue` as full-screen overlay; shown when `activeHost.last_ping_status === 'offline'`; retry triggers `ping_host` IPC |
+| L-07 | **Systemd Ollama service control** | P1 | 🟡 | `start_ollama` / `stop_ollama` / `ollama_service_status` commands implemented and exposed in `lib/tauri.ts`, but the only caller is `ErrorScreen.vue`, which itself is never imported anywhere — so currently unreachable from the UI |
+| L-08 | **Connection error screen with retry** | P1 | 🟡 | `ErrorScreen.vue` exists with full retry / start-Ollama logic, but is **not wired into the router or `App.vue`**. Users currently see no friendly screen when Ollama is unreachable |
 | L-09 | **Ollama model storage path override** | P1 | ✅ | `Settings → Engine` writes a systemd override and restarts Ollama (`ModelPathSettings.vue`) |
 
 ### 2.11 Backup & Maintenance
@@ -284,7 +284,7 @@ Implemented in `composables/useKeyboard.ts` (global) and `ChatInput.vue` (input-
 | `Escape` | Stop generation | ✅ |
 | `Ctrl+↑ / Ctrl+↓` | Navigate to previous/next conversation | ✅ |
 | `Ctrl+Shift+M` | Toggle Compact mode (collapses 48 px icon strip only) | ⚠️ |
-| `Ctrl+H` | Open Hosts Manager modal | ✅ |
+| `Ctrl+H` | Open `Settings → Connection` tab | ✅ |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo inside the chat input (custom history stack) | ✅ |
 
 ### 3.6 Compact / TWM Mode
@@ -376,9 +376,6 @@ messages
 ├── total_duration_ms, load_duration_ms
 ├── prompt_eval_duration_ms, eval_duration_ms
 ├── created_at
-├── parent_id (FK → messages, nullable)   -- branching: points to parent message
-├── sibling_order (int, default 0)         -- position among siblings
-└── is_active (bool, default 1)            -- whether this branch is on the active path
 
 settings
 ├── key (PK)
@@ -525,7 +522,7 @@ Optional:
 | **Phase 5 — Distribution** | AUR (bin + git), `.deb`, AppImage, documentation site | ✅ v1.0.1 |
 | **Phase 6 — v1.2** | Custom model creation, model tagging/favorites, preset profiles, per-model defaults, seed control, Mirostat, stop sequences, configurable model path, API key UI, conversation search | ✅ v1.2.0 |
 | **Phase 7 — v1.3 (planned)** | Wire `ErrorScreen` into router, expose chat export button, folder-context tree picker, top-bar host switcher, true Compact/TWM layout (padding/font/top-bar collapse), Markdown export | Planned |
-| **Phase 8 — v2.x** | Multi-chat tabs, plugin system, Flatpak, mobile companion | Planned |
+| **Phase 8 — v2.x** | Multi-chat tabs, chat branching, plugin system, Flatpak, proxy support, mobile companion | Planned |
 
 ### 9.1 Known UI Gaps (from v1.2.0 audit)
 
@@ -538,6 +535,8 @@ reachable from the UI**. They are tracked as P1 for v1.3:
 | Folder-context tree picker | No component calls `list_folder_files` / `update_included_files` | `commands/folders.rs:265,310` |
 | Token-estimate refresh | No component calls `estimate_tokens` | `commands/folders.rs:375` |
 | Connection Error screen | `ErrorScreen.vue` is never imported | `components/shared/ErrorScreen.vue` |
+| Standalone Hosts modal | `HostManager.vue` is never imported (Hosts are managed inside Settings instead) | `components/hosts/HostManager.vue` |
+| Top-bar layout | `components/shared/TopBar.vue` is a 0-byte file | `components/shared/TopBar.vue` |
 | Sidebar search box | `Sidebar.vue:43` `<input>` is bound to a local ref that never filters anything (real search is in `ConversationList`) | `components/sidebar/Sidebar.vue` |
 | Systemd Ollama start/stop | Only caller is the unwired `ErrorScreen.vue` | `commands/service.rs` |
 | True Compact / TWM mode | Only the icon strip is collapsed; padding / font / top-bar behaviour from §3.6 not implemented | `App.vue:14` |

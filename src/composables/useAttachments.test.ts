@@ -7,8 +7,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 // jsdom doesn't implement createObjectURL — stub it with a counter so each call returns a unique URL
 let urlCounter = 0;
-globalThis.URL.createObjectURL = vi.fn(() => `blob:mock-${++urlCounter}`);
-globalThis.URL.revokeObjectURL = vi.fn();
+global.URL.createObjectURL = vi.fn(() => `blob:mock-${++urlCounter}`);
+global.URL.revokeObjectURL = vi.fn();
 
 describe("useAttachments", () => {
   it("handleFiles adds image attachments with preview URLs", async () => {

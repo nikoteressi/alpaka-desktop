@@ -8,10 +8,9 @@
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      background: var(--bg-surface);
-      border: 1px solid var(--border-muted);
-      border-radius: 99px;
-      padding: 8px 16px;
+      background: #222;
+      border-radius: 12px;
+      padding: 10px 14px;
     "
   >
     <span

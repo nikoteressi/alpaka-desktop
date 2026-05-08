@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { createPinia, setActivePinia } from "pinia";
 import MessageBubble from "./MessageBubble.vue";
-import { useChatStore } from "../../stores/chat";
+import { createPinia, setActivePinia } from "pinia";
 
 describe("MessageBubble.vue", () => {
   beforeEach(() => {
@@ -18,52 +17,53 @@ describe("MessageBubble.vue", () => {
   it("renders user message correctly", () => {
     const wrapper = mount(MessageBubble, {
       props: {
-        message: { role: "user", content: "Hello from user" },
+        message: {
+          role: "user",
+          content: "Hello from user",
+        },
       },
     });
+
     expect(wrapper.text()).toContain("Hello from user");
-    expect(wrapper.find(".user-bubble").exists()).toBe(true);
+    // User bubble uses inline styles (dark #2d2d2d background, no Tailwind class)
+    const bubble = wrapper.find('div[style*="--bg-user-msg"]');
+    expect(bubble.exists()).toBe(true);
   });
 
   it("renders assistant thinking block with correct label when isThinking is true", async () => {
-    const chatStore = useChatStore();
-    chatStore.streaming.isStreaming = true;
-    chatStore.streaming.isThinking = true;
-    chatStore.streaming.activeMessageParts = [
-      { type: "think", content: "Thought process here..." },
-    ];
-
     const wrapper = mount(MessageBubble, {
       props: {
-        message: { role: "assistant", content: "" },
-        isStreaming: true,
+        message: {
+          role: "assistant",
+          content: "Final answer",
+        },
         isThinking: true,
+        thinkingContent: "Thought process here...",
       },
     });
 
-    await wrapper.vm.$nextTick();
     expect(wrapper.text()).toContain("Thinking...");
     expect(wrapper.text()).toContain("Thought process here...");
   });
 
-  it("renders assistant markdown content correctly", async () => {
+  it("markdown throttling logic renders content correctly", async () => {
+    // We don't spy on RAF directly because useRafFn is an abstraction.
+    // Instead we wait for the reactive state to update.
+
     const wrapper = mount(MessageBubble, {
       props: {
-        message: { role: "assistant", content: "**Bolded Content**" },
-        isStreaming: false,
+        message: {
+          role: "assistant",
+          content: "**Bolded Content**",
+        },
+        isStreaming: false, // Not streaming should render immediately
       },
     });
 
     await wrapper.vm.$nextTick();
+
+    // Check if the html updated
     const htmlDiv = wrapper.find(".rendered-markdown");
     expect(htmlDiv.html()).toContain("<strong>Bolded Content</strong>");
-  });
-
-  it("emits edit event when edit button is clicked", async () => {
-    const wrapper = mount(MessageBubble, {
-      props: { message: { role: "user", content: "Original text" } },
-    });
-    await wrapper.find('[aria-label="Edit"]').trigger("click");
-    expect(wrapper.emitted("edit")).toBeTruthy();
   });
 });

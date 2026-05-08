@@ -23,7 +23,7 @@ describe("useModelLibrary", () => {
   it("doSearch clears results and returns early when query is shorter than 2 chars", async () => {
     const lib = useModelLibrary();
     lib.libraryResults.value = [
-      { name: "old", slug: "old", description: "", tags: [] },
+      { name: "old", description: "", tags: [], pulls: 0, updated: "" },
     ];
     await lib.doSearch("a");
     expect(lib.libraryResults.value).toEqual([]);
@@ -32,7 +32,7 @@ describe("useModelLibrary", () => {
 
   it("doSearch populates libraryResults on success", async () => {
     const results = [
-      { name: "llama3", slug: "llama3", description: "", tags: [] },
+      { name: "llama3", description: "", tags: [], pulls: 0, updated: "" },
     ];
     vi.mocked(invoke).mockResolvedValue(results);
 

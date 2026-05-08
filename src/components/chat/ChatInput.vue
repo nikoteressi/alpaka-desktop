@@ -189,11 +189,6 @@ async function selectModel(model: string) {
     // ignore — chatOptions stays as-is on IPC failure
   }
   presetId.value = "";
-  if (!chatStore.isDraft && activeConvId.value) {
-    tauriApi
-      .updateConversationSettings(activeConvId.value, chatOptions.value)
-      .catch(() => {});
-  }
 }
 
 async function selectLibraryModel(name: string) {
@@ -266,6 +261,12 @@ watch(
       try {
         chatOptions.value = await applyModelDefaults(name);
         presetId.value = "";
+        if (!chatStore.isDraft && activeConvId.value) {
+          await tauriApi.updateConversationSettings(
+            activeConvId.value,
+            chatOptions.value,
+          );
+        }
       } catch {
         // ignore IPC failure
       }
@@ -292,17 +293,7 @@ const isCurrentChatStreaming = computed(
     chatStore.streaming.currentConversationId === activeConvId.value,
 );
 
-const isCompactingActive = computed(
-  () =>
-    !!activeConvId.value &&
-    !!chatStore.compactionInProgress[activeConvId.value],
-);
-
-const compactionTokens = computed(() =>
-  activeConvId.value
-    ? (chatStore.compactionTokens[activeConvId.value] ?? "")
-    : "",
-);
+const isCompacting = ref(false);
 
 // ---- Text input ----
 const inputContent = ref("");
@@ -437,9 +428,18 @@ async function handleCompact() {
     activeModelName.value === "Select model"
   )
     return;
-  const compactionModel =
-    settingsStore.compactionModel || activeModelName.value;
-  await chatStore.compactConversation(activeConvId.value, compactionModel);
+  isCompacting.value = true;
+  try {
+    const newConvId = await chatStore.compactConversation(
+      activeConvId.value,
+      activeModelName.value,
+    );
+    await chatStore.loadConversation(newConvId);
+  } catch (e) {
+    console.error("Compact failed:", e);
+  } finally {
+    isCompacting.value = false;
+  }
 }
 
 // ---- Draft Sync ----
@@ -614,51 +614,11 @@ onBeforeUnmount(() => {
 
       <ChatInputComposer
         v-model="inputContent"
-        :isStreaming="isStreaming || isCompactingActive"
+        :isStreaming="isStreaming"
         :hasAttachments="attachments.length > 0"
         @keydown="handleTextareaKeydown"
         @submit="handleSubmit"
       />
-
-      <!-- Compaction status bar -->
-      <div
-        v-if="isCompactingActive"
-        class="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg border text-[12px]"
-        :style="{
-          background: 'color-mix(in srgb, var(--warning) 10%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--warning) 30%, transparent)',
-          color: 'var(--warning)',
-        }"
-      >
-        <svg
-          class="w-3 h-3 animate-spin flex-shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          />
-          <path
-            class="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8v8H4z"
-          />
-        </svg>
-        <span class="flex-1 min-w-0 truncate">
-          {{ compactionTokens || "Generating summary…" }}
-        </span>
-        <button
-          @click="chatStore.cancelCompaction().catch(console.error)"
-          class="flex-shrink-0 text-[11px] opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
-        >
-          Cancel
-        </button>
-      </div>
 
       <div class="flex items-center justify-between mt-2">
         <div class="flex items-center gap-2">
@@ -667,24 +627,21 @@ onBeforeUnmount(() => {
             :maxContext="maxContext"
           />
 
-          <!-- Compact conversation button -->
+          <!-- Compact conversation button — visible when context >= 70% -->
           <CustomTooltip
             v-if="
-              !isCurrentChatStreaming &&
-              !chatStore.isDraft &&
-              !!activeConvId &&
-              activeModelName !== 'Select model'
+              isContextNearFull && !isCurrentChatStreaming && !chatStore.isDraft
             "
-            text="Summarize and compact conversation in-place"
+            text="Summarize conversation and continue in a new chat"
             wrapper-class="flex-shrink-0"
           >
             <button
               @click="handleCompact"
-              :disabled="isCompactingActive"
+              :disabled="isCompacting"
               class="flex items-center gap-1 px-2 py-0.5 rounded-full border border-amber-500/40 bg-amber-500/10 text-[10px] font-medium text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               <svg
-                v-if="isCompactingActive"
+                v-if="isCompacting"
                 class="w-2.5 h-2.5 animate-spin"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -717,7 +674,7 @@ onBeforeUnmount(() => {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                 />
               </svg>
-              <span>{{ isCompactingActive ? "Compacting…" : "Compact" }}</span>
+              <span>{{ isCompacting ? "Compacting…" : "Compact" }}</span>
             </button>
           </CustomTooltip>
         </div>
@@ -872,53 +829,6 @@ onBeforeUnmount(() => {
             @select="selectModel"
             @pull="selectLibraryModel"
           />
-
-          <!-- Send Button -->
-          <button
-            data-testid="send-btn"
-            @click="handleSubmit"
-            :disabled="
-              isCompactingActive ||
-              (!isStreaming && !inputContent.trim() && attachments.length === 0)
-            "
-            :aria-label="isStreaming ? 'Stop generation' : 'Send message'"
-            class="w-7 h-7 rounded-full flex items-center justify-center transition-all flex-shrink-0 cursor-pointer disabled:opacity-30 ml-1.5"
-            :class="
-              isStreaming
-                ? 'bg-[var(--bg-user-msg)] hover:bg-[var(--bg-active)]'
-                : inputContent.trim() || attachments.length > 0
-                  ? 'bg-[var(--text)] hover:bg-[var(--text-muted)] scale-105 shadow-sm'
-                  : 'bg-[var(--bg-elevated)] border border-[var(--border-strong)]'
-            "
-          >
-            <svg
-              v-if="isStreaming"
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              :class="isStreaming ? 'text-[var(--text)]' : ''"
-            >
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-            <svg
-              v-else
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              :stroke="
-                inputContent.trim() || attachments.length > 0
-                  ? 'var(--bg-base)'
-                  : 'var(--text-muted)'
-              "
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
-          </button>
         </div>
       </div>
     </div>

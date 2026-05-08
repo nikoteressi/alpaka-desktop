@@ -7,15 +7,14 @@ describe('Streaming — real token delivery', () => {
     await chat.waitForAppReady()
     await chat.clickNavIcon('chat')
     await $('[data-testid="chat-input"]').waitForDisplayed({ timeout: 8000 })
-    // Use the same small model as CI to ensure fast, predictable responses
-    await chat.selectModel('qwen2:0.5b')
   })
 
   it('streaming indicator appears in DOM while model is generating', async () => {
     const input = await chat.messageInput
-    // Short but multi-token prompt — enough to catch the streaming indicator
-    // without making the model generate a long response that risks a timeout.
-    await input.setValue('Count from 1 to 5.')
+    // Use a multi-sentence prompt to ensure streaming takes >500ms (the default poll interval);
+    // isStreaming is set synchronously on click but a short response can complete before the
+    // first waitForExist poll fires, causing a spurious miss.
+    await input.setValue('Write a short paragraph about the solar system.')
     await chat.sendButton.click()
     // streaming-indicator exists in DOM (v-if) but has display:none — use waitForExist.
     // interval:100 polls every 100ms so even a sub-second stream is caught.
@@ -23,8 +22,7 @@ describe('Streaming — real token delivery', () => {
   })
 
   it('streaming indicator is removed from DOM when generation is complete', async () => {
-    // Allow up to 2 minutes — CI machines can be slow under load.
-    await chat.waitForStreamComplete(120000)
+    await chat.waitForStreamComplete(60000)
     await $('[data-testid="streaming-indicator"]').waitForExist({
       timeout: 5000,
       reverse: true,
@@ -40,24 +38,15 @@ describe('Streaming — real token delivery', () => {
     await chat.sendButton.click()
     await browser.waitUntil(
       async () => !(await $('[data-testid="streaming-indicator"]').isExisting()),
-      { timeout: 15000, interval: 300 }
+      { timeout: 8000, interval: 300 }
     )
   })
 
   it('response text is readable after stream complete', async () => {
-    await chat.sendMessage('Say hello to me in a short sentence.')
-    // Wait for streaming to START before waiting for it to end, otherwise
-    // waitForStreamComplete can resolve immediately (indicator not yet in DOM)
-    // and lastAssistantMessageText() returns the previous stale message.
-    await $('[data-testid="streaming-indicator"]').waitForExist({ timeout: 15000, interval: 100 })
-    await chat.waitForStreamComplete(120000)
-    // Vue reactive text updates can lag one tick behind the streaming indicator
-    // leaving the DOM, so poll until the last assistant message has content.
-    await browser.waitUntil(
-      async () => (await chat.lastAssistantMessageText()).length > 0,
-      { timeout: 5000, interval: 100 }
-    )
+    await chat.sendMessage('Reply: hello')
+    await chat.waitForStreamComplete(60000)
     const text = await chat.lastAssistantMessageText()
     expect(text.length).toBeGreaterThan(0)
+    expect(text).not.toMatch(/^[A-Za-z0-9+/]+=*$/)
   })
 })

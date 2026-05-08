@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { initMarkdown, renderMarkdown, renderInline } from "./markdown";
+import { initMarkdown, renderMarkdown } from "./markdown";
 
 beforeAll(async () => {
   await initMarkdown();
@@ -45,27 +45,5 @@ describe("normalizeLang (via highlight fallback)", () => {
     const { highlight } = await import("./markdown");
     const html = await highlight("const x = 1", "TypeScript");
     expect(html).toContain("<code");
-  });
-});
-
-describe("renderInline", () => {
-  it("renders inline markdown without wrapping paragraph tags", () => {
-    const html = renderInline("**bold** text");
-    expect(html).toContain("<strong>bold</strong>");
-    expect(html).not.toContain("<p>");
-  });
-});
-
-describe("citation pill", () => {
-  it("renders [1] citation markers as citation-pill spans", () => {
-    const html = renderMarkdown("See [1] for details.");
-    expect(html).toContain('class="citation-pill"');
-    expect(html).toContain("1");
-  });
-
-  it("escapes HTML in citation content", () => {
-    const html = renderMarkdown("Ref [<script>].");
-    // The pill should not contain a bare <script> tag
-    expect(html).not.toContain("<script>");
   });
 });

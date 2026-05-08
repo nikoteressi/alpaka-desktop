@@ -125,49 +125,6 @@ md.renderer.rules.table_close = (tokens, idx, options, env, self) => {
 md.use(footnote);
 md.use(mk, { throwOnError: false, errorColor: "#ef4444" });
 
-// Replaces [1], [1 2], [1, 2] etc. in plain text nodes only — never inside HTML attributes.
-const CITATION_RE = /(\[\d+(?:[\s,]+\d+)*\])/;
-md.core.ruler.push("citation_pills", (state) => {
-  for (const block of state.tokens) {
-    if (block.type !== "inline" || !block.children) continue;
-    const next = [] as NonNullable<typeof block.children>;
-    for (const child of block.children) {
-      if (child.type !== "text") {
-        next.push(child);
-        continue;
-      }
-      const parts = child.content.split(CITATION_RE);
-      if (parts.length === 1) {
-        next.push(child);
-        continue;
-      }
-      for (const part of parts) {
-        if (!part) continue;
-        if (CITATION_RE.test(part)) {
-          const numbers = part
-            .slice(1, -1)
-            .split(/[\s,]+/)
-            .filter(Boolean);
-          for (const n of numbers) {
-            const tok = new state.Token("citation_pill", "", 0);
-            tok.content = n;
-            next.push(tok);
-          }
-        } else {
-          const tok = new state.Token("text", "", 0);
-          tok.content = part;
-          next.push(tok);
-        }
-      }
-    }
-    block.children = next;
-  }
-});
-md.renderer.rules["citation_pill"] = (tokens, idx) => {
-  const n = escapeHtml(tokens[idx].content);
-  return `<span class="citation-pill" data-citation="${n}">${n}</span>`;
-};
-
 export function renderMarkdown(content: string): string {
   return DOMPurify.sanitize(md.render(content));
 }
