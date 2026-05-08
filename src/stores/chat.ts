@@ -454,6 +454,10 @@ export const useChatStore = defineStore("chat", {
       delete this.compactionTokens[conversationId];
     },
 
+    async cancelCompaction(): Promise<void> {
+      await invoke("cancel_compaction");
+    },
+
     async loadArchivedMessages(conversationId: string): Promise<void> {
       const rawMessages = await invoke<import("../types/chat").BackendMessage[]>(
         "get_archived_messages",

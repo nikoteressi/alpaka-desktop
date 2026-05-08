@@ -55,7 +55,9 @@ function toggle() {
       class="flex items-center gap-2 px-3 py-1.5 text-[11px] rounded transition-colors cursor-pointer w-full"
       :style="{ color: 'var(--text-muted)' }"
     >
-      <span>📋</span>
+      <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
       <span>Previous messages hidden</span>
       <span class="ml-auto">{{ isExpanded ? "▴ Hide history" : "▾ Show history" }}</span>
     </button>
@@ -66,7 +68,9 @@ function toggle() {
       :style="{ background: 'var(--bg-active)', border: '1px solid var(--border-subtle)' }"
     >
       <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wide mb-1" :style="{ color: 'var(--text-muted)' }">
-        <span>📋</span>
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
         <span>Conversation summary</span>
       </div>
       <div
