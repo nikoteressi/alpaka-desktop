@@ -787,7 +787,10 @@ mod tests {
         // CTE filters is_archived = 0 on both anchor and recursive clauses, so archived
         // messages must not appear in list_for_conversation results.
         let visible = list_for_conversation(&conn, &cid).unwrap();
-        assert!(visible.is_empty(), "archived messages must not appear in live view");
+        assert!(
+            visible.is_empty(),
+            "archived messages must not appear in live view"
+        );
 
         let n2 = archive_all_for_conversation(&conn, &cid).unwrap();
         assert_eq!(n2, 0, "second call archives nothing (already archived)");
