@@ -474,7 +474,9 @@ export const useChatStore = defineStore("chat", {
               return arr;
             });
           }
-        } catch {}
+        } catch {
+          // image decoding is best-effort; skip on failure
+        }
         return {
           id: m.id,
           conversation_id: m.conversation_id,
