@@ -106,6 +106,9 @@ export const tauriApi = {
   exportConversation: (conversationId: string) =>
     invoke<void>("export_conversation", { conversationId }),
 
+  exportConversationMarkdown: (conversationId: string) =>
+    invoke<void>("export_conversation_markdown", { conversationId }),
+
   backupDatabase: () => invoke<void>("backup_database"),
 
   // Models
