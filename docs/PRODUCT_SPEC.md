@@ -140,8 +140,8 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 | ID | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
 | N-01 | **LAN mode (multi-host)** | P0 | ✅ | Multiple Ollama endpoints including LAN servers; one active at a time |
-| N-02 | **Hosts Manager** | P0 | ⚠️ | Implemented inside `Settings → Connection` (`HostSettings.vue`). Standalone modal `HostManager.vue` exists but is **never imported** anywhere |
-| N-03 | **Quick host switching** | P0 | ⚠️ | No top-bar dropdown — `components/shared/TopBar.vue` is a 0-byte file. Host switching reachable via `Ctrl+H` → Settings → Connection. Active-host change takes effect on the next API call (`OllamaClient` reads active host from DB on each call) |
+| N-02 | **Hosts Manager** | P0 | ✅ | Modal at `components/hosts/HostManager.vue`; mounted in `App.vue`; opened via `Ctrl+H` |
+| N-03 | **Quick host switching** | P0 | ✅ | `Ctrl+H` opens `HostManager` modal directly; host switch takes effect on next API call |
 | N-04 | **Host health indicator** | P1 | ✅ | Background ping every 30 s; `host:status-change` event (`commands/hosts.rs::start_host_health_loop`) |
 | N-05 | **Proxy support** | P1 | ✅ | HTTP/SOCKS5 proxy URL + optional username/password (keyring); Test button; Settings → Connection (`ProxySettings.vue`, `commands/proxy.rs`) |
 | N-06 | **Per-host bearer token** | P1 | ✅ | Optional auth token stored in keyring (never in DB) |
@@ -284,7 +284,7 @@ Implemented in `composables/useKeyboard.ts` (global) and `ChatInput.vue` (input-
 | `Escape` | Stop generation | ✅ |
 | `Ctrl+↑ / Ctrl+↓` | Navigate to previous/next conversation | ✅ |
 | `Ctrl+Shift+M` | Toggle Compact mode (collapses 48 px icon strip only) | ⚠️ |
-| `Ctrl+H` | Open `Settings → Connection` tab | ✅ |
+| `Ctrl+H` | Open Hosts Manager modal | ✅ |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo inside the chat input (custom history stack) | ✅ |
 
 ### 3.6 Compact / TWM Mode
@@ -538,8 +538,6 @@ reachable from the UI**. They are tracked as P1 for v1.3:
 | Folder-context tree picker | No component calls `list_folder_files` / `update_included_files` | `commands/folders.rs:265,310` |
 | Token-estimate refresh | No component calls `estimate_tokens` | `commands/folders.rs:375` |
 | Connection Error screen | `ErrorScreen.vue` is never imported | `components/shared/ErrorScreen.vue` |
-| Standalone Hosts modal | `HostManager.vue` is never imported (Hosts are managed inside Settings instead) | `components/hosts/HostManager.vue` |
-| Top-bar layout | `components/shared/TopBar.vue` is a 0-byte file | `components/shared/TopBar.vue` |
 | Sidebar search box | `Sidebar.vue:43` `<input>` is bound to a local ref that never filters anything (real search is in `ConversationList`) | `components/sidebar/Sidebar.vue` |
 | Systemd Ollama start/stop | Only caller is the unwired `ErrorScreen.vue` | `commands/service.rs` |
 | True Compact / TWM mode | Only the icon strip is collapsed; padding / font / top-bar behaviour from §3.6 not implemented | `App.vue:14` |

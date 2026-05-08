@@ -206,7 +206,7 @@ alpaka-desktop/
 │   │   │       ├── ModelSelector.vue
 │   │   │       └── SystemPromptPanel.vue
 │   │   ├── hosts/
-│   │   │   └── HostManager.vue       # ⚠️ Defined but never imported as of v1.2.0
+│   │   │   └── HostManager.vue       # Host manager modal; opened via Ctrl+H (App.vue)
 │   │   ├── models/
 │   │   │   ├── CloudTagSelector.vue
 │   │   │   ├── CreateModelPage.vue   # Modelfile create / edit page
@@ -219,7 +219,7 @@ alpaka-desktop/
 │   │   │   ├── AccountSettings.vue   # OAuth signin + API key panel
 │   │   │   ├── ApiKeyPanel.vue
 │   │   │   ├── GpuLayersSettings.vue # num_gpu input + detect_hardware summary (Settings → Engine)
-│   │   │   ├── HostSettings.vue      # Host CRUD lives here, not in HostManager.vue
+│   │   │   ├── HostSettings.vue      # Host CRUD (also accessible from HostManager.vue modal)
 │   │   │   ├── ProxySettings.vue     # HTTP/SOCKS5 proxy config (URL, username, keyring password)
 │   │   │   ├── ModelPathSettings.vue
 │   │   │   ├── PresetEditor.vue
@@ -235,7 +235,6 @@ alpaka-desktop/
 │   │   │   ├── MirostatSelector.vue
 │   │   │   ├── ModelTagBadge.vue
 │   │   │   ├── ToggleSwitch.vue
-│   │   │   ├── TopBar.vue            # ⚠️ 0-byte placeholder; layout lives in App.vue
 │   │   │   └── icons/
 │   │   └── sidebar/
 │   │       ├── Sidebar.vue           # ⚠️ Search input on line 43 is unwired
