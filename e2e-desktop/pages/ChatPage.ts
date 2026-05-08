@@ -49,4 +49,18 @@ export class ChatPage extends BasePage {
     if (messages.length === 0) throw new Error('No assistant messages found')
     return messages[messages.length - 1].getText()
   }
+
+  async startNewChat(): Promise<void> {
+    const btn = await $('[data-testid="new-chat-btn"]')
+    const isVisible = await btn.isDisplayed()
+    if (!isVisible) {
+      const toggle = await $('[data-testid="sidebar-toggle"]')
+      if (await toggle.isExisting()) {
+        await toggle.click()
+        await this.driver.pause(200)
+      }
+    }
+    await btn.waitForDisplayed({ timeout: 5000 })
+    await btn.click()
+  }
 }

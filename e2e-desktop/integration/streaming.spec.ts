@@ -44,7 +44,7 @@ describe('Streaming — real token delivery', () => {
 
   it('response text is readable after stream complete', async () => {
     // Start a fresh conversation to avoid context contamination from earlier tests
-    await $('[data-testid="new-chat-btn"]').click()
+    await chat.startNewChat()
     await $('[data-testid="chat-input"]').waitForDisplayed({ timeout: 5000 })
     await chat.sendMessage('Say hello to me in a short sentence.')
     // Wait for streaming to START before waiting for it to end, otherwise
