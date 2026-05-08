@@ -178,7 +178,7 @@ function handleClose() {
         class="text-[11px] text-[var(--text-dim)] mr-auto flex items-center gap-2"
       >
         {{ footerMeta }}
-        <label
+        <span
           class="flex items-center gap-1.5 text-[10px] text-[var(--text-dim)] cursor-pointer select-none"
         >
           <button
@@ -197,7 +197,7 @@ function handleClose() {
             />
           </button>
           Auto-refresh
-        </label>
+        </span>
       </span>
       <button
         data-testid="btn-cancel"
