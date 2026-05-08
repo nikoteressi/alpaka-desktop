@@ -33,6 +33,7 @@ const defaultProps = {
   contextName: "my-project",
   contextPath: "/home/user/my-project",
   includedFiles: undefined as string[] | undefined,
+  autoRefresh: false,
 };
 
 describe("FolderFilePickerModal", () => {
@@ -150,6 +151,33 @@ describe("FolderFilePickerModal", () => {
     await wrapper.find('[data-testid="btn-cancel"]').trigger("click");
     expect(wrapper.emitted("close")).toBeTruthy();
     expect(tauriApi.updateIncludedFiles).not.toHaveBeenCalled();
+  });
+
+  describe("auto-refresh toggle", () => {
+    it("renders toggle with correct initial state (off)", () => {
+      const wrapper = mount(FolderFilePickerModal, {
+        props: { ...defaultProps, autoRefresh: false },
+      });
+      const toggle = wrapper.find('[role="switch"]');
+      expect(toggle.exists()).toBe(true);
+      expect(toggle.attributes("aria-checked")).toBe("false");
+    });
+
+    it("renders toggle with correct initial state (on)", () => {
+      const wrapper = mount(FolderFilePickerModal, {
+        props: { ...defaultProps, autoRefresh: true },
+      });
+      const toggle = wrapper.find('[role="switch"]');
+      expect(toggle.attributes("aria-checked")).toBe("true");
+    });
+
+    it("emits update-auto-refresh with toggled value on click", async () => {
+      const wrapper = mount(FolderFilePickerModal, {
+        props: { ...defaultProps, autoRefresh: false },
+      });
+      await wrapper.find('[role="switch"]').trigger("click");
+      expect(wrapper.emitted("update-auto-refresh")?.[0]).toEqual([true]);
+    });
   });
 
   it("shows error message and retry button when listFolderFiles fails", async () => {
