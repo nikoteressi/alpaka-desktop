@@ -142,6 +142,7 @@ import { useSettingsStore } from "./stores/settings";
 import { useAuthStore } from "./stores/auth";
 import { useAppOrchestration } from "./composables/useAppOrchestration";
 import { useStreamingEvents } from "./composables/useStreamingEvents";
+import { useCompactionEvents } from "./composables/useCompactionEvents";
 import { useKeyboard } from "./composables/useKeyboard";
 import {
   IconNewChat,
@@ -159,6 +160,7 @@ const settingsStore = useSettingsStore();
 const authStore = useAuthStore();
 const orchestration = useAppOrchestration();
 const { init: initStreamListeners } = useStreamingEvents();
+const { init: initCompactionListeners } = useCompactionEvents();
 const { cleanup: cleanupKeyboard } = useKeyboard();
 onUnmounted(() => cleanupKeyboard());
 
@@ -278,6 +280,9 @@ onMounted(async () => {
       }),
       initStreamListeners().catch((err: unknown) => {
         console.error("[App] Stream listeners failed:", err);
+      }),
+      initCompactionListeners().catch((err: unknown) => {
+        console.error("[App] Compaction listeners failed:", err);
       }),
       modelStore.fetchInitialUpdateStatus().catch((err: unknown) => {
         console.error("[App] Model update status fetch failed:", err);

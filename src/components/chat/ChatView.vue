@@ -101,6 +101,7 @@
                 :active="active"
                 :size-dependencies="[
                   item.message.content,
+                  item.message.role,
                   item.isStreaming,
                   item.thinkingContent,
                   item.isThinking,
@@ -109,7 +110,13 @@
                 ]"
                 :data-index="index"
               >
+                <CompactSummaryBubble
+                  v-if="item.message.role === 'compact_summary'"
+                  :message="item.message"
+                  :conversation-id="chatStore.activeConversationId ?? ''"
+                />
                 <MessageBubble
+                  v-else
                   :message="item.message"
                   :message-id="item.id"
                   :is-streaming="item.isStreaming"
@@ -245,6 +252,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { DynamicScroller, DynamicScrollerItem } from "vue-virtual-scroller";
 import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 import MessageBubble from "./MessageBubble.vue";
+import CompactSummaryBubble from "./CompactSummaryBubble.vue";
 import ChatInput from "./ChatInput.vue";
 import SearchSidebar from "./SearchSidebar.vue";
 import EditMessageModal from "./EditMessageModal.vue";

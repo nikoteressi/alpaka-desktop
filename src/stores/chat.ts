@@ -34,6 +34,39 @@ export function base64ToUint8Array(base64: string) {
   return bytes;
 }
 
+function decodeImages(imagesJson: string): Uint8Array[] {
+  try {
+    if (!imagesJson) return [];
+    return (JSON.parse(imagesJson) as string[]).map(base64ToUint8Array);
+  } catch {
+    return [];
+  }
+}
+
+export function mapBackendMessage(m: BackendMessage): Message {
+  return {
+    id: m.id,
+    conversation_id: m.conversation_id,
+    role: m.role,
+    content: m.content,
+    images: decodeImages(m.images_json),
+    tokens: m.tokens_used ?? undefined,
+    prompt_tokens: m.prompt_tokens ?? undefined,
+    tokens_per_sec: m.tokens_per_sec ?? undefined,
+    generation_time_ms: m.generation_time_ms ?? undefined,
+    total_duration_ms: m.total_duration_ms ?? undefined,
+    load_duration_ms: m.load_duration_ms ?? undefined,
+    prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? undefined,
+    eval_duration_ms: m.eval_duration_ms ?? undefined,
+    seed: m.seed ?? undefined,
+    created_at: m.created_at,
+    parentId: m.parent_id ?? null,
+    siblingOrder: m.sibling_order ?? 0,
+    siblingCount: m.sibling_count ?? 1,
+    isActive: m.is_active ?? true,
+  };
+}
+
 export function uint8ArrayToBase64(bytes: Uint8Array) {
   let binary = "";
   const len = bytes.byteLength;
@@ -43,32 +76,36 @@ export function uint8ArrayToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+function initialStreaming(): StreamingState {
+  return {
+    isStreaming: false,
+    currentConversationId: null,
+    buffer: "",
+    thinkingBuffer: "",
+    isThinking: false,
+    tokensPerSec: null,
+    thinkTime: null,
+    toolCalls: [],
+    searchState: null,
+    searchResults: [],
+    sidebarOpen: false,
+    activeSearchMessageId: null,
+    activeSearchData: [],
+    promptTokens: 0,
+    evalTokens: 0,
+    activeMessageParts: [],
+    regeneratingMessageId: null,
+  };
+}
+
 export const useChatStore = defineStore("chat", {
   state: () => ({
     conversations: [] as Conversation[],
     activeConversationId: null as string | null,
-    messages: {} as Record<string, Message[]>,
-    folderContexts: {} as Record<string, LinkedContext[]>,
-    expandedStats: new Set<string>(), // Track which message IDs have full stats visible
-    streaming: {
-      isStreaming: false,
-      currentConversationId: null,
-      buffer: "",
-      thinkingBuffer: "",
-      isThinking: false,
-      tokensPerSec: null,
-      thinkTime: null,
-      toolCalls: [],
-      searchState: null,
-      searchResults: [],
-      sidebarOpen: false,
-      activeSearchMessageId: null,
-      activeSearchData: [],
-      promptTokens: 0,
-      evalTokens: 0,
-      activeMessageParts: [] as MessagePart[],
-      regeneratingMessageId: null,
-    } as StreamingState,
+    messages: {} as Record<string, Message[]>, // NOSONAR
+    folderContexts: {} as Record<string, LinkedContext[]>, // NOSONAR
+    expandedStats: new Set<string>(),
+    streaming: initialStreaming(),
     _listenersInitialized: false,
     /** Draft conversation — local-only, not yet persisted to DB */
     draftConversation: null as Conversation | null,
@@ -77,9 +114,13 @@ export const useChatStore = defineStore("chat", {
     isLoadingMore: false,
     nextOffset: 0,
     /** In-memory cache of drafts for loaded conversations */
-    drafts: {} as Record<string, ChatDraft>,
+    drafts: {} as Record<string, ChatDraft>, // NOSONAR
     /** Temporary system prompt for drafts or newly created chats */
-    draftSystemPrompt: "" as string,
+    draftSystemPrompt: "",
+    compactionInProgress: {} as Record<string, boolean>, // NOSONAR
+    compactionTokens: {} as Record<string, string>, // NOSONAR
+    archivedMessages: {} as Record<string, import("../types/chat").Message[]>, // NOSONAR
+    showingHistory: new Set<string>(),
   }),
 
   getters: {
@@ -225,11 +266,7 @@ export const useChatStore = defineStore("chat", {
       }
 
       // Otherwise, create a new part
-      parts.push({
-        type,
-        content,
-        ...metadata,
-      } as MessagePart);
+      parts.push({ type, content, ...metadata } as MessagePart); // NOSONAR
     },
 
     updatePartMetadata(
@@ -335,37 +372,7 @@ export const useChatStore = defineStore("chat", {
 
         if (this.activeConversationId !== id) return;
 
-        this.messages[id] = (rawMessages || []).map((m) => {
-          let images: Uint8Array[] = [];
-          try {
-            if (m.images_json) {
-              const base64s = JSON.parse(m.images_json) as string[];
-              images = base64s.map(base64ToUint8Array);
-            }
-          } catch (e) {
-            console.warn("Failed to parse message images", e);
-          }
-
-          return {
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            images,
-            tokens: m.tokens_used ?? 0,
-            prompt_tokens: m.prompt_tokens ?? 0,
-            tokens_per_sec: m.tokens_per_sec ?? 0,
-            generation_time_ms: m.generation_time_ms ?? 0,
-            total_duration_ms: m.total_duration_ms ?? 0,
-            load_duration_ms: m.load_duration_ms ?? 0,
-            prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
-            eval_duration_ms: m.eval_duration_ms ?? 0,
-            seed: m.seed ?? undefined,
-            parentId: m.parent_id ?? null,
-            siblingOrder: m.sibling_order ?? 0,
-            siblingCount: m.sibling_count ?? 1,
-            isActive: m.is_active ?? true,
-          };
-        });
+        this.messages[id] = (rawMessages || []).map(mapBackendMessage);
 
         // Read contents of folders for the model context
         const populatedContexts = await Promise.all(
@@ -426,15 +433,55 @@ export const useChatStore = defineStore("chat", {
     async compactConversation(
       conversationId: string,
       model: string,
-      title?: string,
-    ): Promise<string> {
-      const newConvId = await invoke<string>("compact_conversation", {
-        conversationId,
-        model,
-        title,
-      });
-      await this.loadConversations(true);
-      return newConvId;
+    ): Promise<void> {
+      this.compactionInProgress[conversationId] = true;
+      this.compactionTokens[conversationId] = "";
+      try {
+        await invoke<void>("compact_conversation", { conversationId, model });
+        // compact:done event is the single owner of cache-clear + reload for both
+        // UI-triggered and future background-triggered compaction paths.
+      } catch (e) {
+        console.error("Compact failed:", e);
+        this.finishCompaction(conversationId);
+      }
+    },
+
+    appendCompactionToken(conversationId: string, content: string) {
+      this.compactionTokens[conversationId] =
+        (this.compactionTokens[conversationId] ?? "") + content;
+    },
+
+    finishCompaction(conversationId: string) {
+      delete this.compactionInProgress[conversationId];
+      delete this.compactionTokens[conversationId];
+      delete this.archivedMessages[conversationId];
+    },
+
+    async cancelCompaction(): Promise<void> {
+      await invoke("cancel_compaction");
+    },
+
+    async loadArchivedMessages(conversationId: string): Promise<void> {
+      const rawMessages = await invoke<BackendMessage[]>(
+        "get_archived_messages",
+        {
+          conversationId,
+        },
+      );
+      this.archivedMessages[conversationId] = (rawMessages || []).map(
+        mapBackendMessage,
+      );
+    },
+
+    async toggleHistory(conversationId: string): Promise<void> {
+      if (this.showingHistory.has(conversationId)) {
+        this.showingHistory.delete(conversationId);
+      } else {
+        this.showingHistory.add(conversationId);
+        if (!this.archivedMessages[conversationId]) {
+          await this.loadArchivedMessages(conversationId);
+        }
+      }
     },
 
     async switchVersion(siblingId: string): Promise<void> {
@@ -456,42 +503,19 @@ export const useChatStore = defineStore("chat", {
       }
     },
 
+    clearMessages(conversationId: string): void {
+      delete this.messages[conversationId];
+    },
+
     async refreshMessages(conversationId: string): Promise<void> {
       try {
         const rawMessages = await invoke<BackendMessage[]>("get_messages", {
           conversationId,
         });
         if (this.activeConversationId !== conversationId) return;
-        this.messages[conversationId] = (rawMessages || []).map((m) => {
-          let images: Uint8Array[] = [];
-          try {
-            if (m.images_json) {
-              const base64s = JSON.parse(m.images_json) as string[];
-              images = base64s.map(base64ToUint8Array);
-            }
-          } catch {
-            // ignore malformed image data
-          }
-          return {
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            images,
-            tokens: m.tokens_used ?? 0,
-            prompt_tokens: m.prompt_tokens ?? 0,
-            tokens_per_sec: m.tokens_per_sec ?? 0,
-            generation_time_ms: m.generation_time_ms ?? 0,
-            total_duration_ms: m.total_duration_ms ?? 0,
-            load_duration_ms: m.load_duration_ms ?? 0,
-            prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? 0,
-            eval_duration_ms: m.eval_duration_ms ?? 0,
-            seed: m.seed ?? undefined,
-            parentId: m.parent_id ?? null,
-            siblingOrder: m.sibling_order ?? 0,
-            siblingCount: m.sibling_count ?? 1,
-            isActive: m.is_active ?? true,
-          };
-        });
+        this.messages[conversationId] = (rawMessages || []).map(
+          mapBackendMessage,
+        );
       } catch (err) {
         console.warn("Could not refresh messages", err);
       }

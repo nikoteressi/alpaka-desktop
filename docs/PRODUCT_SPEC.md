@@ -63,7 +63,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | C-09 | **Chat branching** | P2 | ✅ | Regenerate assistant responses to create sibling branches; navigate between versions with `<` / `>` controls in `MessageBubble.vue` (`useVersionSwitcher`). Edit message truncates conversation from the edited point before resending. |
 | C-10 | **Chat backup & restore** | P1 | ⚠️ | Raw SQLite backup/restore wired in `Settings → Maintenance`; no per-conversation JSON import/export UI |
 | C-11 | **Compact / TWM mode** | P1 | ⚠️ | `Ctrl+Shift+M` collapses the 48 px icon strip (`App.vue:14`). Padding, font sizes and the top-bar layout described in §3.6 are **not** implemented |
-| C-12 | **Conversation summarisation (Compact)** | P1 | ✅ | Button at ≥70 % context usage; summarises history with `temperature=0.3`, creates a new conversation with the summary as a system prompt + last 4 turns (`services/chat/compact.rs`) |
+| C-12 | **Conversation summarisation (Compact)** | P1 | ✅ | In-place compaction: messages soft-archived (migration v15 `is_archived` + `compaction_events` table), streaming summary progress bar in ChatInput, expandable history toggle via `CompactSummaryBubble.vue`, background support with sidebar spinner, cancel button, compaction model setting in Settings → General (`services/chat/compact.rs`) |
 | C-13 | **Sliding-window context truncation** | P0 | ✅ | Automatic on every send; trims oldest user/assistant messages to fit `0.85 × num_ctx` (`services/chat/context.rs`) |
 | C-14 | **Stop generation** | P0 | ✅ | `Escape` key + Send button toggles to "Stop" while streaming; cancel via `tokio::broadcast` channel |
 | C-15 | **Drafts per-conversation** | P1 | ✅ | Input + advanced options auto-saved per conversation (`useDraftSync`) |

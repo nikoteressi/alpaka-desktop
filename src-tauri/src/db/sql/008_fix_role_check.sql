@@ -1,5 +1,6 @@
--- In-place compaction: add is_archived column, relax the role CHECK, and create compaction_events.
--- SQLite cannot ALTER a CHECK constraint, so we recreate the messages table.
+-- v15 was recorded against an older ALTER TABLE-only script that never updated the
+-- role CHECK constraint. Recreate the messages table to fix it.
+-- This is safe to run even if v15 already added is_archived via ALTER TABLE.
 
 PRAGMA foreign_keys = OFF;
 
@@ -34,7 +35,7 @@ INSERT INTO messages_new
     SELECT id, conversation_id, role, content, images_json, files_json,
            tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
            total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-           seed, created_at, parent_id, sibling_order, is_active, 0
+           seed, created_at, parent_id, sibling_order, is_active, is_archived
     FROM messages;
 
 DROP TABLE messages;
@@ -43,11 +44,3 @@ ALTER TABLE messages_new RENAME TO messages;
 COMMIT;
 
 PRAGMA foreign_keys = ON;
-
--- Compaction events log
-CREATE TABLE IF NOT EXISTS compaction_events (
-    id               TEXT    PRIMARY KEY NOT NULL,
-    conversation_id  TEXT    NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-    archived_count   INTEGER NOT NULL,
-    created_at       TEXT    NOT NULL
-);

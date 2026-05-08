@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- In-place chat compaction (#158): compact button always visible (not gated on 70% context); messages soft-archived with `is_archived` flag; streaming summary saved as `compact_summary` message in the same conversation; streaming status bar shows tokens as they arrive with a Cancel button; sidebar spinner when compacting a background conversation; desktop notification on completion; expandable "Show history" toggle on the summary bubble; "Compaction model" setting in Settings → General
 - DeepSeek-inspired chat visual styling (#149): thinking blocks now render as a collapsible timeline with step-by-step reasoning, animated brain icon, dot markers, and auto-collapse after generation; web search shown as an inline pill inside the timeline during streaming, then as a post-message favicon-stack badge that opens a 320 px source sidebar (`SearchSidebar.vue`); `chat:tool-reading` Tauri event streams preview results before the LLM finishes reading
 - `MessageActions.vue` — copy, edit, regenerate, like/dislike, and version-switcher controls per message; shown on hover
 - Message branching (#150): regenerate an assistant response to create an alternative version; navigate between versions with `<` / `>` controls and a `1/N` counter directly in the message bubble (`useVersionSwitcher` composable)

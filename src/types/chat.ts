@@ -15,7 +15,7 @@ export type MessagePart = {
 export interface Message {
   id?: string;
   conversation_id?: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "compact_summary";
   content: string;
   images?: Uint8Array[];
   tokens?: number;
@@ -37,7 +37,7 @@ export interface Message {
 export interface BackendMessage {
   id: string;
   conversation_id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "compact_summary";
   content: string;
   images_json: string;
   files_json: string;

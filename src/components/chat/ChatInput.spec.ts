@@ -1266,15 +1266,15 @@ describe("ChatInput — handleCompact", () => {
     const wrapper = mountInput();
     const vm = wrapper.vm as unknown as {
       handleCompact: () => Promise<void>;
-      isCompacting: boolean;
     };
+    const chatStore = useChatStore();
 
     await vm.handleCompact();
-    // Should not set isCompacting if no conversation
-    expect(vm.isCompacting).toBe(false);
+    // No compaction should be in progress since there's no active conversation
+    expect(chatStore.compactionInProgress).toEqual({});
   });
 
-  it("sets isCompacting to false after compact completes", async () => {
+  it("calls compactConversation after compact completes", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "get_model_capabilities")
         return Promise.reject(new Error("mock"));
@@ -1289,18 +1289,16 @@ describe("ChatInput — handleCompact", () => {
 
     const compactSpy = vi
       .spyOn(chatStore, "compactConversation")
-      .mockResolvedValue("new-conv-id");
+      .mockResolvedValue();
     vi.spyOn(chatStore, "loadConversation").mockResolvedValue();
 
     const wrapper = mountInput();
     const vm = wrapper.vm as unknown as {
       handleCompact: () => Promise<void>;
-      isCompacting: boolean;
     };
 
     await vm.handleCompact();
 
     expect(compactSpy).toHaveBeenCalled();
-    expect(vm.isCompacting).toBe(false);
   });
 });
