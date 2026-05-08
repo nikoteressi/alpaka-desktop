@@ -25,7 +25,7 @@
           The Ollama server at
           <span
             class="font-mono bg-neutral-100 dark:bg-neutral-800 px-1 rounded text-neutral-800 dark:text-neutral-300"
-            >localhost:11434</span
+            >{{ props.hostUrl }}</span
           >
           is not responding.
         </p>
@@ -108,6 +108,7 @@
           </button>
 
           <button
+            v-if="props.showServiceControls"
             @click="startService"
             :disabled="isStartingService"
             class="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition shadow-sm text-sm flex items-center justify-center disabled:opacity-50 cursor-pointer"
@@ -204,6 +205,17 @@ import { ref } from "vue";
 import { tauriApi } from "../../lib/tauri";
 import CustomTooltip from "./CustomTooltip.vue";
 import { useCopyToClipboard } from "../../composables/useCopyToClipboard";
+
+const props = withDefaults(
+  defineProps<{
+    hostUrl?: string;
+    showServiceControls?: boolean;
+  }>(),
+  {
+    hostUrl: "localhost:11434",
+    showServiceControls: true,
+  },
+);
 
 const emit = defineEmits(["retry", "openSettings"]);
 
