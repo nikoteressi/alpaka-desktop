@@ -5,7 +5,7 @@ use notify_debouncer_mini::notify::RecursiveMode;
 use notify_debouncer_mini::{new_debouncer, DebounceEventResult, Debouncer};
 use tauri::{AppHandle, Emitter, Runtime};
 
-use crate::commands::folders::{guard_path, read_folder_context};
+use crate::commands::folders::{guard_path, read_folder_context, CHARS_PER_TOKEN};
 use crate::db::folders::{get_folder_context, update_token_estimate};
 use crate::db::DbConn;
 use crate::error::AppError;
@@ -97,7 +97,7 @@ fn reestimate_tokens(db: &DbConn, context_id: &str) -> Result<i64, AppError> {
                 }
             }
         }
-        (total / 4) as i64
+        (total / CHARS_PER_TOKEN) as i64
     } else {
         read_folder_context(&base_path)
             .map(|p| p.token_estimate as i64)

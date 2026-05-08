@@ -79,6 +79,7 @@ pub(crate) fn guard_path(raw: &Path) -> Result<std::path::PathBuf, AppError> {
 
 const MAX_FOLDER_CONTEXT_SIZE: usize = 50 * 1024 * 1024; // 50 MB limit
 const MAX_FOLDER_FILES: usize = 1000; // 1000 files limit
+pub(crate) const CHARS_PER_TOKEN: usize = 4;
 
 /// Recursively reads a directory, ignoring hidden files, `.git`,
 /// and binary files. Extracts text from supported file types.
@@ -106,7 +107,7 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
             .unwrap_or("file");
         content.push_str(&format!("\n--- File: {} ---\n{}\n", filename, file_content));
 
-        let token_estimate = content.chars().count() / 4;
+        let token_estimate = content.chars().count() / CHARS_PER_TOKEN;
         return Ok(FolderContextPayload {
             id: String::new(),
             path: folder_path.to_string_lossy().to_string(),
@@ -170,13 +171,44 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
         }
     }
 
-    let token_estimate = content.chars().count() / 4;
+    let token_estimate = content.chars().count() / CHARS_PER_TOKEN;
     Ok(FolderContextPayload {
         id: String::new(), // Not saved yet
         path: folder_path.to_string_lossy().to_string(),
         content,
         token_estimate,
     })
+}
+
+fn read_included_files(
+    base_path: &Path,
+    included_files: &[String],
+) -> Result<(String, usize), AppError> {
+    let mut content = String::new();
+    let mut total_chars = 0usize;
+
+    for rel_path in included_files {
+        let full_path = base_path.join(rel_path);
+        // Symlink check must happen before canonicalize; after canonicalize
+        // is_symlink() always returns false because the target has been resolved.
+        if full_path.is_symlink() {
+            log::warn!("Skipping symlink in included files: {:?}", full_path);
+            continue;
+        }
+        let canonical = match dunce::canonicalize(&full_path) {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        if !canonical.starts_with(base_path) {
+            return Err(AppError::Internal("Path traversal detected".into()));
+        }
+        if let Ok(file_content) = std::fs::read_to_string(&canonical) {
+            total_chars += file_content.chars().count();
+            content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
+        }
+    }
+
+    Ok((content, total_chars))
 }
 
 #[command]
@@ -382,42 +414,20 @@ pub async fn update_included_files(
 
         let base_path = guard_path(Path::new(&ctx.path))?;
 
-        let mut total_chars = 0usize;
-        let mut content = String::new();
-
-        for rel_path in &included_files {
-            let full_path = base_path.join(rel_path);
-            // Symlink check must happen before canonicalize; after canonicalize
-            // is_symlink() always returns false because the target has been resolved.
-            if full_path.is_symlink() {
-                log::warn!("Skipping symlink in included files: {:?}", full_path);
-                continue;
-            }
-            let canonical = match dunce::canonicalize(&full_path) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-            if !canonical.starts_with(&base_path) {
-                return Err(AppError::Internal("Path traversal detected".into()));
-            }
-            if included_files.len() > MAX_FOLDER_FILES {
-                return Err(AppError::Internal(format!(
-                    "Cannot include more than {} files",
-                    MAX_FOLDER_FILES
-                )));
-            }
-            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
-                total_chars += file_content.chars().count();
-                if total_chars > MAX_FOLDER_CONTEXT_SIZE {
-                    return Err(AppError::Internal(
-                        "Selected files exceed 50MB limit".into(),
-                    ));
-                }
-                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
-            }
+        if included_files.len() > MAX_FOLDER_FILES {
+            return Err(AppError::Internal(format!(
+                "Cannot include more than {} files",
+                MAX_FOLDER_FILES
+            )));
         }
 
-        let token_estimate = (total_chars / 4) as i64;
+        let (content, total_chars) = read_included_files(&base_path, &included_files)?;
+        if total_chars > MAX_FOLDER_CONTEXT_SIZE {
+            return Err(AppError::Internal(
+                "Selected files exceed 50MB limit".into(),
+            ));
+        }
+        let token_estimate = (total_chars / CHARS_PER_TOKEN) as i64;
         let included_files_json = Some(serde_json::to_string(&included_files)?);
 
         crate::db::folders::update_folder_context(
@@ -463,31 +473,9 @@ pub async fn get_included_files_content(
         }
 
         let base_path = guard_path(Path::new(&ctx.path))?;
-        let mut total_chars = 0usize;
-        let mut content = String::new();
-
-        for rel_path in &included_files {
-            let full_path = base_path.join(rel_path);
-            // Symlink check must happen before canonicalize; after canonicalize
-            // is_symlink() always returns false because the target has been resolved.
-            if full_path.is_symlink() {
-                continue;
-            }
-            let canonical = match dunce::canonicalize(&full_path) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-            if !canonical.starts_with(&base_path) {
-                continue;
-            }
-            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
-                total_chars += file_content.chars().count();
-                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
-            }
-        }
-
+        let (content, total_chars) = read_included_files(&base_path, &included_files)?;
         Ok(UpdatedContextResult {
-            token_estimate: (total_chars / 4) as i64,
+            token_estimate: (total_chars / CHARS_PER_TOKEN) as i64,
             content,
         })
     })
@@ -551,7 +539,7 @@ pub async fn estimate_tokens(
             }
         }
 
-        Ok((total_chars / 4) as i64)
+        Ok((total_chars / CHARS_PER_TOKEN) as i64)
     })
     .await
     .map_err(AppError::from)?
