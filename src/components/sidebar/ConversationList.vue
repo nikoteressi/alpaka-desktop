@@ -139,11 +139,20 @@
               v-else
               :text="item.conversation.title"
               only-if-truncated
-              class="flex-1 min-w-0"
+              class="flex-1 min-w-0 flex items-center gap-1.5"
             >
-              <span class="block w-full truncate">{{
+              <span class="block truncate min-w-0 flex-1">{{
                 item.conversation.title
               }}</span>
+              <svg
+                v-if="chatStore.compactionInProgress[item.conversation.id]"
+                class="w-3 h-3 animate-spin text-amber-400 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
             </CustomTooltip>
 
             <!-- Menu Button -->
