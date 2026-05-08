@@ -50,16 +50,12 @@ export class ChatPage extends BasePage {
     return messages[messages.length - 1].getText()
   }
 
-  async startNewChat(): Promise<void> {
-    // Two new-chat triggers exist: sidebar button (visible when sidebar open) and
-    // icon-strip button (visible when sidebar closed). Use whichever is displayed.
-    const iconBtn = $('[data-testid="new-chat-icon-btn"]')
-    if (await iconBtn.isExisting() && await iconBtn.isDisplayed()) {
-      await iconBtn.click()
-    } else {
-      const sidebarBtn = $('[data-testid="new-chat-btn"]')
-      await sidebarBtn.waitForDisplayed({ timeout: 5000 })
-      await sidebarBtn.click()
-    }
+  async selectModel(modelName: string): Promise<void> {
+    const selector = $('[data-testid="model-selector"]')
+    await selector.waitForDisplayed({ timeout: 5000 })
+    await selector.click()
+    const option = $(`[data-testid="model-option-${modelName}"]`)
+    await option.waitForDisplayed({ timeout: 5000 })
+    await option.click()
   }
 }

@@ -5,7 +5,6 @@
     <!-- New Chat -->
     <div class="flex-shrink-0 p-3">
       <button
-        data-testid="new-chat-btn"
         class="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 active:scale-[0.98] transition-all"
         @click="newChat"
       >
