@@ -13,6 +13,7 @@ import { useSettingsStore } from "../../stores/settings";
 import { uint8ArrayToBase64 } from "../../stores/chat";
 import { parseMessageParts } from "../../lib/messageParser";
 import { useVersionSwitcher } from "../../composables/useVersionSwitcher";
+import { useInlineEdit } from "../../composables/useInlineEdit";
 
 const props = defineProps<{
   message: Message;
@@ -36,37 +37,37 @@ const chatStore = useChatStore();
 const settingsStore = useSettingsStore();
 const isUser = computed(() => props.message.role === "user");
 
-// Inline edit state (user messages only)
-const isEditing = ref(false);
-const editContent = ref("");
-const editContainerRef = ref<HTMLElement | null>(null);
-const editTextareaRef = ref<HTMLTextAreaElement | null>(null);
+// Inline edit state (user messages only).
+// useInlineEdit uses a module-level cache keyed by convId+messageId so the
+// state survives DynamicScroller pool-slot remounts (same pattern as useCollapsibleState).
+const {
+  isEditing,
+  editContent,
+  editContainerRef,
+  editTextareaRef,
+  startEdit: _startEdit,
+  cancelEdit: _cancelEdit,
+  applyEdit: _applyEdit,
+  onInput: onEditInput,
+} = useInlineEdit({
+  messageKey: props.messageId ?? props.message.id ?? null,
+  initialContent: () => props.message.content,
+});
+
 function startEdit() {
-  editContent.value = props.message.content;
-  isEditing.value = true;
-  // With v-show the container is always in DOM but has display:none.
-  // Override it directly so focus() works in this same click handler
-  // (calling focus in a nextTick microtask is outside the gesture context
-  // on WebKitGTK/Wayland and is silently ignored).
-  const container = editContainerRef.value;
-  const el = editTextareaRef.value;
-  if (container) container.style.display = "flex";
-  if (el) {
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }
+  chatStore.setEditingMessage(props.messageId ?? props.message.id ?? null);
+  _startEdit();
 }
 
 function cancelEdit() {
-  isEditing.value = false;
-  editContent.value = "";
+  chatStore.setEditingMessage(null);
+  _cancelEdit();
 }
 
 function applyEdit() {
-  const content = editContent.value.trim();
+  const content = _applyEdit();
   if (!content) return;
-  isEditing.value = false;
-  editContent.value = "";
+  chatStore.setEditingMessage(null);
   emit("editConfirm", content);
 }
 
@@ -179,23 +180,22 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           v-model="editContent"
           class="user-edit-textarea"
           rows="4"
+          @input="onEditInput"
           @keydown.ctrl.enter="applyEdit"
           @keydown.escape="cancelEdit"
         />
         <div class="user-edit-actions">
-          <button
-            class="user-edit-btn user-edit-btn--cancel"
-            @click="cancelEdit"
-          >
-            Cancel
-          </button>
-          <button
-            class="user-edit-btn user-edit-btn--apply"
-            :disabled="!editContent.trim()"
-            @click="applyEdit"
-          >
-            Apply
-          </button>
+          <div class="edit-pill">
+            <button class="edit-pill__btn" @click="cancelEdit">Cancel</button>
+            <span class="edit-pill__sep"></span>
+            <button
+              class="edit-pill__btn edit-pill__btn--apply"
+              :disabled="!editContent.trim()"
+              @click="applyEdit"
+            >
+              Send
+            </button>
+          </div>
         </div>
       </div>
       <!-- Normal display mode -->
@@ -375,7 +375,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 .user-edit-textarea {
   width: 100%;
   background: var(--bg-user-msg);
-  border: 1.5px solid var(--accent);
+  border: 1px solid var(--border-strong);
   border-radius: 18px;
   border-top-right-radius: 4px;
   padding: 8px 14px;
@@ -391,45 +391,52 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 
 .user-edit-actions {
   display: flex;
-  gap: 6px;
   justify-content: flex-end;
   padding-right: 2px;
 }
 
-.user-edit-btn {
-  padding: 4px 14px;
+.edit-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(var(--bg-elevated-rgb), 0.5);
+  border: 1px solid var(--border-strong);
+  border-radius: 99px;
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.edit-pill__btn {
+  background: none;
+  border: none;
+  padding: 3px 12px;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 8px;
-  cursor: pointer;
-  border: none;
-  transition:
-    opacity 0.15s,
-    background 0.15s;
-}
-
-.user-edit-btn--cancel {
   color: var(--text-muted);
-  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
 }
 
-.user-edit-btn--cancel:hover {
-  color: var(--text);
+.edit-pill__btn:hover:not(:disabled) {
   background: var(--bg-hover);
+  color: var(--text);
 }
 
-.user-edit-btn--apply {
-  background: var(--accent);
-  color: white;
+.edit-pill__btn--apply {
+  color: var(--text);
+  font-weight: 600;
 }
 
-.user-edit-btn--apply:hover:not(:disabled) {
-  opacity: 0.85;
-}
-
-.user-edit-btn--apply:disabled {
-  opacity: 0.4;
+.edit-pill__btn--apply:disabled {
+  color: var(--text-dim);
   cursor: not-allowed;
+}
+
+.edit-pill__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-strong);
+  flex-shrink: 0;
 }
 
 .assistant-message {

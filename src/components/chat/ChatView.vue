@@ -106,6 +106,7 @@
                   item.isThinking,
                   item.tokensPerSec,
                   chatStore.expandedStats.has(item.id),
+                  chatStore.editingMessageId === item.id,
                 ]"
                 :data-index="index"
               >

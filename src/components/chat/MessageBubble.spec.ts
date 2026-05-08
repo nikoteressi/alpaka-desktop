@@ -79,7 +79,7 @@ describe("MessageBubble.vue", () => {
     await wrapper.find(".user-message").trigger("mouseenter");
     await wrapper.find('[aria-label="Edit"]').trigger("click");
     await wrapper.vm.$nextTick();
-    await wrapper.find(".user-edit-btn--cancel").trigger("click");
+    await wrapper.find(".edit-pill__btn").trigger("click");
     await wrapper.vm.$nextTick();
     // v-show hides the edit container; the normal bubble reappears (v-if="!isEditing")
     expect(wrapper.find(".user-bubble").exists()).toBe(true);
@@ -94,7 +94,7 @@ describe("MessageBubble.vue", () => {
     await wrapper.vm.$nextTick();
     const textarea = wrapper.find("textarea");
     await textarea.setValue("  Updated content  ");
-    await wrapper.find(".user-edit-btn--apply").trigger("click");
+    await wrapper.find(".edit-pill__btn--apply").trigger("click");
     expect(wrapper.emitted("editConfirm")).toEqual([["Updated content"]]);
   });
 });

@@ -76,6 +76,8 @@ export const useChatStore = defineStore("chat", {
     hasMore: true,
     isLoadingMore: false,
     nextOffset: 0,
+    /** The message ID currently being inline-edited, or null. Used by DynamicScroller size-dependencies. */
+    editingMessageId: null as string | null,
     /** In-memory cache of drafts for loaded conversations */
     drafts: {} as Record<string, ChatDraft>,
     /** Temporary system prompt for drafts or newly created chats */
@@ -243,6 +245,10 @@ export const useChatStore = defineStore("chat", {
           break;
         }
       }
+    },
+
+    setEditingMessage(id: string | null) {
+      this.editingMessageId = id;
     },
 
     openSearchSidebar(messageId: string | null, results: SearchResult[]) {
