@@ -675,14 +675,22 @@ async function doExportJson() {
   if (!menuConv.value) return;
   const id = menuConv.value.id;
   closeMenuNow();
-  await tauriApi.exportConversation(id);
+  try {
+    await tauriApi.exportConversation(id);
+  } catch (err) {
+    console.error("Export failed:", err);
+  }
 }
 
 async function doExportMarkdown() {
   if (!menuConv.value) return;
   const id = menuConv.value.id;
   closeMenuNow();
-  await tauriApi.exportConversationMarkdown(id);
+  try {
+    await tauriApi.exportConversationMarkdown(id);
+  } catch (err) {
+    console.error("Export failed:", err);
+  }
 }
 
 function closeMenu(e: MouseEvent) {
@@ -724,5 +732,6 @@ onBeforeUnmount(() => {
   document.removeEventListener("mousedown", closeMenu);
   appEvents.removeEventListener(APP_EVENT.FOCUS_SEARCH, openSearch);
   if (observer) observer.disconnect();
+  if (submenuCloseTimer) clearTimeout(submenuCloseTimer);
 });
 </script>
