@@ -275,7 +275,7 @@ pub fn search(conn: &Connection, query: &str) -> Result<Vec<Conversation>, AppEr
 }
 
 /// Fetch the conversation and its active messages — shared by all export formats.
-pub fn fetch_export_data(
+pub(crate) fn fetch_export_data(
     conn: &Connection,
     conversation_id: &str,
 ) -> Result<(Conversation, Vec<crate::db::messages::Message>), AppError> {
@@ -511,6 +511,16 @@ mod tests {
             },
         )
         .unwrap();
+        crate::db::messages::create(
+            &conn,
+            crate::db::messages::NewMessage {
+                conversation_id: conv.id.clone(),
+                role: crate::db::messages::MessageRole::CompactSummary,
+                content: "should_be_skipped".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("out.md");
@@ -522,5 +532,6 @@ mod tests {
         assert!(content.contains("Hi there"));
         assert!(content.contains("**Assistant:**"));
         assert!(content.contains("Hello!"));
+        assert!(!content.contains("should_be_skipped"));
     }
 }
