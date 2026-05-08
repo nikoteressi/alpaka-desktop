@@ -222,10 +222,9 @@ const activeHostUrl = computed(() => {
   return raw.replace(/^https?:\/\//, "");
 });
 
-const activeHostIsLocal = computed(() => {
-  const url = activeHostUrl.value;
-  return url.includes("localhost") || url.includes("127.0.0.1");
-});
+const activeHostIsLocal = computed(
+  () => hostStore.activeHost?.kind === "local",
+);
 
 async function handleRetry() {
   if (hostStore.activeHostId) {
@@ -236,6 +235,7 @@ async function handleRetry() {
 function handleOpenSettings() {
   router.push("/settings");
 }
+
 const sidebarWidth = ref(220);
 const isResizing = ref(false);
 

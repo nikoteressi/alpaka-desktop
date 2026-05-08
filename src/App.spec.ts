@@ -51,6 +51,20 @@ function makeHost(status: "online" | "offline" | "unknown"): Host {
   };
 }
 
+function makeCloudHost(status: "online" | "offline" | "unknown"): Host {
+  return {
+    id: "h2",
+    name: "Cloud",
+    url: "https://api.ollama.com",
+    kind: "cloud",
+    is_active: true,
+    is_default: false,
+    last_ping_status: status,
+    last_ping_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+  };
+}
+
 describe("App — ErrorScreen overlay", () => {
   beforeEach(async () => {
     setActivePinia(createPinia());
@@ -142,5 +156,22 @@ describe("App — ErrorScreen overlay", () => {
     await errorScreen.vm.$emit("openSettings");
 
     expect(mockPush).toHaveBeenCalledWith("/settings");
+  });
+
+  it("hides service controls when active host is a cloud host", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "list_hosts")
+        return Promise.resolve([makeCloudHost("offline")]);
+      return Promise.resolve(undefined);
+    });
+
+    const wrapper = mount(App, {
+      global: { stubs: GLOBAL_STUBS },
+    });
+    await flushPromises();
+
+    const errorScreen = wrapper.findComponent({ name: "ErrorScreen" });
+    expect(errorScreen.props("showServiceControls")).toBe(false);
   });
 });
