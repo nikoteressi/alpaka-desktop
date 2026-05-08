@@ -6,6 +6,7 @@ use std::sync::{Mutex, RwLock};
 use tokio::sync::{broadcast, oneshot};
 
 use crate::db::DbConn;
+use crate::folder_watcher::FolderWatcher;
 
 // ── Application state ──────────────────────────────────────────────────────────
 
@@ -60,6 +61,10 @@ pub struct AppState {
 
     /// Send on this channel to shut down the model-update background loop on app exit.
     pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+
+    /// Active filesystem watchers, keyed by context_id.
+    /// Dropping an entry cancels the underlying inotify watch.
+    pub folder_watchers: Mutex<HashMap<String, FolderWatcher>>,
 }
 
 /// Builds a reqwest client configured with an optional HTTP or SOCKS5 proxy.
@@ -151,6 +156,7 @@ impl AppState {
             models_with_updates: RwLock::new(Vec::new()),
             update_check_running: AtomicBool::new(false),
             update_check_loop_shutdown: Mutex::new(None),
+            folder_watchers: Mutex::new(HashMap::new()),
         })
     }
 }
