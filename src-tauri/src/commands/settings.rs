@@ -26,6 +26,7 @@ const ALLOWED_SETTING_KEYS: &[&str] = &[
     "presets",
     "defaultPresetId",
     "userPresets",
+    "compactionModel",
 ];
 
 fn validate_setting_key(key: &str) -> Result<(), AppError> {

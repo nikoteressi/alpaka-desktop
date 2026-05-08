@@ -49,6 +49,31 @@
       </template>
     </SettingsRow>
 
+    <SettingsRow icon="sliders">
+      <template #label>Compaction model</template>
+      <template #subtitle
+        >Model used to summarize conversations when compacting. Defaults to the
+        active conversation's model.</template
+      >
+      <template #control>
+        <select
+          :value="settingsStore.compactionModel"
+          @change="
+            settingsStore.updateSetting(
+              'compactionModel',
+              ($event.target as HTMLSelectElement).value,
+            )
+          "
+          class="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-sm text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+        >
+          <option value="">Same as conversation model</option>
+          <option v-for="m in modelStore.models" :key="m.name" :value="m.name">
+            {{ m.name }}
+          </option>
+        </select>
+      </template>
+    </SettingsRow>
+
     <!-- Appearance / Theme Picker -->
     <div class="settings-card">
       <div>
@@ -148,9 +173,11 @@ import ToggleSwitch from "../../components/shared/ToggleSwitch.vue";
 import SettingsRow from "../../components/settings/SettingsRow.vue";
 import ConfirmationModal from "../../components/shared/ConfirmationModal.vue";
 import { useSettingsStore } from "../../stores/settings";
+import { useModelStore } from "../../stores/models";
 import { useConfirmationModal } from "../../composables/useConfirmationModal";
 
 const settingsStore = useSettingsStore();
+const modelStore = useModelStore();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
 
 const themeOptions = [
