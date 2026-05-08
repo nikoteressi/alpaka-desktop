@@ -7,6 +7,7 @@ mod context;
 mod orchestrator;
 
 pub(crate) use context::apply_sliding_window;
+pub(crate) use context::strip_history_content;
 
 use crate::db::repo::AssistantMetrics;
 use crate::db::{messages, spawn_db};

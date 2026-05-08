@@ -317,7 +317,8 @@ pub fn export_to_markdown_path(
             crate::db::messages::MessageRole::System => "System",
             crate::db::messages::MessageRole::CompactSummary => continue,
         };
-        out.push_str(&format!("**{}:**\n\n{}\n\n---\n\n", label, msg.content));
+        let clean = crate::services::chat::strip_history_content(&msg.content);
+        out.push_str(&format!("**{}:**\n\n{}\n\n---\n\n", label, clean));
     }
     std::fs::write(path, out)?;
     Ok(())
@@ -533,5 +534,42 @@ mod tests {
         assert!(content.contains("**Assistant:**"));
         assert!(content.contains("Hello!"));
         assert!(!content.contains("should_be_skipped"));
+    }
+
+    #[test]
+    fn export_to_markdown_strips_think_and_tool_call_tags() {
+        let conn = in_memory_conn();
+        let conv = create(
+            &conn,
+            NewConversation {
+                title: "Strip Test".into(),
+                model: "llama3".into(),
+                settings_json: None,
+                tags: None,
+            },
+        )
+        .unwrap();
+        crate::db::messages::create(
+            &conn,
+            crate::db::messages::NewMessage {
+                conversation_id: conv.id.clone(),
+                role: crate::db::messages::MessageRole::Assistant,
+                content: "<think>internal reasoning</think>Answer<tool_call>{}</tool_call>".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("strip.md");
+        export_to_markdown_path(&conn, &conv.id, &path).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.contains("Answer"));
+        assert!(!content.contains("<think>"));
+        assert!(!content.contains("</think>"));
+        assert!(!content.contains("<tool_call>"));
+        assert!(!content.contains("</tool_call>"));
+        assert!(!content.contains("internal reasoning"));
     }
 }
