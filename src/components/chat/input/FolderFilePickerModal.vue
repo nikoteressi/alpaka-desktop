@@ -183,6 +183,7 @@ function handleClose() {
         >
           <button
             role="switch"
+            aria-label="Auto-refresh"
             :aria-checked="autoRefresh"
             class="relative inline-flex h-4 w-7 items-center rounded-full transition-colors"
             :class="

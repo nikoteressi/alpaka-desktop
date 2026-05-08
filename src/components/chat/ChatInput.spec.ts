@@ -1316,7 +1316,7 @@ describe("ChatInput — folder file picker", () => {
   const folderPickerStub = {
     name: "FolderFilePickerModal",
     template: '<div data-test="picker-modal-stub" />',
-    emits: ["apply", "detach", "close"],
+    emits: ["apply", "detach", "close", "update-auto-refresh"],
   };
 
   function mountWithPicker() {
