@@ -156,13 +156,13 @@ pub fn list_for_conversation(
              SELECT m.*,
                     (SELECT COUNT(*) FROM messages s WHERE s.parent_id = m.parent_id) as sibling_count
              FROM messages m
-             WHERE m.conversation_id = ?1 AND m.parent_id IS NULL
+             WHERE m.conversation_id = ?1 AND m.parent_id IS NULL AND m.is_archived = 0
              UNION ALL
              SELECT m.*,
                     (SELECT COUNT(*) FROM messages s WHERE s.parent_id = m.parent_id) as sibling_count
              FROM messages m
              JOIN active_path ap ON m.parent_id = ap.id
-             WHERE m.is_active = 1
+             WHERE m.is_active = 1 AND m.is_archived = 0
          )
          SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
@@ -784,9 +784,11 @@ mod tests {
         let n = archive_all_for_conversation(&conn, &cid).unwrap();
         assert_eq!(n, 2);
 
-        // list_for_conversation should now return nothing (all archived, not on active path)
-        // archived messages don't show up in the CTE since CTE doesn't filter is_archived,
-        // but we verify archive_all ran correctly by checking list_archived
+        // CTE filters is_archived = 0 on both anchor and recursive clauses, so archived
+        // messages must not appear in list_for_conversation results.
+        let visible = list_for_conversation(&conn, &cid).unwrap();
+        assert!(visible.is_empty(), "archived messages must not appear in live view");
+
         let n2 = archive_all_for_conversation(&conn, &cid).unwrap();
         assert_eq!(n2, 0, "second call archives nothing (already archived)");
     }

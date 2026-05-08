@@ -224,10 +224,11 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let conv_id2 = conversation_id.clone();
         let summary_content = summary.clone();
         spawn_db(self.state.db.clone(), move |conn| {
-            messages::archive_all_for_conversation(conn, &conv_id2)?;
-            compaction_events::create(conn, &conv_id2, archived_count)?;
+            let tx = conn.unchecked_transaction()?;
+            messages::archive_all_for_conversation(&tx, &conv_id2)?;
+            compaction_events::create(&tx, &conv_id2, archived_count)?;
             messages::create(
-                conn,
+                &tx,
                 messages::NewMessage {
                     conversation_id: conv_id2.clone(),
                     role: messages::MessageRole::CompactSummary,
@@ -248,6 +249,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     seed: None,
                 },
             )?;
+            tx.commit()?;
             Ok(())
         })
         .await
