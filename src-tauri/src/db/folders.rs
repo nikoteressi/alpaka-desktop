@@ -133,6 +133,45 @@ pub fn update_folder_context(
     Ok(())
 }
 
+pub fn update_token_estimate(conn: &Connection, id: &str, tokens: i64) -> Result<(), AppError> {
+    let changed = conn.execute(
+        "UPDATE folder_contexts SET estimated_tokens = ?1 WHERE id = ?2",
+        params![tokens, id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!(
+            "Folder context '{id}' not found"
+        )));
+    }
+    Ok(())
+}
+
+pub fn set_auto_refresh_flag(conn: &Connection, id: &str, enabled: bool) -> Result<(), AppError> {
+    let changed = conn.execute(
+        "UPDATE folder_contexts SET auto_refresh = ?1 WHERE id = ?2",
+        params![enabled as i64, id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!(
+            "Folder context '{id}' not found"
+        )));
+    }
+    Ok(())
+}
+
+pub fn get_auto_refresh_contexts(
+    conn: &Connection,
+    conversation_id: &str,
+) -> Result<Vec<FolderContext>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, conversation_id, path, included_files_json, auto_refresh, estimated_tokens, created_at
+         FROM folder_contexts WHERE conversation_id = ?1 AND auto_refresh = 1",
+    )?;
+    let rows = stmt.query_map(params![conversation_id], row_to_folder_context)?;
+    rows.map(|r| r.map_err(AppError::from))
+        .collect::<Result<Vec<_>, _>>()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,5 +250,88 @@ mod tests {
 
         let list2 = get_by_conversation(&conn, "conv2").unwrap();
         assert_eq!(list2.len(), 0);
+    }
+
+    #[test]
+    fn update_token_estimate_changes_only_tokens() {
+        let conn = in_memory_conn();
+        conn.execute("INSERT INTO conversations (id) VALUES ('c1')", [])
+            .unwrap();
+        let ctx = add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "c1".into(),
+                path: "/a".into(),
+                included_files_json: Some("[\"a.txt\"]".into()),
+                auto_refresh: false,
+                estimated_tokens: 10,
+            },
+        )
+        .unwrap();
+
+        update_token_estimate(&conn, &ctx.id, 999).unwrap();
+
+        let fetched = get_folder_context(&conn, &ctx.id).unwrap();
+        assert_eq!(fetched.estimated_tokens, 999);
+        // included_files_json must be untouched
+        assert_eq!(fetched.included_files_json, Some("[\"a.txt\"]".into()));
+    }
+
+    #[test]
+    fn set_auto_refresh_flag_toggles_correctly() {
+        let conn = in_memory_conn();
+        conn.execute("INSERT INTO conversations (id) VALUES ('c1')", [])
+            .unwrap();
+        let ctx = add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "c1".into(),
+                path: "/a".into(),
+                included_files_json: None,
+                auto_refresh: false,
+                estimated_tokens: 0,
+            },
+        )
+        .unwrap();
+
+        set_auto_refresh_flag(&conn, &ctx.id, true).unwrap();
+        assert!(get_folder_context(&conn, &ctx.id).unwrap().auto_refresh);
+
+        set_auto_refresh_flag(&conn, &ctx.id, false).unwrap();
+        assert!(!get_folder_context(&conn, &ctx.id).unwrap().auto_refresh);
+    }
+
+    #[test]
+    fn get_auto_refresh_contexts_returns_only_enabled() {
+        let conn = in_memory_conn();
+        conn.execute("INSERT INTO conversations (id) VALUES ('c1')", [])
+            .unwrap();
+
+        add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "c1".into(),
+                path: "/a".into(),
+                included_files_json: None,
+                auto_refresh: true,
+                estimated_tokens: 0,
+            },
+        )
+        .unwrap();
+        add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "c1".into(),
+                path: "/b".into(),
+                included_files_json: None,
+                auto_refresh: false,
+                estimated_tokens: 0,
+            },
+        )
+        .unwrap();
+
+        let results = get_auto_refresh_contexts(&conn, "c1").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].path, "/a");
     }
 }
