@@ -71,8 +71,8 @@ const SHORTCUTS: Shortcut[] = [
     key: "h",
     shift: false,
     ignoreWhenInputFocused: true,
-    run: ({ router }) =>
-      router.push({ path: "/settings", query: { tab: "connectivity" } }),
+    run: () =>
+      appEvents.dispatchEvent(new Event(APP_EVENT.OPEN_HOST_MANAGER)),
   },
   {
     key: "n",
