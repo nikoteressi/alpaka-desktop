@@ -59,6 +59,7 @@ pub fn run() {
             commands::chat::send_message,
             commands::chat::stop_generation,
             commands::chat::export_conversation,
+            commands::chat::export_conversation_markdown,
             commands::chat::backup_database,
             commands::chat::restore_database,
             commands::chat::compact_conversation,
