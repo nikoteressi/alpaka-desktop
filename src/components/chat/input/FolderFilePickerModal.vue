@@ -22,6 +22,7 @@ const selected = ref<Set<string>>(new Set());
 const loading = ref(false);
 const applying = ref(false);
 const loadError = ref<string | null>(null);
+const applyError = ref<string | null>(null);
 
 const noneSelected = computed(() => selected.value.size === 0);
 
@@ -37,7 +38,7 @@ async function load() {
     allFiles.value = await tauriApi.listFolderFiles(props.contextPath);
     const initial =
       props.includedFiles && props.includedFiles.length > 0
-        ? props.includedFiles
+        ? props.includedFiles.filter((f) => allFiles.value.includes(f))
         : allFiles.value;
     selected.value = new Set(initial);
   } catch (err) {
@@ -66,12 +67,13 @@ function toggle(file: string) {
 
 async function handleApply() {
   applying.value = true;
+  applyError.value = null;
   try {
     const files = [...selected.value];
     const result = await tauriApi.updateIncludedFiles(props.contextId, files);
     emit("apply", files, result.token_estimate, result.content);
   } catch (err) {
-    loadError.value =
+    applyError.value =
       err instanceof Error ? err.message : "Failed to apply selection";
   } finally {
     applying.value = false;
@@ -162,6 +164,13 @@ function handleClose() {
         class="text-[11px] text-[var(--danger)] mt-3"
       >
         No files selected — applying will remove this folder link.
+      </p>
+
+      <p
+        v-if="applyError"
+        class="text-[11px] text-[var(--danger)] mt-2"
+      >
+        {{ applyError }}
       </p>
     </div>
 
