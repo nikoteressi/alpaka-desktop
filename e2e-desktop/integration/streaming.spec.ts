@@ -51,6 +51,12 @@ describe('Streaming — real token delivery', () => {
     // and lastAssistantMessageText() returns the previous stale message.
     await $('[data-testid="streaming-indicator"]').waitForExist({ timeout: 15000, interval: 100 })
     await chat.waitForStreamComplete(120000)
+    // Vue reactive text updates can lag one tick behind the streaming indicator
+    // leaving the DOM, so poll until the last assistant message has content.
+    await browser.waitUntil(
+      async () => (await chat.lastAssistantMessageText()).length > 0,
+      { timeout: 5000, interval: 100 }
+    )
     const text = await chat.lastAssistantMessageText()
     expect(text.length).toBeGreaterThan(0)
   })
