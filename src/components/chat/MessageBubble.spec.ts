@@ -81,7 +81,8 @@ describe("MessageBubble.vue", () => {
     await wrapper.vm.$nextTick();
     await wrapper.find(".user-edit-btn--cancel").trigger("click");
     await wrapper.vm.$nextTick();
-    expect(wrapper.find("textarea").exists()).toBe(false);
+    // v-show hides the edit container; the normal bubble reappears (v-if="!isEditing")
+    expect(wrapper.find(".user-bubble").exists()).toBe(true);
   });
 
   it("applyEdit emits editConfirm with trimmed content", async () => {

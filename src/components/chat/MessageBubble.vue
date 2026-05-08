@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { renderMarkdown } from "../../lib/markdown";
 import type { Message, MessagePart } from "../../types/chat";
 import { useChatStore } from "../../stores/chat";
@@ -39,25 +39,22 @@ const isUser = computed(() => props.message.role === "user");
 // Inline edit state (user messages only)
 const isEditing = ref(false);
 const editContent = ref("");
+const editContainerRef = ref<HTMLElement | null>(null);
 const editTextareaRef = ref<HTMLTextAreaElement | null>(null);
-const isHovered = ref(false);
-
-// flush:'post' — fires after DOM update, ref is guaranteed set, no nextTick needed
-watch(
-  isEditing,
-  (val) => {
-    if (!val) return;
-    const el = editTextareaRef.value;
-    if (!el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  },
-  { flush: "post" },
-);
-
 function startEdit() {
   editContent.value = props.message.content;
   isEditing.value = true;
+  // With v-show the container is always in DOM but has display:none.
+  // Override it directly so focus() works in this same click handler
+  // (calling focus in a nextTick microtask is outside the gesture context
+  // on WebKitGTK/Wayland and is silently ignored).
+  const container = editContainerRef.value;
+  const el = editTextareaRef.value;
+  if (container) container.style.display = "flex";
+  if (el) {
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
 }
 
 function cancelEdit() {
@@ -169,16 +166,14 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 
 <template>
   <!-- User Message -->
-  <article
-    v-if="isUser"
-    data-role="user"
-    class="user-message"
-    @mouseenter="isHovered = true"
-    @mouseleave="isHovered = false"
-  >
+  <article v-if="isUser" data-role="user" class="user-message">
     <div class="user-bubble-container relative">
       <!-- Inline edit mode -->
-      <div v-if="isEditing" class="user-edit-container">
+      <div
+        ref="editContainerRef"
+        v-show="isEditing"
+        class="user-edit-container"
+      >
         <textarea
           ref="editTextareaRef"
           v-model="editContent"
@@ -204,7 +199,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
         </div>
       </div>
       <!-- Normal display mode -->
-      <template v-else>
+      <template v-if="!isEditing">
         <div class="user-bubble">
           <div
             v-if="message.images && message.images.length > 0"
@@ -219,7 +214,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           </div>
           {{ message.content }}
         </div>
-        <div v-if="!isStreaming && isHovered" class="user-footer-actions">
+        <div v-if="!isStreaming" class="user-footer-actions">
           <MessageActions
             :message="message"
             :is-user="true"
@@ -241,8 +236,6 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
     data-role="assistant"
     class="assistant-message"
     :class="{ 'assistant-message--streaming': isStreaming }"
-    @mouseenter="isHovered = true"
-    @mouseleave="isHovered = false"
   >
     <div
       class="assistant-content rendered-markdown-container"
@@ -325,7 +318,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
           class="w-full"
         />
       </div>
-      <div v-if="isHovered" class="assistant-footer__actions">
+      <div class="assistant-footer__actions">
         <MessageActions
           :message="message"
           :is-user="false"
