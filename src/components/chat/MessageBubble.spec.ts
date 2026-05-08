@@ -64,7 +64,7 @@ describe("MessageBubble.vue", () => {
       props: { message: { role: "user", content: "Original text" } },
     });
     await wrapper.find(".user-message").trigger("mouseenter");
-    await wrapper.find('[aria-label="Edit"]').trigger("click");
+    await wrapper.find('[aria-label="Edit"]').trigger("pointerdown");
     await wrapper.vm.$nextTick();
     expect(wrapper.find("textarea").exists()).toBe(true);
     expect(
@@ -77,9 +77,9 @@ describe("MessageBubble.vue", () => {
       props: { message: { role: "user", content: "Original text" } },
     });
     await wrapper.find(".user-message").trigger("mouseenter");
-    await wrapper.find('[aria-label="Edit"]').trigger("click");
+    await wrapper.find('[aria-label="Edit"]').trigger("pointerdown");
     await wrapper.vm.$nextTick();
-    await wrapper.find(".edit-pill__btn").trigger("click");
+    await wrapper.find(".edit-pill__btn").trigger("pointerdown");
     await wrapper.vm.$nextTick();
     // v-show hides the edit container; the normal bubble reappears (v-if="!isEditing")
     expect(wrapper.find(".user-bubble").exists()).toBe(true);
@@ -90,7 +90,7 @@ describe("MessageBubble.vue", () => {
       props: { message: { role: "user", content: "Original" } },
     });
     await wrapper.find(".user-message").trigger("mouseenter");
-    await wrapper.find('[aria-label="Edit"]').trigger("click");
+    await wrapper.find('[aria-label="Edit"]').trigger("pointerdown");
     await wrapper.vm.$nextTick();
     const textarea = wrapper.find("textarea");
     await textarea.setValue("  Updated content  ");

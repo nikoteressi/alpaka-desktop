@@ -186,11 +186,17 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
         />
         <div class="user-edit-actions">
           <div class="edit-pill">
-            <button class="edit-pill__btn" @click="cancelEdit">Cancel</button>
+            <!-- pointerdown.prevent fires before any focus/blur processing,
+                 making it reliable on WebKitGTK/Wayland where @click can
+                 miss when a textarea focus-change happens between mousedown
+                 and click. prevent stops the button from stealing focus. -->
+            <button class="edit-pill__btn" @pointerdown.prevent="cancelEdit">
+              Cancel
+            </button>
             <span class="edit-pill__sep"></span>
             <button
               class="edit-pill__btn edit-pill__btn--apply"
-              :disabled="!editContent.trim()"
+              :disabled="!editContent.trim() || editContent === message.content"
               @click="applyEdit"
             >
               Send
@@ -398,10 +404,9 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
 .edit-pill {
   display: inline-flex;
   align-items: center;
-  background: rgba(var(--bg-elevated-rgb), 0.5);
+  background: var(--bg-surface);
   border: 1px solid var(--border-strong);
   border-radius: 99px;
-  backdrop-filter: blur(8px);
   overflow: hidden;
 }
 
