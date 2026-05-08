@@ -80,6 +80,10 @@ export const useChatStore = defineStore("chat", {
     drafts: {} as Record<string, ChatDraft>,
     /** Temporary system prompt for drafts or newly created chats */
     draftSystemPrompt: "" as string,
+    compactionInProgress: {} as Record<string, boolean>,
+    compactionTokens: {} as Record<string, string>,
+    archivedMessages: {} as Record<string, import("../types/chat").Message[]>,
+    showingHistory: new Set<string>() as Set<string>,
   }),
 
   getters: {
@@ -426,15 +430,81 @@ export const useChatStore = defineStore("chat", {
     async compactConversation(
       conversationId: string,
       model: string,
-      title?: string,
-    ): Promise<string> {
-      const newConvId = await invoke<string>("compact_conversation", {
-        conversationId,
-        model,
-        title,
+    ): Promise<void> {
+      this.compactionInProgress[conversationId] = true;
+      this.compactionTokens[conversationId] = "";
+      try {
+        await invoke<string>("compact_conversation", { conversationId, model });
+        await this.loadConversation(conversationId);
+      } catch (e) {
+        console.error("Compact failed:", e);
+      } finally {
+        delete this.compactionInProgress[conversationId];
+        delete this.compactionTokens[conversationId];
+      }
+    },
+
+    appendCompactionToken(conversationId: string, content: string) {
+      this.compactionTokens[conversationId] =
+        (this.compactionTokens[conversationId] ?? "") + content;
+    },
+
+    finishCompaction(conversationId: string) {
+      delete this.compactionInProgress[conversationId];
+      delete this.compactionTokens[conversationId];
+    },
+
+    async loadArchivedMessages(conversationId: string): Promise<void> {
+      const rawMessages = await invoke<import("../types/chat").BackendMessage[]>(
+        "get_archived_messages",
+        { conversationId },
+      );
+      this.archivedMessages[conversationId] = (rawMessages || []).map((m) => {
+        let images: Uint8Array[] = [];
+        try {
+          if (m.images_json) {
+            const base64s = JSON.parse(m.images_json) as string[];
+            images = base64s.map((b) => {
+              const bin = atob(b);
+              const arr = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+              return arr;
+            });
+          }
+        } catch {}
+        return {
+          id: m.id,
+          conversation_id: m.conversation_id,
+          role: m.role,
+          content: m.content,
+          images,
+          tokens: m.tokens_used ?? undefined,
+          prompt_tokens: m.prompt_tokens ?? undefined,
+          tokens_per_sec: m.tokens_per_sec ?? undefined,
+          generation_time_ms: m.generation_time_ms ?? undefined,
+          total_duration_ms: m.total_duration_ms ?? undefined,
+          load_duration_ms: m.load_duration_ms ?? undefined,
+          prompt_eval_duration_ms: m.prompt_eval_duration_ms ?? undefined,
+          eval_duration_ms: m.eval_duration_ms ?? undefined,
+          seed: m.seed ?? undefined,
+          created_at: m.created_at,
+          parentId: m.parent_id ?? null,
+          siblingOrder: m.sibling_order,
+          siblingCount: m.sibling_count,
+          isActive: m.is_active,
+        };
       });
-      await this.loadConversations(true);
-      return newConvId;
+    },
+
+    async toggleHistory(conversationId: string): Promise<void> {
+      if (this.showingHistory.has(conversationId)) {
+        this.showingHistory.delete(conversationId);
+      } else {
+        this.showingHistory.add(conversationId);
+        if (!this.archivedMessages[conversationId]) {
+          await this.loadArchivedMessages(conversationId);
+        }
+      }
     },
 
     async switchVersion(siblingId: string): Promise<void> {
