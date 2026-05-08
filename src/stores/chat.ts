@@ -435,6 +435,7 @@ export const useChatStore = defineStore("chat", {
       this.compactionTokens[conversationId] = "";
       try {
         await invoke<string>("compact_conversation", { conversationId, model });
+        delete this.messages[conversationId];
         await this.loadConversation(conversationId);
       } catch (e) {
         console.error("Compact failed:", e);
@@ -529,6 +530,10 @@ export const useChatStore = defineStore("chat", {
         delete this.messages[id];
         await this.loadConversation(id);
       }
+    },
+
+    clearMessages(conversationId: string): void {
+      delete this.messages[conversationId];
     },
 
     async refreshMessages(conversationId: string): Promise<void> {

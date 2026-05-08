@@ -51,6 +51,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "in-place compaction: is_archived column + compaction_events table",
         sql: include_str!("sql/007_compaction.sql"),
     },
+    Migration {
+        version: 16,
+        description: "fix role CHECK constraint to include compact_summary",
+        sql: include_str!("sql/008_fix_role_check.sql"),
+    },
 ];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────
