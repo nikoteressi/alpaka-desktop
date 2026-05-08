@@ -27,7 +27,7 @@
 │  │                        │    │  ├─────────────────────┤  │ │
 │  │  ┌──────────────────┐  │    │  │  Ollama Client      │  │ │
 │  │  │  Composables     │  │    │  │  (ollama/)          │  │ │
-│  │  │  18 composables  │  │    │  ├─────────────────────┤  │ │
+│  │  │  19 composables  │  │    │  ├─────────────────────┤  │ │
 │  │  └──────────────────┘  │    │  │  SQLite (db/)       │  │ │
 │  └────────────────────────┘    │  ├─────────────────────┤  │ │
 │                                │  │  Auth / Keyring     │  │ │
@@ -179,7 +179,8 @@ alpaka-desktop/
 │   │   ├── useStreaming.ts          # Streaming state accumulation
 │   │   ├── useStreamingEvents.ts    # Raw Tauri event listener setup
 │   │   ├── useUndoHistory.ts        # Custom Ctrl+Z / Shift+Z stack for chat input
-│   │   └── useVersionSwitcher.ts    # Per-message sibling navigation (hasPrev/hasNext/prevVersion/nextVersion)
+│   │   ├── useVersionSwitcher.ts    # Per-message sibling navigation (hasPrev/hasNext/prevVersion/nextVersion)
+│   │   └── useCompactionEvents.ts   # Registers listeners for compact:token/done/error events, routes to chat store
 │   │
 │   ├── components/
 │   │   ├── chat/
@@ -191,6 +192,7 @@ alpaka-desktop/
 │   │   │   ├── SearchBlock.vue       # Two-state pill: "found" (inline in ThinkBlock) and "final" (post-message badge); opens SearchSidebar
 │   │   │   ├── SearchSidebar.vue     # 320 px right panel listing web search source cards (favicon, title, snippet, link)
 │   │   │   ├── StatsBlock.vue        # Per-message metrics
+│   │   │   ├── CompactSummaryBubble.vue  # Renders compact_summary role messages with expandable archived history toggle
 │   │   │   ├── ChatInput.vue
 │   │   │   ├── StreamIndicator.vue
 │   │   │   ├── TypingIndicator.vue
@@ -321,7 +323,9 @@ tauri::generate_handler![
     commands::chat::export_conversation,
     commands::chat::backup_database,
     commands::chat::restore_database,
-    commands::chat::compact_conversation,  // delegates to ChatService::compact()
+    commands::chat::compact_conversation,  // delegates to ChatService::compact_in_place()
+    commands::chat::cancel_compaction,     // cancels in-progress compaction via oneshot channel
+    commands::chat::get_archived_messages, // returns archived messages for history toggle
     commands::chat::regenerate_message,    // streams new assistant response as a sibling branch
     commands::chat::switch_version,        // activates a sibling message, updating the active path
     commands::chat::truncate_from,         // removes a message and all its descendants
@@ -437,6 +441,10 @@ pub struct AppState {
 
     /// Shutdown signal for the model-update background loop task.
     pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+
+    /// Send on this oneshot to cancel an in-progress compaction.
+    /// None when no compaction is running.
+    pub compact_cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
 }
 ```
 
@@ -551,6 +559,9 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `model:create-done` | Rust → Vue | `{ model: string }` | Model creation complete |
 | `model:create-error` | Rust → Vue | `{ model: string, error: string, cancelled: boolean }` | Model creation failed or cancelled |
 | `host:status-change` | Rust → Vue | `{ host_id, status, latency_ms? }` | Periodic health check result |
+| `compact:token` | Rust → Vue | `{ conversation_id, content }` | Streaming summary token during compaction |
+| `compact:done` | Rust → Vue | `{ conversation_id }` | Compaction complete, DB writes finished |
+| `compact:error` | Rust → Vue | `{ conversation_id, error }` | Compaction failed or cancelled |
 
 ### 4.3 Why Tauri Events over WebSockets/SSE
 
@@ -610,6 +621,7 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `useConfirmationModal` | Shared destructive-action confirmation dialog |
 | `useCopyToClipboard` | Clipboard write with 2 s feedback flash |
 | `useVersionSwitcher` | Per-message sibling navigation: `hasPrev`, `hasNext`, `versionLabel`, `prevVersion`, `nextVersion`; calls `switch_version` Tauri command |
+| `useCompactionEvents` | Registers listeners for `compact:token`/`compact:done`/`compact:error` events, routes to chat store |
 
 ### 5.3 Frontend Token Rendering Strategy
 
@@ -905,7 +917,18 @@ CREATE TABLE IF NOT EXISTS messages (
     -- branching columns (migration v13)
     parent_id               TEXT    REFERENCES messages(id) ON DELETE CASCADE,
     sibling_order           INTEGER NOT NULL DEFAULT 0,
-    is_active               INTEGER NOT NULL DEFAULT 1
+    is_active               INTEGER NOT NULL DEFAULT 1,
+    -- compaction columns (migration v15)
+    is_archived             INTEGER NOT NULL DEFAULT 0
+);
+
+-- compaction_events (migration v15)
+CREATE TABLE IF NOT EXISTS compaction_events (
+    id              TEXT    PRIMARY KEY NOT NULL,   -- UUID v4
+    conversation_id TEXT    NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    summary_message_id TEXT NOT NULL REFERENCES messages(id),
+    archived_count  INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 -- settings (key-value)
