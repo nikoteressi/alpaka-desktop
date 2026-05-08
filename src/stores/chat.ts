@@ -51,6 +51,7 @@ export const useChatStore = defineStore("chat", {
     folderContexts: {} as Record<string, LinkedContext[]>, // NOSONAR
     expandedStats: new Set<string>(), // Track which message IDs have full stats visible
     streaming: {
+      // NOSONAR
       isStreaming: false,
       currentConversationId: null,
       buffer: "",
@@ -68,7 +69,7 @@ export const useChatStore = defineStore("chat", {
       evalTokens: 0,
       activeMessageParts: [] as MessagePart[],
       regeneratingMessageId: null,
-    } as StreamingState, // NOSONAR
+    } as StreamingState,
     _listenersInitialized: false,
     /** Draft conversation — local-only, not yet persisted to DB */
     draftConversation: null as Conversation | null,
@@ -230,10 +231,11 @@ export const useChatStore = defineStore("chat", {
 
       // Otherwise, create a new part
       parts.push({
+        // NOSONAR
         type,
         content,
         ...metadata,
-      } as MessagePart); // NOSONAR
+      } as MessagePart);
     },
 
     updatePartMetadata(
