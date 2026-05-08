@@ -386,12 +386,25 @@ export const useChatStore = defineStore("chat", {
               // Optimization: if we already had a command to just read content, we'd use it.
               // link_folder is safe and idempotent.
             });
+            const includedFiles: string[] | undefined = ctx.included_files_json
+              ? (() => {
+                  try {
+                    return JSON.parse(ctx.included_files_json) as string[];
+                  } catch {
+                    return undefined;
+                  }
+                })()
+              : undefined;
             return {
               id: ctx.id,
               name: ctx.path.split("/").pop() || ctx.path,
               path: ctx.path,
               content: payload.content,
               tokens: payload.token_estimate,
+              includedFiles:
+                includedFiles && includedFiles.length > 0
+                  ? includedFiles
+                  : undefined,
             };
           }),
         );
@@ -423,6 +436,23 @@ export const useChatStore = defineStore("chat", {
         this.folderContexts[conversationId] = this.folderContexts[
           conversationId
         ].filter((c) => c.id !== contextId);
+      }
+    },
+
+    updateContextFiles(
+      conversationId: string,
+      contextId: string,
+      files: string[],
+      tokens: number,
+      content: string,
+    ) {
+      const ctx = this.folderContexts[conversationId]?.find(
+        (c) => c.id === contextId,
+      );
+      if (ctx) {
+        ctx.includedFiles = files.length > 0 ? files : undefined;
+        ctx.tokens = tokens;
+        ctx.content = content;
       }
     },
 

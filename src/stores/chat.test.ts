@@ -228,6 +228,56 @@ describe("useChatStore", () => {
     expect(store.folderContexts["nonexistent"]).toBeUndefined();
   });
 
+  // --- updateContextFiles ---
+
+  describe("updateContextFiles", () => {
+    it("patches tokens, content, and includedFiles in place", () => {
+      const store = useChatStore();
+      store.folderContexts["conv1"] = [
+        {
+          id: "ctx1",
+          name: "my-project",
+          path: "/home/user/my-project",
+          content: "old content",
+          tokens: 100,
+          includedFiles: undefined,
+        },
+      ];
+
+      store.updateContextFiles("conv1", "ctx1", ["src/main.rs"], 42, "new content");
+
+      const ctx = store.folderContexts["conv1"][0];
+      expect(ctx.tokens).toBe(42);
+      expect(ctx.content).toBe("new content");
+      expect(ctx.includedFiles).toEqual(["src/main.rs"]);
+    });
+
+    it("sets includedFiles to undefined when files array is empty", () => {
+      const store = useChatStore();
+      store.folderContexts["conv1"] = [
+        {
+          id: "ctx1",
+          name: "my-project",
+          path: "/home/user/my-project",
+          content: "old content",
+          tokens: 100,
+          includedFiles: ["a.ts"],
+        },
+      ];
+
+      store.updateContextFiles("conv1", "ctx1", [], 0, "");
+
+      expect(store.folderContexts["conv1"][0].includedFiles).toBeUndefined();
+    });
+
+    it("is a no-op when contextId does not exist", () => {
+      const store = useChatStore();
+      store.folderContexts["conv1"] = [];
+      // Should not throw
+      store.updateContextFiles("conv1", "missing", ["a.ts"], 10, "x");
+    });
+  });
+
   // --- clearFolderContext ---
 
   it("clearFolderContext deletes folderContexts[conversationId] entirely", () => {
