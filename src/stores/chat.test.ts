@@ -244,7 +244,13 @@ describe("useChatStore", () => {
         },
       ];
 
-      store.updateContextFiles("conv1", "ctx1", ["src/main.rs"], 42, "new content");
+      store.updateContextFiles(
+        "conv1",
+        "ctx1",
+        ["src/main.rs"],
+        42,
+        "new content",
+      );
 
       const ctx = store.folderContexts["conv1"][0];
       expect(ctx.tokens).toBe(42);

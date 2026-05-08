@@ -104,11 +104,7 @@ function handleClose() {
         v-if="loading"
         class="flex items-center justify-center py-8 text-[var(--text-dim)] text-[12px]"
       >
-        <svg
-          class="w-4 h-4 animate-spin mr-2"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
+        <svg class="w-4 h-4 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
           <circle
             class="opacity-25"
             cx="12"
@@ -147,9 +143,7 @@ function handleClose() {
           :key="file"
           class="flex items-center gap-2.5 px-3 py-1.5 rounded-md cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
           :class="
-            selected.has(file)
-              ? 'text-[var(--text)]'
-              : 'text-[var(--text-dim)]'
+            selected.has(file) ? 'text-[var(--text)]' : 'text-[var(--text-dim)]'
           "
         >
           <input

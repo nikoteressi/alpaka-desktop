@@ -422,7 +422,10 @@ describe("tauriApi", () => {
   });
 
   it("updateIncludedFiles calls invoke with id and includedFiles", async () => {
-    vi.mocked(invoke).mockResolvedValueOnce({ token_estimate: 50, content: "file content" });
+    vi.mocked(invoke).mockResolvedValueOnce({
+      token_estimate: 50,
+      content: "file content",
+    });
     const result = await tauriApi.updateIncludedFiles("f1", ["a.md", "b.md"]);
     expect(invoke).toHaveBeenCalledWith("update_included_files", {
       id: "f1",

@@ -360,10 +360,7 @@ pub async fn update_included_files(
                         "Selected files exceed 50MB limit".into(),
                     ));
                 }
-                content.push_str(&format!(
-                    "\n--- File: {} ---\n{}\n",
-                    rel_path, file_content
-                ));
+                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
             }
         }
 
@@ -377,7 +374,10 @@ pub async fn update_included_files(
             token_estimate,
         )?;
 
-        Ok(UpdatedContextResult { token_estimate, content })
+        Ok(UpdatedContextResult {
+            token_estimate,
+            content,
+        })
     })
     .await
     .map_err(AppError::from)?

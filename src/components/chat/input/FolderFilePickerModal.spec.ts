@@ -50,10 +50,14 @@ describe("FolderFilePickerModal", () => {
     await new Promise((r) => setTimeout(r, 0));
     await wrapper.vm.$nextTick();
 
-    expect(tauriApi.listFolderFiles).toHaveBeenCalledWith("/home/user/my-project");
+    expect(tauriApi.listFolderFiles).toHaveBeenCalledWith(
+      "/home/user/my-project",
+    );
     const checkboxes = wrapper.findAll('input[type="checkbox"]');
     expect(checkboxes.length).toBe(3);
-    checkboxes.forEach((cb) => expect((cb.element as HTMLInputElement).checked).toBe(true));
+    checkboxes.forEach((cb) =>
+      expect((cb.element as HTMLInputElement).checked).toBe(true),
+    );
   });
 
   it("pre-checks only includedFiles when provided", async () => {
@@ -95,7 +99,9 @@ describe("FolderFilePickerModal", () => {
   });
 
   it("emits apply with selected files, token estimate, and content on Apply click", async () => {
-    (tauriApi.updateIncludedFiles as ReturnType<typeof vi.fn>).mockResolvedValue({
+    (
+      tauriApi.updateIncludedFiles as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
       token_estimate: 200,
       content: "file content here",
     });
@@ -110,7 +116,9 @@ describe("FolderFilePickerModal", () => {
     await new Promise((r) => setTimeout(r, 0));
     await wrapper.vm.$nextTick();
 
-    expect(tauriApi.updateIncludedFiles).toHaveBeenCalledWith("ctx-1", ["src/main.rs"]);
+    expect(tauriApi.updateIncludedFiles).toHaveBeenCalledWith("ctx-1", [
+      "src/main.rs",
+    ]);
     expect(wrapper.emitted("apply")).toBeTruthy();
     expect(wrapper.emitted("apply")![0]).toEqual([
       ["src/main.rs"],
@@ -158,7 +166,9 @@ describe("FolderFilePickerModal", () => {
     expect(retryBtn.exists()).toBe(true);
 
     // Retry re-calls listFolderFiles
-    (tauriApi.listFolderFiles as ReturnType<typeof vi.fn>).mockResolvedValue(["a.rs"]);
+    (tauriApi.listFolderFiles as ReturnType<typeof vi.fn>).mockResolvedValue([
+      "a.rs",
+    ]);
     await retryBtn.trigger("click");
     await new Promise((r) => setTimeout(r, 0));
     await wrapper.vm.$nextTick();

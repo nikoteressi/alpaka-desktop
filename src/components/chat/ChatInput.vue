@@ -966,7 +966,9 @@ onBeforeUnmount(() => {
     :contextName="pickerContext.name"
     :contextPath="pickerContext.path"
     :includedFiles="pickerContext.includedFiles"
-    @apply="(files, tokens, content) => handlePickerApply(files, tokens, content)"
+    @apply="
+      (files, tokens, content) => handlePickerApply(files, tokens, content)
+    "
     @detach="handlePickerDetach"
     @close="closeFilePicker"
   />

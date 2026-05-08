@@ -81,7 +81,7 @@ export interface LinkedContext {
   path: string;
   content: string;
   tokens: number;
-  includedFiles?: string[];   // undefined = all files included (no filter)
+  includedFiles?: string[]; // undefined = all files included (no filter)
 }
 
 export interface ChatDraft {
