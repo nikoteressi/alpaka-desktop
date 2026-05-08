@@ -90,6 +90,7 @@ pub fn run() {
             commands::model_user_data::list_model_user_data,
             commands::folders::link_folder,
             commands::folders::unlink_folder,
+            commands::folders::set_auto_refresh,
             commands::folders::get_folder_contexts,
             commands::folders::list_folder_files,
             commands::folders::update_included_files,

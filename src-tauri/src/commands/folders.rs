@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::{command, AppHandle, Runtime, State};
 
-use crate::db::folders::{add_folder_context, NewFolderContext};
+use crate::db::folders::{
+    add_folder_context, get_folder_context, set_auto_refresh_flag, NewFolderContext,
+};
+use crate::folder_watcher::FolderWatcher;
 use crate::{error::AppError, state::AppState};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -235,6 +238,11 @@ pub async fn link_folder<R: Runtime>(
 
 #[command]
 pub async fn unlink_folder(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    // Remove any running watcher before deleting the DB row
+    if let Ok(mut watchers) = state.folder_watchers.lock() {
+        watchers.remove(&id);
+    }
+
     let db_conn = state.db.clone();
     tokio::task::spawn_blocking(move || {
         let guard = db_conn
@@ -244,6 +252,51 @@ pub async fn unlink_folder(state: State<'_, AppState>, id: String) -> Result<(),
     })
     .await
     .map_err(AppError::from)?
+}
+
+#[command]
+pub async fn set_auto_refresh<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    id: String,
+    enabled: bool,
+) -> Result<(), AppError> {
+    // Step 1: update DB and fetch context in one lock scope
+    let ctx = {
+        let conn = state
+            .db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        set_auto_refresh_flag(&conn, &id, enabled)?;
+        get_folder_context(&conn, &id)?
+    };
+
+    // Step 2: manage watcher
+    if !enabled {
+        if let Ok(mut watchers) = state.folder_watchers.lock() {
+            watchers.remove(&id);
+        }
+    } else {
+        let is_active = {
+            let active_conv = state
+                .active_conversation_id
+                .read()
+                .map_err(|_| AppError::Internal("RwLock poisoned".into()))?;
+            active_conv.as_deref() == Some(ctx.conversation_id.as_str())
+        };
+
+        if is_active {
+            let watcher =
+                FolderWatcher::start(&app, &id, std::path::Path::new(&ctx.path), state.db.clone())?;
+            let mut watchers = state
+                .folder_watchers
+                .lock()
+                .map_err(|_| AppError::Internal("Mutex poisoned".into()))?;
+            watchers.insert(id, watcher);
+        }
+    }
+
+    Ok(())
 }
 
 #[command]
