@@ -168,7 +168,7 @@ const { init: initCompactionListeners } = useCompactionEvents();
 const { cleanup: cleanupKeyboard } = useKeyboard();
 
 function onOpenHostManager() {
-  hostStore.isHostManagerOpen = true;
+  hostStore.isHostManagerOpen = !hostStore.isHostManagerOpen;
 }
 
 onUnmounted(() => {

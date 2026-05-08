@@ -31,6 +31,7 @@ vi.mock("../lib/clipboard", () => ({
 import { useKeyboard } from "./useKeyboard";
 import { useChatStore } from "../stores/chat";
 import { useSettingsStore } from "../stores/settings";
+import { useHostStore } from "../stores/hosts";
 import { appEvents, APP_EVENT } from "../lib/appEvents";
 
 function fire(key: string, opts: KeyboardEventInit = {}) {
@@ -271,5 +272,23 @@ describe("useKeyboard", () => {
     chat.streaming = { ...chat.streaming, isStreaming: false };
     fire("Escape");
     expect(vi.mocked(invoke)).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+H dispatches event when host manager is open (toggle close)", () => {
+    const hosts = useHostStore();
+    hosts.isHostManagerOpen = true;
+    fire("h", { ctrlKey: true });
+    expect(appEvents.dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: APP_EVENT.OPEN_HOST_MANAGER }),
+    );
+  });
+
+  it("other shortcuts are suppressed when host manager modal is open", () => {
+    const hosts = useHostStore();
+    hosts.isHostManagerOpen = true;
+    fire("m", { ctrlKey: true });
+    expect(appEvents.dispatchEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: APP_EVENT.OPEN_MODEL_SWITCHER }),
+    );
   });
 });

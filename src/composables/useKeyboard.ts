@@ -2,6 +2,7 @@ import { useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
 import { useChatStore } from "../stores/chat";
 import { useSettingsStore } from "../stores/settings";
+import { useHostStore } from "../stores/hosts";
 import { useAppOrchestration } from "./useAppOrchestration";
 import { appEvents, APP_EVENT } from "../lib/appEvents";
 import { copyToClipboard } from "../lib/clipboard";
@@ -125,6 +126,7 @@ export function useKeyboard() {
   const router = useRouter();
   const chatStore = useChatStore();
   const settingsStore = useSettingsStore();
+  const hostStore = useHostStore();
   const orchestration = useAppOrchestration();
 
   function navigateConversation(delta: 1 | -1) {
@@ -152,6 +154,7 @@ export function useKeyboard() {
     const shift = e.shiftKey;
     const match = SHORTCUTS.find((s) => s.key === key && s.shift === shift);
     if (!match) return;
+    if (hostStore.isHostManagerOpen && !(key === "h" && !shift)) return;
     if (match.ignoreWhenInputFocused && isFocusedOnInput()) return;
     e.preventDefault();
     match.run(ctx);
