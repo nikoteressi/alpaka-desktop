@@ -158,8 +158,12 @@ async function handlePickerDetach() {
 const refreshingContextIds = ref(new Set<string>());
 
 async function handleAutoRefreshToggle(contextId: string, enabled: boolean) {
-  await tauriApi.setAutoRefresh(contextId, enabled);
-  chatStore.setContextAutoRefresh(contextId, enabled);
+  try {
+    await tauriApi.setAutoRefresh(contextId, enabled);
+    chatStore.setContextAutoRefresh(contextId, enabled);
+  } catch (e) {
+    console.error("Failed to set auto-refresh:", e);
+  }
 }
 
 // ---- System prompt ----

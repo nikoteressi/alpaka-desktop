@@ -476,19 +476,27 @@ export const useChatStore = defineStore("chat", {
     },
 
     updateContextTokens(contextId: string, tokenEstimate: number) {
-      if (!this.activeConversationId) return;
-      const ctx = this.folderContexts[this.activeConversationId]?.find(
-        (c) => c.id === contextId,
-      );
-      if (ctx) ctx.tokens = tokenEstimate;
+      for (const convId of Object.keys(this.folderContexts)) {
+        const ctx = this.folderContexts[convId]?.find(
+          (c) => c.id === contextId,
+        );
+        if (ctx) {
+          ctx.tokens = tokenEstimate;
+          return;
+        }
+      }
     },
 
     setContextAutoRefresh(contextId: string, enabled: boolean) {
-      if (!this.activeConversationId) return;
-      const ctx = this.folderContexts[this.activeConversationId]?.find(
-        (c) => c.id === contextId,
-      );
-      if (ctx) ctx.autoRefresh = enabled;
+      for (const convId of Object.keys(this.folderContexts)) {
+        const ctx = this.folderContexts[convId]?.find(
+          (c) => c.id === contextId,
+        );
+        if (ctx) {
+          ctx.autoRefresh = enabled;
+          return;
+        }
+      }
     },
 
     async compactConversation(
