@@ -51,16 +51,15 @@ export class ChatPage extends BasePage {
   }
 
   async startNewChat(): Promise<void> {
-    const btn = await $('[data-testid="new-chat-btn"]')
-    const isVisible = await btn.isDisplayed()
-    if (!isVisible) {
-      const toggle = await $('[data-testid="sidebar-toggle"]')
-      if (await toggle.isExisting()) {
-        await toggle.click()
-        await this.driver.pause(200)
-      }
+    // Two new-chat triggers exist: sidebar button (visible when sidebar open) and
+    // icon-strip button (visible when sidebar closed). Use whichever is displayed.
+    const iconBtn = $('[data-testid="new-chat-icon-btn"]')
+    if (await iconBtn.isExisting() && await iconBtn.isDisplayed()) {
+      await iconBtn.click()
+    } else {
+      const sidebarBtn = $('[data-testid="new-chat-btn"]')
+      await sidebarBtn.waitForDisplayed({ timeout: 5000 })
+      await sidebarBtn.click()
     }
-    await btn.waitForDisplayed({ timeout: 5000 })
-    await btn.click()
   }
 }

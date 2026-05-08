@@ -45,6 +45,7 @@
       <CustomTooltip text="New Chat" wrapper-class="inline-flex">
         <button
           v-if="!sidebarOpen"
+          data-testid="new-chat-icon-btn"
           @click="newChat"
           class="w-8 h-8 rounded-md border-none bg-transparent flex items-center justify-center cursor-pointer transition-colors icon-btn"
         >
