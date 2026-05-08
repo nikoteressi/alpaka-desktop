@@ -44,6 +44,10 @@ describe('Streaming — real token delivery', () => {
 
   it('response text is readable after stream complete', async () => {
     await chat.sendMessage('Say hello to me in a short sentence.')
+    // Wait for streaming to START before waiting for it to end, otherwise
+    // waitForStreamComplete can resolve immediately (indicator not yet in DOM)
+    // and lastAssistantMessageText() returns the previous stale message.
+    await $('[data-testid="streaming-indicator"]').waitForExist({ timeout: 15000, interval: 100 })
     await chat.waitForStreamComplete(120000)
     const text = await chat.lastAssistantMessageText()
     expect(text.length).toBeGreaterThan(0)
