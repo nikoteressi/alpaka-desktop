@@ -71,8 +71,7 @@ const SHORTCUTS: Shortcut[] = [
     key: "h",
     shift: false,
     ignoreWhenInputFocused: true,
-    run: () =>
-      appEvents.dispatchEvent(new Event(APP_EVENT.OPEN_HOST_MANAGER)),
+    run: () => appEvents.dispatchEvent(new Event(APP_EVENT.OPEN_HOST_MANAGER)),
   },
   {
     key: "n",
