@@ -43,10 +43,11 @@ describe('Streaming — real token delivery', () => {
   })
 
   it('response text is readable after stream complete', async () => {
-    await chat.sendMessage('Reply: hello')
+    await chat.sendMessage('Say hello to me in a short sentence.')
     await chat.waitForStreamComplete(60000)
     const text = await chat.lastAssistantMessageText()
     expect(text.length).toBeGreaterThan(0)
-    expect(text).not.toMatch(/^[A-Za-z0-9+/]+=*$/)
+    // Must contain at least one space — a multi-word sentence is plain text, not a base64 blob
+    expect(text).toMatch(/\s/)
   })
 })
