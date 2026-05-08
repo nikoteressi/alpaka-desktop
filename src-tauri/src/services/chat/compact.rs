@@ -29,16 +29,24 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         })
         .await?;
 
-        // 2. Build dialogue from user+assistant turns
+        // 2. Build dialogue from user+assistant turns (plus prior compact summary for re-compaction)
         let dialogue: String = history
             .iter()
             .filter(|m| {
                 matches!(
                     m.role,
-                    messages::MessageRole::User | messages::MessageRole::Assistant
+                    messages::MessageRole::User
+                        | messages::MessageRole::Assistant
+                        | messages::MessageRole::CompactSummary
                 )
             })
-            .map(|m| format!("{}: {}", m.role.as_str().to_uppercase(), m.content))
+            .map(|m| {
+                let label = match m.role {
+                    messages::MessageRole::CompactSummary => "PREVIOUS SUMMARY".to_string(),
+                    _ => m.role.as_str().to_uppercase(),
+                };
+                format!("{label}: {}", m.content)
+            })
             .collect::<Vec<_>>()
             .join("\n\n");
 
@@ -68,8 +76,11 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         );
 
         // 3. Set up cancel channel
-        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
-        *self.state.compact_cancel_tx.lock().unwrap() = Some(cancel_tx);
+        let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        match self.state.compact_cancel_tx.lock() {
+            Ok(mut lock) => *lock = Some(cancel_tx),
+            Err(_) => return Err(AppError::Internal("Compact cancel lock poisoned".into())),
+        }
 
         // 4. Stream Ollama for summary
         let http = self
@@ -78,7 +89,15 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .clone();
-        let client = OllamaClient::from_state(http, self.state.db.clone()).await?;
+        let client = match OllamaClient::from_state(http, self.state.db.clone()).await {
+            Ok(c) => c,
+            Err(e) => {
+                if let Ok(mut lock) = self.state.compact_cancel_tx.lock() {
+                    *lock = None;
+                }
+                return Err(e);
+            }
+        };
 
         let req = ChatRequest {
             model: model.clone(),
@@ -99,10 +118,26 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             }),
         };
 
-        let resp = client.post("/api/chat").json(&req).send().await?;
+        let resp = match client.post("/api/chat").json(&req).send().await {
+            Ok(r) => r,
+            Err(e) => {
+                if let Ok(mut lock) = self.state.compact_cancel_tx.lock() {
+                    *lock = None;
+                }
+                return Err(AppError::Http(e.to_string()));
+            }
+        };
+
         if !resp.status().is_success() {
-            *self.state.compact_cancel_tx.lock().unwrap() = None;
-            return Err(AppError::Http(format!("Ollama returned {}", resp.status())));
+            if let Ok(mut lock) = self.state.compact_cancel_tx.lock() {
+                *lock = None;
+            }
+            let msg = format!("Ollama returned {}", resp.status());
+            let _ = self.app.emit(
+                "compact:error",
+                json!({ "conversation_id": &conversation_id, "error": &msg }),
+            );
+            return Err(AppError::Http(msg));
         }
 
         // 5. Stream response, emit compact:token per chunk
@@ -110,7 +145,6 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let mut buf = String::new();
         let mut summary = String::new();
         let mut cancelled = false;
-        let mut cancel_rx = cancel_rx;
 
         'stream: loop {
             tokio::select! {
@@ -147,8 +181,15 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                             }
                         }
                         Some(Err(e)) => {
-                            *self.state.compact_cancel_tx.lock().unwrap() = None;
-                            return Err(AppError::Http(e.to_string()));
+                            if let Ok(mut lock) = self.state.compact_cancel_tx.lock() {
+                                *lock = None;
+                            }
+                            let msg = e.to_string();
+                            let _ = self.app.emit(
+                                "compact:error",
+                                json!({ "conversation_id": &conversation_id, "error": &msg }),
+                            );
+                            return Err(AppError::Http(msg));
                         }
                         None => break 'stream,
                     }
@@ -156,7 +197,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             }
         }
 
-        *self.state.compact_cancel_tx.lock().unwrap() = None;
+        if let Ok(mut lock) = self.state.compact_cancel_tx.lock() {
+            *lock = None;
+        }
 
         if cancelled {
             let _ = self.app.emit(
@@ -170,6 +213,10 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         }
 
         if summary.trim().is_empty() {
+            let _ = self.app.emit(
+                "compact:error",
+                json!({ "conversation_id": &conversation_id, "error": "Empty summary from model" }),
+            );
             return Err(AppError::Internal("Empty summary from model".into()));
         }
 
@@ -203,7 +250,17 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             )?;
             Ok(())
         })
-        .await?;
+        .await
+        .map_err(|e| {
+            let _ = self.app.emit(
+                "compact:error",
+                json!({
+                    "conversation_id": &conversation_id,
+                    "error": e.to_string()
+                }),
+            );
+            e
+        })?;
 
         // 7. Emit done event and desktop notification
         let _ = self.app.emit(
