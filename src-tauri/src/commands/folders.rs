@@ -334,6 +334,8 @@ pub async fn update_included_files(
 
         for rel_path in &included_files {
             let full_path = base_path.join(rel_path);
+            // Symlink check must happen before canonicalize; after canonicalize
+            // is_symlink() always returns false because the target has been resolved.
             if full_path.is_symlink() {
                 log::warn!("Skipping symlink in included files: {:?}", full_path);
                 continue;
