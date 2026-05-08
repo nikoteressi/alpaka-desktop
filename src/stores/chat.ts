@@ -475,28 +475,24 @@ export const useChatStore = defineStore("chat", {
       delete this.folderContexts[conversationId];
     },
 
-    updateContextTokens(contextId: string, tokenEstimate: number) {
+    _findContextById(contextId: string): LinkedContext | undefined {
       for (const convId of Object.keys(this.folderContexts)) {
         const ctx = this.folderContexts[convId]?.find(
           (c) => c.id === contextId,
         );
-        if (ctx) {
-          ctx.tokens = tokenEstimate;
-          return;
-        }
+        if (ctx) return ctx;
       }
+      return undefined;
+    },
+
+    updateContextTokens(contextId: string, tokenEstimate: number) {
+      const ctx = this._findContextById(contextId);
+      if (ctx) ctx.tokens = tokenEstimate;
     },
 
     setContextAutoRefresh(contextId: string, enabled: boolean) {
-      for (const convId of Object.keys(this.folderContexts)) {
-        const ctx = this.folderContexts[convId]?.find(
-          (c) => c.id === contextId,
-        );
-        if (ctx) {
-          ctx.autoRefresh = enabled;
-          return;
-        }
-      }
+      const ctx = this._findContextById(contextId);
+      if (ctx) ctx.autoRefresh = enabled;
     },
 
     async compactConversation(
