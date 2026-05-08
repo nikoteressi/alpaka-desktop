@@ -251,7 +251,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             Ok(())
         })
         .await
-        .map_err(|e| {
+        .inspect_err(|e| {
             let _ = self.app.emit(
                 "compact:error",
                 json!({
@@ -259,7 +259,6 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     "error": e.to_string()
                 }),
             );
-            e
         })?;
 
         // 7. Emit done event and desktop notification
