@@ -9,12 +9,14 @@ const props = defineProps<{
   contextName: string;
   contextPath: string;
   includedFiles: string[] | undefined;
+  autoRefresh: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "apply", files: string[], tokens: number, content: string): void;
   (e: "detach"): void;
   (e: "close"): void;
+  (e: "update-auto-refresh", enabled: boolean): void;
 }>();
 
 const allFiles = ref<string[]>([]);
@@ -172,8 +174,30 @@ function handleClose() {
     </div>
 
     <template #footer>
-      <span class="text-[11px] text-[var(--text-dim)] mr-auto">
+      <span
+        class="text-[11px] text-[var(--text-dim)] mr-auto flex items-center gap-2"
+      >
         {{ footerMeta }}
+        <span
+          class="flex items-center gap-1.5 text-[10px] text-[var(--text-dim)] cursor-pointer select-none"
+        >
+          <button
+            role="switch"
+            aria-label="Auto-refresh"
+            :aria-checked="autoRefresh"
+            class="relative inline-flex h-4 w-7 items-center rounded-full transition-colors"
+            :class="
+              autoRefresh ? 'bg-[var(--accent)]' : 'bg-[var(--border-strong)]'
+            "
+            @click="emit('update-auto-refresh', !autoRefresh)"
+          >
+            <span
+              class="inline-block h-3 w-3 rounded-full bg-white shadow transition-transform"
+              :class="autoRefresh ? 'translate-x-3.5' : 'translate-x-0.5'"
+            />
+          </button>
+          Auto-refresh
+        </span>
       </span>
       <button
         data-testid="btn-cancel"

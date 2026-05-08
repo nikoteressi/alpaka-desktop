@@ -2,7 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tauri::{command, AppHandle, Runtime, State};
 
-use crate::db::folders::{add_folder_context, NewFolderContext};
+use crate::db::folders::{
+    add_folder_context, get_folder_context, set_auto_refresh_flag, NewFolderContext,
+};
+use crate::folder_watcher::FolderWatcher;
 use crate::{error::AppError, state::AppState};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -34,7 +37,7 @@ fn is_text_file(path: &Path) -> Result<bool, std::io::Error> {
 
 /// MED-05: Validate that the resolved path does not point to a restricted
 /// system directory. Uses `dunce::canonicalize` to resolve symlinks first.
-fn guard_path(raw: &Path) -> Result<std::path::PathBuf, AppError> {
+pub(crate) fn guard_path(raw: &Path) -> Result<std::path::PathBuf, AppError> {
     let canonical = dunce::canonicalize(raw)
         .map_err(|e| AppError::Io(format!("Cannot resolve path: {}", e)))?;
 
@@ -76,6 +79,7 @@ fn guard_path(raw: &Path) -> Result<std::path::PathBuf, AppError> {
 
 const MAX_FOLDER_CONTEXT_SIZE: usize = 50 * 1024 * 1024; // 50 MB limit
 const MAX_FOLDER_FILES: usize = 1000; // 1000 files limit
+pub(crate) const CHARS_PER_TOKEN: usize = 4;
 
 /// Recursively reads a directory, ignoring hidden files, `.git`,
 /// and binary files. Extracts text from supported file types.
@@ -103,7 +107,7 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
             .unwrap_or("file");
         content.push_str(&format!("\n--- File: {} ---\n{}\n", filename, file_content));
 
-        let token_estimate = content.chars().count() / 4;
+        let token_estimate = content.chars().count() / CHARS_PER_TOKEN;
         return Ok(FolderContextPayload {
             id: String::new(),
             path: folder_path.to_string_lossy().to_string(),
@@ -167,13 +171,44 @@ pub fn read_folder_context(folder_path: &Path) -> Result<FolderContextPayload, A
         }
     }
 
-    let token_estimate = content.chars().count() / 4;
+    let token_estimate = content.chars().count() / CHARS_PER_TOKEN;
     Ok(FolderContextPayload {
         id: String::new(), // Not saved yet
         path: folder_path.to_string_lossy().to_string(),
         content,
         token_estimate,
     })
+}
+
+fn read_included_files(
+    base_path: &Path,
+    included_files: &[String],
+) -> Result<(String, usize), AppError> {
+    let mut content = String::new();
+    let mut total_chars = 0usize;
+
+    for rel_path in included_files {
+        let full_path = base_path.join(rel_path);
+        // Symlink check must happen before canonicalize; after canonicalize
+        // is_symlink() always returns false because the target has been resolved.
+        if full_path.is_symlink() {
+            log::warn!("Skipping symlink in included files: {:?}", full_path);
+            continue;
+        }
+        let canonical = match dunce::canonicalize(&full_path) {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        if !canonical.starts_with(base_path) {
+            return Err(AppError::Internal("Path traversal detected".into()));
+        }
+        if let Ok(file_content) = std::fs::read_to_string(&canonical) {
+            total_chars += file_content.chars().count();
+            content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
+        }
+    }
+
+    Ok((content, total_chars))
 }
 
 #[command]
@@ -235,6 +270,11 @@ pub async fn link_folder<R: Runtime>(
 
 #[command]
 pub async fn unlink_folder(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    // Remove any running watcher before deleting the DB row
+    if let Ok(mut watchers) = state.folder_watchers.lock() {
+        watchers.remove(&id);
+    }
+
     let db_conn = state.db.clone();
     tokio::task::spawn_blocking(move || {
         let guard = db_conn
@@ -244,6 +284,51 @@ pub async fn unlink_folder(state: State<'_, AppState>, id: String) -> Result<(),
     })
     .await
     .map_err(AppError::from)?
+}
+
+#[command]
+pub async fn set_auto_refresh<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    id: String,
+    enabled: bool,
+) -> Result<(), AppError> {
+    // Step 1: update DB and fetch context in one lock scope
+    let ctx = {
+        let conn = state
+            .db
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        set_auto_refresh_flag(&conn, &id, enabled)?;
+        get_folder_context(&conn, &id)?
+    };
+
+    // Step 2: manage watcher
+    if !enabled {
+        if let Ok(mut watchers) = state.folder_watchers.lock() {
+            watchers.remove(&id);
+        }
+    } else {
+        let is_active = {
+            let active_conv = state
+                .active_conversation_id
+                .read()
+                .map_err(|_| AppError::Internal("RwLock poisoned".into()))?;
+            active_conv.as_deref() == Some(ctx.conversation_id.as_str())
+        };
+
+        if is_active {
+            let watcher =
+                FolderWatcher::start(&app, &id, std::path::Path::new(&ctx.path), state.db.clone())?;
+            let mut watchers = state
+                .folder_watchers
+                .lock()
+                .map_err(|_| AppError::Internal("Mutex poisoned".into()))?;
+            watchers.insert(id, watcher);
+        }
+    }
+
+    Ok(())
 }
 
 #[command]
@@ -329,42 +414,20 @@ pub async fn update_included_files(
 
         let base_path = guard_path(Path::new(&ctx.path))?;
 
-        let mut total_chars = 0usize;
-        let mut content = String::new();
-
-        for rel_path in &included_files {
-            let full_path = base_path.join(rel_path);
-            // Symlink check must happen before canonicalize; after canonicalize
-            // is_symlink() always returns false because the target has been resolved.
-            if full_path.is_symlink() {
-                log::warn!("Skipping symlink in included files: {:?}", full_path);
-                continue;
-            }
-            let canonical = match dunce::canonicalize(&full_path) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-            if !canonical.starts_with(&base_path) {
-                return Err(AppError::Internal("Path traversal detected".into()));
-            }
-            if included_files.len() > MAX_FOLDER_FILES {
-                return Err(AppError::Internal(format!(
-                    "Cannot include more than {} files",
-                    MAX_FOLDER_FILES
-                )));
-            }
-            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
-                total_chars += file_content.chars().count();
-                if total_chars > MAX_FOLDER_CONTEXT_SIZE {
-                    return Err(AppError::Internal(
-                        "Selected files exceed 50MB limit".into(),
-                    ));
-                }
-                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
-            }
+        if included_files.len() > MAX_FOLDER_FILES {
+            return Err(AppError::Internal(format!(
+                "Cannot include more than {} files",
+                MAX_FOLDER_FILES
+            )));
         }
 
-        let token_estimate = (total_chars / 4) as i64;
+        let (content, total_chars) = read_included_files(&base_path, &included_files)?;
+        if total_chars > MAX_FOLDER_CONTEXT_SIZE {
+            return Err(AppError::Internal(
+                "Selected files exceed 50MB limit".into(),
+            ));
+        }
+        let token_estimate = (total_chars / CHARS_PER_TOKEN) as i64;
         let included_files_json = Some(serde_json::to_string(&included_files)?);
 
         crate::db::folders::update_folder_context(
@@ -410,31 +473,9 @@ pub async fn get_included_files_content(
         }
 
         let base_path = guard_path(Path::new(&ctx.path))?;
-        let mut total_chars = 0usize;
-        let mut content = String::new();
-
-        for rel_path in &included_files {
-            let full_path = base_path.join(rel_path);
-            // Symlink check must happen before canonicalize; after canonicalize
-            // is_symlink() always returns false because the target has been resolved.
-            if full_path.is_symlink() {
-                continue;
-            }
-            let canonical = match dunce::canonicalize(&full_path) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-            if !canonical.starts_with(&base_path) {
-                continue;
-            }
-            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
-                total_chars += file_content.chars().count();
-                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
-            }
-        }
-
+        let (content, total_chars) = read_included_files(&base_path, &included_files)?;
         Ok(UpdatedContextResult {
-            token_estimate: (total_chars / 4) as i64,
+            token_estimate: (total_chars / CHARS_PER_TOKEN) as i64,
             content,
         })
     })
@@ -498,7 +539,7 @@ pub async fn estimate_tokens(
             }
         }
 
-        Ok((total_chars / 4) as i64)
+        Ok((total_chars / CHARS_PER_TOKEN) as i64)
     })
     .await
     .map_err(AppError::from)?

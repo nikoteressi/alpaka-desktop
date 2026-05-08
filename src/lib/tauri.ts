@@ -212,6 +212,9 @@ export const tauriApi = {
       { id, includedFiles },
     ),
 
+  setAutoRefresh: (id: string, enabled: boolean) =>
+    invoke<void>("set_auto_refresh", { id, enabled }),
+
   estimateTokens: (folderId: string) =>
     invoke<number>("estimate_tokens", { folderId }),
 

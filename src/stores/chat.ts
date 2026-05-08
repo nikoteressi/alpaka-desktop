@@ -419,6 +419,7 @@ export const useChatStore = defineStore("chat", {
               content,
               tokens,
               includedFiles,
+              autoRefresh: ctx.auto_refresh ?? false,
             };
           }),
         );
@@ -472,6 +473,26 @@ export const useChatStore = defineStore("chat", {
 
     clearFolderContext(conversationId: string) {
       delete this.folderContexts[conversationId];
+    },
+
+    _findContextById(contextId: string): LinkedContext | undefined {
+      for (const convId of Object.keys(this.folderContexts)) {
+        const ctx = this.folderContexts[convId]?.find(
+          (c) => c.id === contextId,
+        );
+        if (ctx) return ctx;
+      }
+      return undefined;
+    },
+
+    updateContextTokens(contextId: string, tokenEstimate: number) {
+      const ctx = this._findContextById(contextId);
+      if (ctx) ctx.tokens = tokenEstimate;
+    },
+
+    setContextAutoRefresh(contextId: string, enabled: boolean) {
+      const ctx = this._findContextById(contextId);
+      if (ctx) ctx.autoRefresh = enabled;
     },
 
     async compactConversation(

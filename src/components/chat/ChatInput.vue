@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { tauriApi } from "../../lib/tauri";
 import { useChatStore } from "../../stores/chat";
@@ -151,6 +152,18 @@ async function handlePickerDetach() {
   if (!pickerContext.value) return;
   await removeContext(pickerContext.value.id);
   closeFilePicker();
+}
+
+// ---- Folder refresh flash ----
+const refreshingContextIds = ref(new Set<string>());
+
+async function handleAutoRefreshToggle(contextId: string, enabled: boolean) {
+  try {
+    await tauriApi.setAutoRefresh(contextId, enabled);
+    chatStore.setContextAutoRefresh(contextId, enabled);
+  } catch (e) {
+    console.error("Failed to set auto-refresh:", e);
+  }
 }
 
 // ---- System prompt ----
@@ -505,6 +518,7 @@ function onOpenModelSwitcher() {
 }
 
 let unlistenDrag: (() => void) | undefined;
+let unlistenFolderRefreshed: (() => void) | undefined;
 
 onMounted(async () => {
   modelStore.fetchModels();
@@ -517,6 +531,23 @@ onMounted(async () => {
   } catch {
     // drag-drop unavailable in non-Tauri context
   }
+  unlistenFolderRefreshed = await listen<{
+    context_id: string;
+    token_estimate: number;
+  }>("folder:refreshed", ({ payload }) => {
+    chatStore.updateContextTokens(payload.context_id, payload.token_estimate);
+    refreshingContextIds.value = new Set([
+      ...refreshingContextIds.value,
+      payload.context_id,
+    ]);
+    setTimeout(() => {
+      refreshingContextIds.value = new Set(
+        [...refreshingContextIds.value].filter(
+          (id) => id !== payload.context_id,
+        ),
+      );
+    }, 2000);
+  });
 });
 
 onBeforeUnmount(() => {
@@ -526,6 +557,7 @@ onBeforeUnmount(() => {
     onOpenModelSwitcher,
   );
   unlistenDrag?.();
+  unlistenFolderRefreshed?.();
   clearAttachments();
 });
 </script>
@@ -589,6 +621,8 @@ onBeforeUnmount(() => {
         <div
           v-for="ctx in linkedContexts"
           :key="ctx.id"
+          :data-testid="`refresh-flash-${ctx.id}`"
+          :class="{ 'is-refreshing': refreshingContextIds.has(ctx.id) }"
           class="flex items-center gap-1.5 px-2 py-1 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-lg cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
           @click="openFilePicker(ctx)"
         >
@@ -623,6 +657,12 @@ onBeforeUnmount(() => {
           >
           <span class="text-[10px] text-[var(--text-dim)]"
             >~{{ ctx.tokens.toLocaleString() }}</span
+          >
+          <span
+            v-if="refreshingContextIds.has(ctx.id)"
+            class="text-[var(--accent)] animate-pulse"
+            aria-hidden="true"
+            >↻</span
           >
           <button
             @click.stop="removeContext(ctx.id)"
@@ -966,10 +1006,12 @@ onBeforeUnmount(() => {
     :contextName="pickerContext.name"
     :contextPath="pickerContext.path"
     :includedFiles="pickerContext.includedFiles"
+    :auto-refresh="pickerContext.autoRefresh ?? false"
     @apply="
       (files, tokens, content) => handlePickerApply(files, tokens, content)
     "
     @detach="handlePickerDetach"
     @close="closeFilePicker"
+    @update-auto-refresh="handleAutoRefreshToggle(pickerContext!.id, $event)"
   />
 </template>

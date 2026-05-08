@@ -422,6 +422,26 @@ body {
   }
 }
 
+.is-refreshing {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+  animation: refresh-pulse 1s ease-in-out;
+}
+
+@keyframes refresh-pulse {
+  0% {
+    outline-color: transparent;
+  }
+
+  30% {
+    outline-color: var(--accent);
+  }
+
+  100% {
+    outline-color: transparent;
+  }
+}
+
 @keyframes pulse-opacity {
   0%,
   100% {

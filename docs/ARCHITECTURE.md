@@ -138,6 +138,8 @@ alpaka-desktop/
 │       │   └── sql/
 │       │       └── 001_init_v1.sql  # v1.0.0 baseline schema (single file)
 │       │
+│       ├── folder_watcher.rs     # FolderWatcher struct wrapping notify-debouncer-mini inotify watcher
+│       │
 │       ├── auth/
 │       │   ├── mod.rs
 │       │   └── keyring.rs        # Secret Service API wrapper
@@ -380,6 +382,7 @@ tauri::generate_handler![
     commands::folders::update_included_files,   // → UpdatedContextResult { token_estimate, content }
     commands::folders::get_included_files_content, // read-only; returns filtered content from DB-persisted included_files_json
     commands::folders::estimate_tokens,
+    commands::folders::set_auto_refresh,        // enables/disables inotify watcher for a folder context
 
     // ── Ollama Library ────────────────────────────────────────────────────
     commands::library::search_ollama_library,
@@ -447,6 +450,10 @@ pub struct AppState {
     /// Send on this oneshot to cancel an in-progress compaction.
     /// None when no compaction is running.
     pub compact_cancel_tx: Mutex<Option<oneshot::Sender<()>>>,
+
+    /// Active inotify watchers keyed by folder context id.
+    /// Each watcher is started/stopped via set_auto_refresh and report_active_view.
+    pub folder_watchers: Mutex<HashMap<String, FolderWatcher>>,
 }
 ```
 
@@ -564,6 +571,7 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
 | `compact:token` | Rust → Vue | `{ conversation_id, content }` | Streaming summary token during compaction |
 | `compact:done` | Rust → Vue | `{ conversation_id }` | Compaction complete, DB writes finished |
 | `compact:error` | Rust → Vue | `{ conversation_id, error }` | Compaction failed or cancelled |
+| `folder:refreshed` | Rust → Vue | `{ context_id, token_estimate }` | Auto-refresh inotify watcher detected a file change; token count updated |
 
 ### 4.3 Why Tauri Events over WebSockets/SSE
 
