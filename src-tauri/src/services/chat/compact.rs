@@ -247,6 +247,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     prompt_eval_duration_ms: None,
                     eval_duration_ms: None,
                     seed: None,
+                    thinking: None,
+                    tool_calls_json: None,
+                    tool_name: None,
                 },
             )?;
             tx.commit()?;

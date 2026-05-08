@@ -414,6 +414,9 @@ async fn test_create_conversation_and_get_messages() {
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
             seed: None,
+            thinking: None,
+            tool_calls_json: None,
+            tool_name: None,
         },
     )
     .unwrap();
@@ -438,6 +441,9 @@ async fn test_create_conversation_and_get_messages() {
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
             seed: None,
+            thinking: None,
+            tool_calls_json: None,
+            tool_name: None,
         },
     )
     .unwrap();
