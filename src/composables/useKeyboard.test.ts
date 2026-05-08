@@ -14,6 +14,7 @@ vi.mock("../lib/appEvents", () => ({
   APP_EVENT: {
     FOCUS_SEARCH: "focus-search",
     OPEN_MODEL_SWITCHER: "open-model-switcher",
+    OPEN_HOST_MANAGER: "open-host-manager",
   },
 }));
 
@@ -75,12 +76,11 @@ describe("useKeyboard", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/settings");
   });
 
-  it("Ctrl+H navigates to /settings connectivity tab", () => {
+  it("Ctrl+H dispatches open-host-manager event", () => {
     fire("h", { ctrlKey: true });
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      path: "/settings",
-      query: { tab: "connectivity" },
-    });
+    expect(appEvents.dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: APP_EVENT.OPEN_HOST_MANAGER }),
+    );
   });
 
   it("Ctrl+N navigates to /chat", () => {
