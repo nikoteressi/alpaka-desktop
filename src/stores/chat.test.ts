@@ -273,8 +273,8 @@ describe("useChatStore", () => {
     it("is a no-op when contextId does not exist", () => {
       const store = useChatStore();
       store.folderContexts["conv1"] = [];
-      // Should not throw
       store.updateContextFiles("conv1", "missing", ["a.ts"], 10, "x");
+      expect(store.folderContexts["conv1"]).toEqual([]);
     });
   });
 
