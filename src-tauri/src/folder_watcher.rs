@@ -72,10 +72,13 @@ fn reestimate_tokens(db: &DbConn, context_id: &str) -> Result<i64, AppError> {
 
     let base_path = guard_path(Path::new(&path))?;
 
-    let included: Vec<String> = included_files_json
-        .as_deref()
-        .and_then(|s| serde_json::from_str(s).ok())
-        .unwrap_or_default();
+    let included: Vec<String> = match included_files_json.as_deref() {
+        Some(s) => serde_json::from_str(s).unwrap_or_else(|e| {
+            log::warn!("Failed to parse included_files_json for {context_id}: {e}");
+            Vec::new()
+        }),
+        None => Vec::new(),
+    };
 
     let token_estimate: i64 = if !included.is_empty() {
         let mut total = 0usize;
@@ -96,7 +99,10 @@ fn reestimate_tokens(db: &DbConn, context_id: &str) -> Result<i64, AppError> {
     } else {
         read_folder_context(&base_path)
             .map(|p| p.token_estimate as i64)
-            .unwrap_or(0)
+            .unwrap_or_else(|e| {
+                log::warn!("Failed to scan folder for context {context_id}: {e}");
+                0
+            })
     };
 
     {
