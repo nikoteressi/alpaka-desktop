@@ -20,6 +20,7 @@ const isModelDropdownOpen = ref(false);
 const modelSearch = ref("");
 const modelSelectorRef = ref<HTMLElement | null>(null);
 const modelSearchInput = ref<HTMLInputElement | null>(null);
+const focusedIndex = ref(-1);
 
 const selectorTagFilter = ref<string | null>(null);
 
@@ -64,7 +65,35 @@ function openModelDropdown() {
 }
 
 function onModelSearchInput() {
+  focusedIndex.value = -1;
   modelStore.searchLibrary(modelSearch.value);
+}
+
+function onSearchKeydown(e: KeyboardEvent) {
+  const models = filteredInstalledModels.value;
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    focusedIndex.value = Math.min(focusedIndex.value + 1, models.length - 1);
+    scrollFocusedIntoView();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    focusedIndex.value = Math.max(focusedIndex.value - 1, -1);
+    scrollFocusedIntoView();
+  } else if (e.key === "Enter" && focusedIndex.value >= 0) {
+    e.preventDefault();
+    selectModel(models[focusedIndex.value].name);
+  } else if (e.key === "Escape") {
+    closeModelDropdown();
+  }
+}
+
+function scrollFocusedIntoView() {
+  nextTick(() => {
+    const el = modelSelectorRef.value?.querySelector(
+      `[data-model-index="${focusedIndex.value}"]`,
+    );
+    (el as HTMLElement)?.scrollIntoView({ block: "nearest" });
+  });
 }
 
 function selectModel(name: string) {
@@ -115,7 +144,12 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
 </script>
 
 <template>
-  <div class="relative" ref="modelSelectorRef" data-testid="model-selector">
+  <div
+    class="relative"
+    ref="modelSelectorRef"
+    data-testid="model-selector"
+    :data-model-selector-open="isModelDropdownOpen ? '' : null"
+  >
     <button
       @click="openModelDropdown"
       class="flex items-center gap-1.5 bg-[var(--bg-elevated)] border border-[var(--border-strong)] rounded-full px-3 h-7 text-[12px] text-[var(--text)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors flex-shrink-0 whitespace-nowrap"
@@ -163,6 +197,7 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
           ref="modelSearchInput"
           v-model="modelSearch"
           @input="onModelSearchInput"
+          @keydown="onSearchKeydown"
           placeholder="Search models..."
           class="w-full bg-[var(--bg-input)] rounded-lg px-3 py-2 text-[13px] text-[var(--text)] border border-transparent focus:border-[var(--accent)]/50 outline-none placeholder-[var(--text-dim)] transition-all"
         />
@@ -209,14 +244,17 @@ defineExpose({ openModelDropdown: ensureModelDropdownOpen });
           </div>
           <div class="flex flex-col">
             <div
-              v-for="m in filteredInstalledModels"
+              v-for="(m, idx) in filteredInstalledModels"
               :key="'installed-' + m.name"
               :data-testid="'model-option-' + m.name"
+              :data-model-index="idx"
               class="group flex flex-col px-4 py-3 cursor-pointer transition-colors border-b border-[var(--border-subtle)] last:border-b-0"
               :class="
-                m.name === activeModelName
-                  ? 'bg-[var(--accent-muted)]/10'
-                  : 'hover:bg-[var(--bg-hover)]'
+                focusedIndex === idx
+                  ? 'bg-[var(--bg-active)]'
+                  : m.name === activeModelName
+                    ? 'bg-[var(--accent-muted)]/10'
+                    : 'hover:bg-[var(--bg-hover)]'
               "
               @click="selectModel(m.name)"
             >

@@ -154,6 +154,12 @@ export function useKeyboard() {
     const match = SHORTCUTS.find((s) => s.key === key && s.shift === shift);
     if (!match) return;
     if (hostStore.isHostManagerOpen && !(key === "h" && !shift)) return;
+    if (
+      key === "m" &&
+      !shift &&
+      !!document.querySelector("[data-model-selector-open]")
+    )
+      return;
     if (match.ignoreWhenInputFocused && isFocusedOnInput()) return;
     e.preventDefault();
     match.run(ctx);
