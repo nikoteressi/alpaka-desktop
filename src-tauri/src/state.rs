@@ -28,6 +28,10 @@ pub struct AppState {
     /// Set to `None` when no generation is running.
     pub cancel_tx: Mutex<Option<broadcast::Sender<()>>>,
 
+    /// Send on this channel to cancel an in-progress compaction.
+    /// Set to `None` when no compaction is running.
+    pub compact_cancel_tx: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+
     /// Per-model cancellation senders for in-progress create_model commands.
     /// Key is the model name; dropping the sender also cancels the stream.
     pub model_create_cancel_tx: Mutex<HashMap<String, oneshot::Sender<()>>>,
@@ -138,6 +142,7 @@ impl AppState {
             db_path,
             http_client: RwLock::new(http_client),
             cancel_tx: Mutex::new(None),
+            compact_cancel_tx: Mutex::new(None),
             model_create_cancel_tx: Mutex::new(HashMap::new()),
             health_loop_shutdown: Mutex::new(None),
             health_loop_handle: std::sync::Mutex::new(None),
