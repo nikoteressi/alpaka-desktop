@@ -263,20 +263,18 @@ describe("useChatStore", () => {
     });
   });
 
-  it("compactConversation calls loadConversation after compacting", async () => {
+  it("compactConversation does not reload messages itself (compact:done event owns that)", async () => {
     const store = useChatStore();
     store.activeConversationId = "old-conv-id";
-    mockInvoke.mockImplementation(async (cmd) => {
-      if (cmd === "compact_conversation") return null;
-      if (cmd === "get_messages") return [];
-      if (cmd === "get_folder_contexts") return [];
-      return null;
-    });
+    mockInvoke.mockResolvedValue(null);
 
     await store.compactConversation("old-conv-id", "llama3:latest");
-    expect(mockInvoke).toHaveBeenCalledWith("get_messages", {
-      conversationId: "old-conv-id",
-    });
+
+    // Reload is delegated to the compact:done event handler, not done inline.
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "get_messages",
+      expect.anything(),
+    );
   });
 
   it("loadConversations handles pagination and appends to existing list", async () => {

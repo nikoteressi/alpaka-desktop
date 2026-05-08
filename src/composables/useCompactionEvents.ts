@@ -27,8 +27,8 @@ export function useCompactionEvents() {
       async (event) => {
         const convId = event.payload.conversation_id;
         chatStore.finishCompaction(convId);
+        chatStore.clearMessages(convId);
         if (chatStore.activeConversationId === convId) {
-          chatStore.clearMessages(convId);
           await chatStore.loadConversation(convId);
         }
       },

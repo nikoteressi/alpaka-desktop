@@ -43,14 +43,16 @@ describe("useChatStore — no Vue context required", () => {
     expect(store.compactionTokens["conv-1"]).toBe("Hello world");
   });
 
-  it("finishCompaction clears compaction state", async () => {
+  it("finishCompaction clears compaction state and archived cache", async () => {
     const { useChatStore } = await import("./chat");
     const store = useChatStore();
     store.compactionInProgress["conv-1"] = true;
     store.compactionTokens["conv-1"] = "summary text";
+    store.archivedMessages["conv-1"] = [];
     store.finishCompaction("conv-1");
     expect(store.compactionInProgress["conv-1"]).toBeUndefined();
     expect(store.compactionTokens["conv-1"]).toBeUndefined();
+    expect(store.archivedMessages["conv-1"]).toBeUndefined();
   });
 
   it("loadArchivedMessages stores mapped messages from invoke", async () => {
@@ -124,15 +126,10 @@ describe("useChatStore — no Vue context required", () => {
     expect(mockInvoke).toHaveBeenCalledWith("cancel_compaction");
   });
 
-  it("compactConversation clears messages cache and reloads on success", async () => {
+  it("compactConversation invokes backend and delegates cleanup to compact:done event", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const mockInvoke = vi.mocked(invoke);
-    mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "compact_conversation") return Promise.resolve("conv-1");
-      if (cmd === "get_messages") return Promise.resolve([]);
-      if (cmd === "get_folder_contexts") return Promise.resolve([]);
-      return Promise.resolve(null);
-    });
+    mockInvoke.mockResolvedValue(undefined);
 
     const { useChatStore } = await import("./chat");
     const store = useChatStore();
@@ -145,6 +142,25 @@ describe("useChatStore — no Vue context required", () => {
       conversationId: "conv-1",
       model: "llama3",
     });
+    // On success, cleanup is owned by the compact:done event handler.
+    // compactionInProgress stays true until the event fires.
+    expect(store.compactionInProgress["conv-1"]).toBe(true);
+    // Messages cache is NOT touched here — the event handler clears it.
+    expect(store.messages["conv-1"]).toEqual([]);
+  });
+
+  it("compactConversation calls finishCompaction on error", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockRejectedValue(new Error("backend error"));
+
+    const { useChatStore } = await import("./chat");
+    const store = useChatStore();
+    store.compactionInProgress["conv-1"] = true;
+    store.compactionTokens["conv-1"] = "";
+
+    await store.compactConversation("conv-1", "llama3");
+
     expect(store.compactionInProgress["conv-1"]).toBeUndefined();
+    expect(store.compactionTokens["conv-1"]).toBeUndefined();
   });
 });

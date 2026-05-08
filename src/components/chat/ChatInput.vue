@@ -654,7 +654,7 @@ onBeforeUnmount(() => {
           {{ compactionTokens || "Generating summary…" }}
         </span>
         <button
-          @click="chatStore.cancelCompaction()"
+          @click="chatStore.cancelCompaction().catch(console.error)"
           class="flex-shrink-0 text-[11px] opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
         >
           Cancel

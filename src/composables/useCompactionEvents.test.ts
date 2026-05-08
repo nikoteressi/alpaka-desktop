@@ -67,7 +67,7 @@ describe("useCompactionEvents", () => {
     const store = useChatStore();
     store.activeConversationId = "conv-1";
     store.compactionInProgress["conv-1"] = true;
-    store.messages["conv-1"] = [];
+    store.messages["conv-1"] = [{ role: "user", content: "old" } as never];
 
     const { init } = useCompactionEvents();
     await init();
@@ -77,6 +77,24 @@ describe("useCompactionEvents", () => {
     expect(store.compactionInProgress["conv-1"]).toBeUndefined();
     // messages are cleared then reloaded (invoke returns [])
     expect(store.messages["conv-1"]).toEqual([]);
+  });
+
+  it("compact:done handler clears messages cache for non-active conversation", async () => {
+    const { useCompactionEvents } = await import("./useCompactionEvents");
+    const { useChatStore } = await import("../stores/chat");
+    const store = useChatStore();
+    store.activeConversationId = "conv-2"; // different from compacted conv
+    store.compactionInProgress["conv-1"] = true;
+    store.messages["conv-1"] = [{ role: "user", content: "old" } as never];
+
+    const { init } = useCompactionEvents();
+    await init();
+
+    await handlers["compact:done"]({ payload: { conversation_id: "conv-1" } });
+
+    expect(store.compactionInProgress["conv-1"]).toBeUndefined();
+    // cache must be cleared so next navigation forces a fresh load
+    expect(store.messages["conv-1"]).toBeUndefined();
   });
 
   it("compact:error handler finishes compaction", async () => {

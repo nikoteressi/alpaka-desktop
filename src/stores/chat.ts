@@ -434,14 +434,12 @@ export const useChatStore = defineStore("chat", {
       this.compactionInProgress[conversationId] = true;
       this.compactionTokens[conversationId] = "";
       try {
-        await invoke<string>("compact_conversation", { conversationId, model });
-        delete this.messages[conversationId];
-        await this.loadConversation(conversationId);
+        await invoke<void>("compact_conversation", { conversationId, model });
+        // compact:done event is the single owner of cache-clear + reload for both
+        // UI-triggered and future background-triggered compaction paths.
       } catch (e) {
         console.error("Compact failed:", e);
-      } finally {
-        delete this.compactionInProgress[conversationId];
-        delete this.compactionTokens[conversationId];
+        this.finishCompaction(conversationId);
       }
     },
 
@@ -453,6 +451,7 @@ export const useChatStore = defineStore("chat", {
     finishCompaction(conversationId: string) {
       delete this.compactionInProgress[conversationId];
       delete this.compactionTokens[conversationId];
+      delete this.archivedMessages[conversationId];
     },
 
     async cancelCompaction(): Promise<void> {
