@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::db::folders::get_auto_refresh_contexts;
 use crate::error::AppError;
 use crate::folder_watcher::FolderWatcher;
@@ -21,14 +23,7 @@ pub async fn report_active_view(
         .map_err(|_| AppError::Internal("active_conversation_id lock poisoned".into()))? =
         conversation_id.clone();
 
-    {
-        let mut watchers = state
-            .folder_watchers
-            .lock()
-            .map_err(|_| AppError::Internal("folder_watchers lock poisoned".into()))?;
-        watchers.clear();
-    }
-
+    let mut new_watchers: HashMap<String, FolderWatcher> = HashMap::new();
     if let Some(ref conv_id) = conversation_id {
         let contexts = {
             let conn = state
@@ -37,10 +32,6 @@ pub async fn report_active_view(
                 .map_err(|_| AppError::Internal("db lock poisoned".into()))?;
             get_auto_refresh_contexts(&conn, conv_id)?
         };
-        let mut watchers = state
-            .folder_watchers
-            .lock()
-            .map_err(|_| AppError::Internal("folder_watchers lock poisoned".into()))?;
         for ctx in contexts {
             match FolderWatcher::start(
                 &app,
@@ -49,13 +40,21 @@ pub async fn report_active_view(
                 state.db.clone(),
             ) {
                 Ok(watcher) => {
-                    watchers.insert(ctx.id, watcher);
+                    new_watchers.insert(ctx.id, watcher);
                 }
                 Err(e) => {
                     log::warn!("Failed to start watcher for context {}: {e}", ctx.id);
                 }
             }
         }
+    }
+
+    {
+        let mut watchers = state
+            .folder_watchers
+            .lock()
+            .map_err(|_| AppError::Internal("folder_watchers lock poisoned".into()))?;
+        *watchers = new_watchers;
     }
 
     Ok(())

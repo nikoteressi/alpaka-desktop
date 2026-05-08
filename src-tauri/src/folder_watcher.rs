@@ -21,6 +21,8 @@ impl FolderWatcher {
         path: &Path,
         db: DbConn,
     ) -> Result<Self, AppError> {
+        guard_path(path)?;
+
         let app = app.clone();
         let ctx_id = context_id.to_owned();
 
