@@ -384,6 +384,65 @@ pub async fn update_included_files(
 }
 
 #[command]
+pub async fn get_included_files_content(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<UpdatedContextResult, AppError> {
+    let db_conn = state.db.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let guard = db_conn
+            .lock()
+            .map_err(|_| AppError::Db("Database lock poisoned".into()))?;
+        let ctx = crate::db::folders::get_folder_context(&guard, &id)?;
+
+        let included_files: Vec<String> = ctx
+            .included_files_json
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or_default();
+
+        if included_files.is_empty() {
+            return Ok(UpdatedContextResult {
+                token_estimate: ctx.estimated_tokens,
+                content: String::new(),
+            });
+        }
+
+        let base_path = guard_path(Path::new(&ctx.path))?;
+        let mut total_chars = 0usize;
+        let mut content = String::new();
+
+        for rel_path in &included_files {
+            let full_path = base_path.join(rel_path);
+            // Symlink check must happen before canonicalize; after canonicalize
+            // is_symlink() always returns false because the target has been resolved.
+            if full_path.is_symlink() {
+                continue;
+            }
+            let canonical = match dunce::canonicalize(&full_path) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+            if !canonical.starts_with(&base_path) {
+                continue;
+            }
+            if let Ok(file_content) = std::fs::read_to_string(&canonical) {
+                total_chars += file_content.chars().count();
+                content.push_str(&format!("\n--- File: {} ---\n{}\n", rel_path, file_content));
+            }
+        }
+
+        Ok(UpdatedContextResult {
+            token_estimate: (total_chars / 4) as i64,
+            content,
+        })
+    })
+    .await
+    .map_err(AppError::from)?
+}
+
+#[command]
 pub async fn estimate_tokens(
     path: String,
     included_files: Option<Vec<String>>,

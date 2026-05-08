@@ -92,6 +92,7 @@ pub fn run() {
             commands::folders::get_folder_contexts,
             commands::folders::list_folder_files,
             commands::folders::update_included_files,
+            commands::folders::get_included_files_content,
             commands::folders::estimate_tokens,
             commands::library::search_ollama_library,
             commands::library::get_library_tags,
