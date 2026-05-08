@@ -200,8 +200,11 @@ export const tauriApi = {
   listFolderFiles: (path: string) =>
     invoke<string[]>("list_folder_files", { path }),
 
-  updateIncludedFiles: (folderId: string, includedFiles: string[]) =>
-    invoke<void>("update_included_files", { folderId, includedFiles }),
+  updateIncludedFiles: (id: string, includedFiles: string[]) =>
+    invoke<{ token_estimate: number; content: string }>(
+      "update_included_files",
+      { id, includedFiles },
+    ),
 
   estimateTokens: (folderId: string) =>
     invoke<number>("estimate_tokens", { folderId }),
