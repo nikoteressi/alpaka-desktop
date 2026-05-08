@@ -92,7 +92,6 @@ const SHORTCUTS: Shortcut[] = [
   {
     key: "m",
     shift: false,
-    ignoreWhenInputFocused: true,
     run: () =>
       appEvents.dispatchEvent(new Event(APP_EVENT.OPEN_MODEL_SWITCHER)),
   },

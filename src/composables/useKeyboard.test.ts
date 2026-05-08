@@ -104,6 +104,17 @@ describe("useKeyboard", () => {
     );
   });
 
+  it("Ctrl+M dispatches open-model-switcher even when an input is focused", () => {
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+    fire("m", { ctrlKey: true });
+    expect(appEvents.dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: APP_EVENT.OPEN_MODEL_SWITCHER }),
+    );
+    input.remove();
+  });
+
   it("Ctrl+Shift+C copies last assistant message to clipboard", async () => {
     const chat = useChatStore();
     chat.conversations = [
