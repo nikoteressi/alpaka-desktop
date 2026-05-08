@@ -122,6 +122,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     prompt_eval_duration_ms: None,
                     eval_duration_ms: None,
                     seed: None,
+                    thinking: None,
+                    tool_calls_json: None,
+                    tool_name: None,
                 },
             )?;
 
@@ -318,6 +321,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         prompt_eval_duration_ms: m.prompt_eval_duration_ms,
                         eval_duration_ms: m.eval_duration_ms,
                         seed: m.seed,
+                        thinking: None,
+                        tool_calls_json: None,
+                        tool_name: None,
                     },
                 )
             })
@@ -537,6 +543,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         prompt_eval_duration_ms: m.prompt_eval_duration_ms,
                         eval_duration_ms: m.eval_duration_ms,
                         seed: m.seed,
+                        thinking: None,
+                        tool_calls_json: None,
+                        tool_name: None,
                     },
                 )
             })
