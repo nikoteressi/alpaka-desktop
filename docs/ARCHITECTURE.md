@@ -264,7 +264,7 @@ alpaka-desktop/
 │   │   ├── tauri.ts               # Typed invoke() wrappers
 │   │   ├── markdown.ts            # markdown-it + Shiki + KaTeX pipeline
 │   │   ├── messageParser.ts       # Block-level message parser (code / think / tool_call / markdown parts)
-│   │   ├── appEvents.ts           # App-level custom event bus
+│   │   ├── appEvents.ts           # App-level custom event bus (APP_EVENT: FOCUS_SEARCH, OPEN_MODEL_SWITCHER, OPEN_HOST_MANAGER)
 │   │   ├── clipboard.ts           # Clipboard write with secure-context check
 │   │   ├── urlOpener.ts           # Cross-platform URL open helper
 │   │   └── constants.ts
