@@ -143,4 +143,26 @@ describe("FolderFilePickerModal", () => {
     expect(wrapper.emitted("close")).toBeTruthy();
     expect(tauriApi.updateIncludedFiles).not.toHaveBeenCalled();
   });
+
+  it("shows error message and retry button when listFolderFiles fails", async () => {
+    (tauriApi.listFolderFiles as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("Permission denied"),
+    );
+
+    const wrapper = mount(FolderFilePickerModal, { props: defaultProps });
+    await new Promise((r) => setTimeout(r, 0));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain("Permission denied");
+    const retryBtn = wrapper.find("button");
+    expect(retryBtn.exists()).toBe(true);
+
+    // Retry re-calls listFolderFiles
+    (tauriApi.listFolderFiles as ReturnType<typeof vi.fn>).mockResolvedValue(["a.rs"]);
+    await retryBtn.trigger("click");
+    await new Promise((r) => setTimeout(r, 0));
+    await wrapper.vm.$nextTick();
+
+    expect(tauriApi.listFolderFiles).toHaveBeenCalledTimes(2);
+  });
 });

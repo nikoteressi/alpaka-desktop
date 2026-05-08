@@ -70,6 +70,9 @@ async function handleApply() {
     const files = [...selected.value];
     const result = await tauriApi.updateIncludedFiles(props.contextId, files);
     emit("apply", files, result.token_estimate, result.content);
+  } catch (err) {
+    loadError.value =
+      err instanceof Error ? err.message : "Failed to apply selection";
   } finally {
     applying.value = false;
   }
