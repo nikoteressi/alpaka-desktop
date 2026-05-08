@@ -20,6 +20,7 @@
       >
         <div class="flex items-center gap-2.5 min-w-0">
           <span
+            data-testid="host-status"
             class="w-2 h-2 rounded-full flex-shrink-0"
             :class="
               host.last_ping_status === 'online'
@@ -40,7 +41,10 @@
                 >Active</span
               >
             </p>
-            <p class="text-[11px] text-[var(--text-dim)] font-mono truncate">
+            <p
+              data-testid="host-url"
+              class="text-[11px] text-[var(--text-dim)] font-mono truncate"
+            >
               {{ host.url }}
             </p>
           </div>
@@ -55,6 +59,7 @@
           </button>
           <CustomTooltip text="Delete host" wrapper-class="inline-block">
             <button
+              data-testid="delete-host-btn"
               @click="confirmDelete(host.id, host.is_active)"
               class="text-[var(--text-dim)] hover:text-[var(--danger)] transition-colors cursor-pointer p-1"
             >
@@ -121,48 +126,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
 import BaseModal from "../shared/BaseModal.vue";
 import ConfirmationModal from "../shared/ConfirmationModal.vue";
 import CustomTooltip from "../shared/CustomTooltip.vue";
 import { useHostStore } from "../../stores/hosts";
 import { useAppOrchestration } from "../../composables/useAppOrchestration";
-import { useConfirmationModal } from "../../composables/useConfirmationModal";
+import { useHostCrud } from "../../composables/useHostCrud";
 
 const hostStore = useHostStore();
 const orchestration = useAppOrchestration();
-const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
-
-const newHostName = ref("");
-const newHostUrl = ref("");
-
-async function addHost() {
-  if (!newHostName.value.trim() || !newHostUrl.value.trim()) return;
-  await hostStore.addHost(newHostName.value.trim(), newHostUrl.value.trim());
-  newHostName.value = "";
-  newHostUrl.value = "";
-}
-
-function confirmDelete(id: string, isActive: boolean) {
-  if (isActive) {
-    openModal({
-      title: "Action Prohibited",
-      message:
-        "You cannot delete the active host. Please switch to another host first.",
-      confirmLabel: "OK",
-      kind: "info",
-      hideCancel: true,
-      onConfirm: () => {},
-    });
-    return;
-  }
-
-  openModal({
-    title: "Confirm Delete",
-    message: "Are you sure you want to delete this host?",
-    confirmLabel: "Delete",
-    kind: "danger",
-    onConfirm: () => hostStore.deleteHost(id),
-  });
-}
+const {
+  newHostName,
+  newHostUrl,
+  addHost,
+  confirmDelete,
+  modal,
+  onConfirm,
+  onCancel,
+} = useHostCrud();
 </script>
