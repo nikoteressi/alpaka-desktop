@@ -373,16 +373,35 @@ pub async fn compact_conversation<R: Runtime>(
     app: AppHandle<R>,
     conversation_id: String,
     model: String,
-    title: Option<String>,
 ) -> Result<String, AppError> {
     let service = crate::services::chat::ChatService::new(app, &state);
     service
-        .compact(crate::services::chat::CompactParams {
+        .compact_in_place(crate::services::chat::CompactParams {
             conversation_id,
             model,
-            title,
         })
         .await
+}
+
+#[tauri::command]
+pub async fn cancel_compaction(state: State<'_, AppState>) -> Result<(), AppError> {
+    if let Ok(mut lock) = state.compact_cancel_tx.lock() {
+        if let Some(tx) = lock.take() {
+            let _ = tx.send(());
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_archived_messages(
+    state: State<'_, AppState>,
+    conversation_id: String,
+) -> Result<Vec<crate::db::messages::Message>, AppError> {
+    crate::db::spawn_db(state.db.clone(), move |conn| {
+        crate::db::messages::list_archived_for_conversation(conn, &conversation_id)
+    })
+    .await
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -31,11 +31,10 @@ pub struct SendParams {
     pub original_content: String,
 }
 
-/// Parameters for the `ChatService::compact()` lifecycle.
+/// Parameters for the `ChatService::compact_in_place()` lifecycle.
 pub struct CompactParams {
     pub conversation_id: String,
     pub model: String,
-    pub title: Option<String>,
 }
 
 /// Parameters for `ChatService::send_regenerate()`.
@@ -600,11 +599,10 @@ mod tests {
         let params = super::CompactParams {
             conversation_id: String::new(),
             model: "llama3".to_string(),
-            title: None,
         };
         assert!(
             params.conversation_id.is_empty(),
-            "empty conversation_id should be caught by compact()"
+            "empty conversation_id should be caught by compact_in_place()"
         );
     }
 

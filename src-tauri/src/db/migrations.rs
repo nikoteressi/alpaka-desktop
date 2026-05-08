@@ -46,6 +46,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "repair orphaned root user messages for branch isolation",
         sql: include_str!("sql/006_fix_orphan_parent_ids.sql"),
     },
+    Migration {
+        version: 15,
+        description: "in-place compaction: is_archived column + compaction_events table",
+        sql: include_str!("sql/007_compaction.sql"),
+    },
 ];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────

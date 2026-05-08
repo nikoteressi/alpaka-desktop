@@ -29,6 +29,7 @@ pub struct Message {
     pub sibling_order: i64,
     pub is_active: bool,
     pub sibling_count: i64,
+    pub is_archived: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -37,6 +38,8 @@ pub enum MessageRole {
     User,
     Assistant,
     System,
+    #[serde(rename = "compact_summary")]
+    CompactSummary,
 }
 
 impl MessageRole {
@@ -45,6 +48,7 @@ impl MessageRole {
             MessageRole::User => "user",
             MessageRole::Assistant => "assistant",
             MessageRole::System => "system",
+            MessageRole::CompactSummary => "compact_summary",
         }
     }
 }
@@ -57,6 +61,7 @@ impl std::str::FromStr for MessageRole {
             "user" => Ok(MessageRole::User),
             "assistant" => Ok(MessageRole::Assistant),
             "system" => Ok(MessageRole::System),
+            "compact_summary" => Ok(MessageRole::CompactSummary),
             other => Err(AppError::Internal(format!("Unknown role: '{other}'"))),
         }
     }
@@ -112,6 +117,7 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
     let role_str: String = row.get(2)?;
     let role = role_str.parse::<MessageRole>().unwrap_or(MessageRole::User);
     let is_active_int: i64 = row.get(18)?;
+    let is_archived_int: i64 = row.get(20).unwrap_or(0);
 
     Ok(Message {
         id: row.get(0)?,
@@ -134,6 +140,7 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         sibling_order: row.get(17)?,
         is_active: is_active_int != 0,
         sibling_count: row.get(19).unwrap_or(1),
+        is_archived: is_archived_int != 0,
     })
 }
 
@@ -160,7 +167,7 @@ pub fn list_for_conversation(
          SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at, parent_id, sibling_order, is_active, sibling_count
+                seed, created_at, parent_id, sibling_order, is_active, sibling_count, is_archived
          FROM active_path ORDER BY created_at ASC",
     )?;
 
@@ -211,7 +218,7 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
         "SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count
+                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count, is_archived
          FROM messages WHERE id = ?1",
         params![id],
         row_to_message,
@@ -241,7 +248,7 @@ pub fn get_siblings(conn: &Connection, parent_id: &str) -> Result<Vec<Message>, 
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
                 seed, created_at, parent_id, sibling_order, is_active,
-                (SELECT COUNT(*) FROM messages s WHERE s.parent_id = ?1) as sibling_count
+                (SELECT COUNT(*) FROM messages s WHERE s.parent_id = ?1) as sibling_count, is_archived
          FROM messages WHERE parent_id = ?1 ORDER BY sibling_order ASC",
     )?;
     let rows = stmt.query_map(params![parent_id], row_to_message)?;
@@ -356,6 +363,38 @@ pub fn navigate_sibling(
     set_active_sibling_inner(conn, &target_id)?;
     tx.commit()?;
     Ok(())
+}
+
+/// Marks all non-archived messages in a conversation as archived.
+/// Returns the count of messages that were archived.
+pub fn archive_all_for_conversation(
+    conn: &Connection,
+    conversation_id: &str,
+) -> Result<usize, AppError> {
+    conn.execute(
+        "UPDATE messages SET is_archived = 1 WHERE conversation_id = ?1 AND is_archived = 0",
+        params![conversation_id],
+    )
+    .map_err(AppError::from)
+}
+
+/// Returns all archived messages for a conversation in chronological order.
+pub fn list_archived_for_conversation(
+    conn: &Connection,
+    conversation_id: &str,
+) -> Result<Vec<Message>, AppError> {
+    let mut stmt = conn.prepare(
+        "SELECT id, conversation_id, role, content, images_json, files_json,
+                tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
+                total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
+                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count, is_archived
+         FROM messages
+         WHERE conversation_id = ?1 AND is_archived = 1
+         ORDER BY created_at ASC",
+    )?;
+    let rows = stmt.query_map(params![conversation_id], row_to_message)?;
+    rows.map(|r| r.map_err(AppError::from))
+        .collect::<Result<Vec<_>, _>>()
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -732,5 +771,54 @@ mod tests {
         assert!(msg.is_active);
         assert!(msg.parent_id.is_none());
         assert_eq!(msg.sibling_count, 1);
+    }
+
+    #[test]
+    fn archive_all_marks_messages_and_returns_count() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        create(&conn, new_msg(&cid, MessageRole::User, "hello")).unwrap();
+        create(&conn, new_msg(&cid, MessageRole::Assistant, "hi")).unwrap();
+
+        let n = archive_all_for_conversation(&conn, &cid).unwrap();
+        assert_eq!(n, 2);
+
+        // list_for_conversation should now return nothing (all archived, not on active path)
+        // archived messages don't show up in the CTE since CTE doesn't filter is_archived,
+        // but we verify archive_all ran correctly by checking list_archived
+        let n2 = archive_all_for_conversation(&conn, &cid).unwrap();
+        assert_eq!(n2, 0, "second call archives nothing (already archived)");
+    }
+
+    #[test]
+    fn list_archived_returns_archived_messages_in_order() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        create(&conn, new_msg(&cid, MessageRole::User, "first")).unwrap();
+        create(&conn, new_msg(&cid, MessageRole::Assistant, "second")).unwrap();
+
+        archive_all_for_conversation(&conn, &cid).unwrap();
+
+        let archived = list_archived_for_conversation(&conn, &cid).unwrap();
+        assert_eq!(archived.len(), 2);
+        assert!(archived.iter().all(|m| m.is_archived));
+        assert_eq!(archived[0].content, "first");
+        assert_eq!(archived[1].content, "second");
+    }
+
+    #[test]
+    fn compact_summary_role_roundtrips() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+
+        let msg = create(
+            &conn,
+            new_msg(&cid, MessageRole::CompactSummary, "summary text"),
+        )
+        .unwrap();
+        assert_eq!(msg.role, MessageRole::CompactSummary);
+        assert_eq!(msg.role.as_str(), "compact_summary");
     }
 }

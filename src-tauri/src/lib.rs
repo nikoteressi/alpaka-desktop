@@ -62,6 +62,8 @@ pub fn run() {
             commands::chat::backup_database,
             commands::chat::restore_database,
             commands::chat::compact_conversation,
+            commands::chat::cancel_compaction,
+            commands::chat::get_archived_messages,
             commands::chat::regenerate_message,
             commands::chat::switch_version,
             commands::chat::navigate_version,

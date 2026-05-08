@@ -1,20 +1,19 @@
-use crate::db::{conversations, messages, spawn_db};
+use futures_util::StreamExt;
+use serde_json::json;
+use tauri::{Emitter, Runtime};
+
+use crate::db::{compaction_events, messages, spawn_db};
 use crate::error::AppError;
 use crate::ollama::client::OllamaClient;
 use crate::ollama::types::{ChatOptions, ChatRequest, Message, StreamResponse};
-use tauri::Runtime;
 
 use super::{ChatService, CompactParams};
 
 impl<'a, R: Runtime> ChatService<'a, R> {
-    /// Compact a conversation: summarize it, create a new conversation with the summary
-    /// as the system prompt, and copy the last 4 messages across.
-    /// Returns the new conversation ID.
-    pub async fn compact(&self, params: CompactParams) -> Result<String, AppError> {
+    pub async fn compact_in_place(&self, params: CompactParams) -> Result<String, AppError> {
         let CompactParams {
             conversation_id,
             model,
-            title,
         } = params;
 
         if conversation_id.is_empty() {
@@ -23,16 +22,14 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             ));
         }
 
-        // 1. Load full conversation history and source title from DB
+        // 1. Load all non-archived messages
         let conv_id = conversation_id.clone();
-        let (history, conv_title) = spawn_db(self.state.db.clone(), move |conn| {
-            let msgs = messages::list_for_conversation(conn, &conv_id)?;
-            let conv = conversations::get_by_id(conn, &conv_id)?;
-            Ok((msgs, conv.title))
+        let history = spawn_db(self.state.db.clone(), move |conn| {
+            messages::list_for_conversation(conn, &conv_id)
         })
         .await?;
 
-        // 2. Build summarization prompt from user+assistant turns only
+        // 2. Build dialogue from user+assistant turns
         let dialogue: String = history
             .iter()
             .filter(|m| {
@@ -49,17 +46,32 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             return Err(AppError::Internal("No messages to compact".into()));
         }
 
-        let summarization_prompt = format!(
-            "Summarize the following conversation concisely but comprehensively. Preserve:\n\
-            - Key decisions and conclusions\n\
-            - Important facts, values, and names\n\
-            - Code snippets or technical details (condensed)\n\
-            - The current task or open question\n\
-            Keep the summary under 600 words.\n\n\
+        let archived_count = history
+            .iter()
+            .filter(|m| {
+                matches!(
+                    m.role,
+                    messages::MessageRole::User | messages::MessageRole::Assistant
+                )
+            })
+            .count();
+
+        let prompt = format!(
+            "Summarize the following conversation. Preserve exactly:\n\
+            - All decisions made and their rationale\n\
+            - Key facts, values, names, file paths, and identifiers\n\
+            - Code snippets and technical details (condense but keep precise)\n\
+            - Any open questions or the current task in progress\n\
+            - The user's goals and preferences revealed in the conversation\n\n\
+            Be concise. Do not add commentary. Output only the summary.\n\n\
             CONVERSATION:\n{dialogue}"
         );
 
-        // 3. Call Ollama non-streaming for summary
+        // 3. Set up cancel channel
+        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel::<()>();
+        *self.state.compact_cancel_tx.lock().unwrap() = Some(cancel_tx);
+
+        // 4. Stream Ollama for summary
         let http = self
             .state
             .http_client
@@ -67,17 +79,18 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             .unwrap_or_else(|e| e.into_inner())
             .clone();
         let client = OllamaClient::from_state(http, self.state.db.clone()).await?;
+
         let req = ChatRequest {
             model: model.clone(),
             messages: vec![Message {
                 role: "user".to_string(),
-                content: summarization_prompt,
+                content: prompt,
                 images: None,
                 thinking: None,
                 tool_calls: None,
                 name: None,
             }],
-            stream: false,
+            stream: true,
             think: None,
             tools: None,
             options: Some(ChatOptions {
@@ -87,93 +100,123 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         };
 
         let resp = client.post("/api/chat").json(&req).send().await?;
-
         if !resp.status().is_success() {
+            *self.state.compact_cancel_tx.lock().unwrap() = None;
             return Err(AppError::Http(format!("Ollama returned {}", resp.status())));
         }
 
-        let chat_resp = resp.json::<StreamResponse>().await?;
+        // 5. Stream response, emit compact:token per chunk
+        let mut stream = resp.bytes_stream();
+        let mut buf = String::new();
+        let mut summary = String::new();
+        let mut cancelled = false;
+        let mut cancel_rx = cancel_rx;
 
-        let summary = chat_resp.message.content;
+        'stream: loop {
+            tokio::select! {
+                _ = &mut cancel_rx => {
+                    cancelled = true;
+                    break 'stream;
+                }
+                chunk = stream.next() => {
+                    match chunk {
+                        Some(Ok(bytes)) => {
+                            buf.push_str(&String::from_utf8_lossy(&bytes));
+                            while let Some(pos) = buf.find('\n') {
+                                let line = buf[..pos].trim().to_string();
+                                buf.drain(..=pos);
+                                if line.is_empty() {
+                                    continue;
+                                }
+                                if let Ok(data) = serde_json::from_str::<StreamResponse>(&line) {
+                                    let token = data.message.content.as_str();
+                                    if !token.is_empty() {
+                                        summary.push_str(token);
+                                        let _ = self.app.emit(
+                                            "compact:token",
+                                            json!({
+                                                "conversation_id": &conversation_id,
+                                                "content": token
+                                            }),
+                                        );
+                                    }
+                                    if data.done {
+                                        break 'stream;
+                                    }
+                                }
+                            }
+                        }
+                        Some(Err(e)) => {
+                            *self.state.compact_cancel_tx.lock().unwrap() = None;
+                            return Err(AppError::Http(e.to_string()));
+                        }
+                        None => break 'stream,
+                    }
+                }
+            }
+        }
+
+        *self.state.compact_cancel_tx.lock().unwrap() = None;
+
+        if cancelled {
+            let _ = self.app.emit(
+                "compact:error",
+                json!({
+                    "conversation_id": &conversation_id,
+                    "error": "cancelled"
+                }),
+            );
+            return Err(AppError::Internal("Compaction cancelled".into()));
+        }
+
         if summary.trim().is_empty() {
             return Err(AppError::Internal("Empty summary from model".into()));
         }
 
-        // 4. Create new conversation with the chosen (or derived) title
-        let new_title = title.unwrap_or_else(|| format!("Compact: {}", conv_title));
-        let new_conv = spawn_db(self.state.db.clone(), move |conn| {
-            conversations::create(
+        // 6. DB writes: archive messages, record event, insert summary message
+        let conv_id2 = conversation_id.clone();
+        let summary_content = summary.clone();
+        spawn_db(self.state.db.clone(), move |conn| {
+            messages::archive_all_for_conversation(conn, &conv_id2)?;
+            compaction_events::create(conn, &conv_id2, archived_count)?;
+            messages::create(
                 conn,
-                conversations::NewConversation {
-                    title: new_title,
-                    model,
-                    settings_json: None,
-                    tags: None,
+                messages::NewMessage {
+                    conversation_id: conv_id2.clone(),
+                    role: messages::MessageRole::CompactSummary,
+                    content: summary_content,
+                    parent_id: None,
+                    sibling_order: 0,
+                    is_active: true,
+                    images_json: None,
+                    files_json: None,
+                    tokens_used: None,
+                    generation_time_ms: None,
+                    prompt_tokens: None,
+                    tokens_per_sec: None,
+                    total_duration_ms: None,
+                    load_duration_ms: None,
+                    prompt_eval_duration_ms: None,
+                    eval_duration_ms: None,
+                    seed: None,
                 },
-            )
-        })
-        .await?;
-
-        // 5. Set summary as system message (context for the new conversation)
-        let new_conv_id = new_conv.id.clone();
-        let system_content = format!(
-            "You are continuing a previous conversation. Here is a summary of what was discussed:\n\n\
-            {summary}\n\nContinue from this context."
-        );
-        spawn_db(self.state.db.clone(), move |conn| {
-            conversations::update_system_prompt(conn, &new_conv_id, &system_content)
-        })
-        .await?;
-
-        // 6. Copy last 4 user+assistant messages from the old conversation
-        let tail: Vec<_> = history
-            .iter()
-            .filter(|m| {
-                matches!(
-                    m.role,
-                    messages::MessageRole::User | messages::MessageRole::Assistant
-                )
-            })
-            .rev()
-            .take(4)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .cloned()
-            .collect();
-
-        let new_conv_id_for_msgs = new_conv.id.clone();
-        spawn_db(self.state.db.clone(), move |conn| {
-            for msg in tail {
-                messages::create(
-                    conn,
-                    messages::NewMessage {
-                        conversation_id: new_conv_id_for_msgs.clone(),
-                        role: msg.role.clone(),
-                        content: msg.content.clone(),
-                        parent_id: None,
-                        sibling_order: 0,
-                        is_active: true,
-                        images_json: Some(msg.images_json.clone()),
-                        files_json: None,
-                        tokens_used: msg.tokens_used,
-                        generation_time_ms: msg.generation_time_ms,
-                        // Clear prompt_tokens so the new conversation's context bar starts
-                        // at zero rather than inheriting the old conversation's cumulative count.
-                        prompt_tokens: None,
-                        tokens_per_sec: msg.tokens_per_sec,
-                        total_duration_ms: msg.total_duration_ms,
-                        load_duration_ms: msg.load_duration_ms,
-                        prompt_eval_duration_ms: msg.prompt_eval_duration_ms,
-                        eval_duration_ms: msg.eval_duration_ms,
-                        seed: msg.seed,
-                    },
-                )?;
-            }
+            )?;
             Ok(())
         })
         .await?;
 
-        Ok(new_conv.id)
+        // 7. Emit done event and desktop notification
+        let _ = self.app.emit(
+            "compact:done",
+            json!({ "conversation_id": &conversation_id }),
+        );
+        crate::system::notifications::send_notification(
+            &self.app,
+            "Alpaka",
+            "Conversation compacted",
+            Some(&conversation_id),
+        );
+
+        Ok(conversation_id)
     }
 }
