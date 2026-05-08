@@ -231,7 +231,7 @@ alpaka-desktop/
 │   │   │   ├── BaseModal.vue
 │   │   │   ├── ConfirmationModal.vue
 │   │   │   ├── CustomTooltip.vue
-│   │   │   ├── ErrorScreen.vue       # ⚠️ Defined but never imported as of v1.2.0
+│   │   │   ├── ErrorScreen.vue       # Full-screen overlay shown when active host is offline (L-07/L-08)
 │   │   │   ├── MirostatSelector.vue
 │   │   │   ├── ModelTagBadge.vue
 │   │   │   ├── ToggleSwitch.vue

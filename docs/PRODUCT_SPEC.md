@@ -179,8 +179,8 @@ values fall back outward (`ChatOptions::merge_with_fallback` in `ollama/types.rs
 | L-04 | **Wayland support** | P0 | ✅ | WebKitGTK 4.1 native Wayland backend |
 | L-05 | **Secret Service (KWallet / GNOME Keyring / KeePassXC)** | P0 | ✅ | API keys, OAuth tokens, per-host bearers — all via `keyring` crate, never on disk |
 | L-06 | **xdg-desktop-portal file dialogs** | P0 | ✅ | Tauri dialog plugin |
-| L-07 | **Systemd Ollama service control** | P1 | 🟡 | `start_ollama` / `stop_ollama` / `ollama_service_status` commands implemented and exposed in `lib/tauri.ts`, but the only caller is `ErrorScreen.vue`, which itself is never imported anywhere — so currently unreachable from the UI |
-| L-08 | **Connection error screen with retry** | P1 | 🟡 | `ErrorScreen.vue` exists with full retry / start-Ollama logic, but is **not wired into the router or `App.vue`**. Users currently see no friendly screen when Ollama is unreachable |
+| L-07 | **Systemd Ollama service control** | P1 | ✅ | `start_ollama` / `stop_ollama` / `ollama_service_status` commands reachable via `ErrorScreen.vue` overlay (shown when active host goes offline); "Start Ollama Service" button hidden for remote hosts |
+| L-08 | **Connection error screen with retry** | P1 | ✅ | `ErrorScreen.vue` mounted in `App.vue` as full-screen overlay; shown when `activeHost.last_ping_status === 'offline'`; retry triggers `ping_host` IPC |
 | L-09 | **Ollama model storage path override** | P1 | ✅ | `Settings → Engine` writes a systemd override and restarts Ollama (`ModelPathSettings.vue`) |
 
 ### 2.11 Backup & Maintenance
