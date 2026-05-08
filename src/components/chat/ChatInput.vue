@@ -300,11 +300,10 @@ const isCompactingActive = computed(
     !!chatStore.compactionInProgress[activeConvId.value],
 );
 
-const compactionTokens = computed(
-  () =>
-    activeConvId.value
-      ? (chatStore.compactionTokens[activeConvId.value] ?? "")
-      : "",
+const compactionTokens = computed(() =>
+  activeConvId.value
+    ? (chatStore.compactionTokens[activeConvId.value] ?? "")
+    : "",
 );
 
 // ---- Text input ----
@@ -633,9 +632,24 @@ onBeforeUnmount(() => {
           color: 'var(--warning)',
         }"
       >
-        <svg class="w-3 h-3 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+        <svg
+          class="w-3 h-3 animate-spin flex-shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          />
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v8H4z"
+          />
         </svg>
         <span class="flex-1 min-w-0 truncate">
           {{ compactionTokens || "Generating summary…" }}
@@ -657,7 +671,12 @@ onBeforeUnmount(() => {
 
           <!-- Compact conversation button -->
           <CustomTooltip
-            v-if="!isCurrentChatStreaming && !chatStore.isDraft && !!activeConvId && activeModelName !== 'Select model'"
+            v-if="
+              !isCurrentChatStreaming &&
+              !chatStore.isDraft &&
+              !!activeConvId &&
+              activeModelName !== 'Select model'
+            "
             text="Summarize and compact conversation in-place"
             wrapper-class="flex-shrink-0"
           >

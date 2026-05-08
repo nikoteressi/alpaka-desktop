@@ -459,10 +459,9 @@ export const useChatStore = defineStore("chat", {
     },
 
     async loadArchivedMessages(conversationId: string): Promise<void> {
-      const rawMessages = await invoke<import("../types/chat").BackendMessage[]>(
-        "get_archived_messages",
-        { conversationId },
-      );
+      const rawMessages = await invoke<
+        import("../types/chat").BackendMessage[]
+      >("get_archived_messages", { conversationId });
       this.archivedMessages[conversationId] = (rawMessages || []).map((m) => {
         let images: Uint8Array[] = [];
         try {
