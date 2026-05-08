@@ -166,10 +166,7 @@ function handleClose() {
         No files selected — applying will remove this folder link.
       </p>
 
-      <p
-        v-if="applyError"
-        class="text-[11px] text-[var(--danger)] mt-2"
-      >
+      <p v-if="applyError" class="text-[11px] text-[var(--danger)] mt-2">
         {{ applyError }}
       </p>
     </div>
