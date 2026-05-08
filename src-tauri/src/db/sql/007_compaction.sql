@@ -3,6 +3,10 @@
 
 PRAGMA foreign_keys = OFF;
 
+BEGIN IMMEDIATE;
+
+DROP TABLE IF EXISTS messages_new;
+
 CREATE TABLE messages_new (
     id                      TEXT    PRIMARY KEY NOT NULL,
     conversation_id         TEXT    NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -35,6 +39,8 @@ INSERT INTO messages_new
 
 DROP TABLE messages;
 ALTER TABLE messages_new RENAME TO messages;
+
+COMMIT;
 
 PRAGMA foreign_keys = ON;
 
