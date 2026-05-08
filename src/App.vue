@@ -8,6 +8,14 @@
       font-family: var(--sans);
     "
   >
+    <ErrorScreen
+      v-if="activeHostIsOffline"
+      :host-url="activeHostUrl"
+      :show-service-controls="activeHostIsLocal"
+      @retry="handleRetry"
+      @open-settings="handleOpenSettings"
+    />
+
     <!-- 48px Icon strip — hidden in compact mode -->
     <div
       class="flex-shrink-0 flex flex-col items-center pt-2 pb-2 gap-1 select-none overflow-hidden transition-[width] duration-[180ms]"
@@ -153,6 +161,7 @@ import {
   IconSettings,
 } from "./components/shared/icons";
 import HostManager from "./components/hosts/HostManager.vue";
+import ErrorScreen from "./components/shared/ErrorScreen.vue";
 import { appEvents, APP_EVENT } from "./lib/appEvents";
 
 const route = useRoute();
@@ -203,6 +212,30 @@ const sidebarOpen = computed({
   get: () => !settingsStore.sidebarCollapsed && !settingsStore.compactMode,
   set: (val: boolean) => settingsStore.updateSetting("sidebarCollapsed", !val),
 });
+
+const activeHostIsOffline = computed(
+  () => hostStore.activeHost?.last_ping_status === "offline",
+);
+
+const activeHostUrl = computed(() => {
+  const raw = hostStore.activeHost?.url ?? "localhost:11434";
+  return raw.replace(/^https?:\/\//, "");
+});
+
+const activeHostIsLocal = computed(
+  () => hostStore.activeHost?.kind === "local",
+);
+
+async function handleRetry() {
+  if (hostStore.activeHostId) {
+    await tauriApi.pingHost(hostStore.activeHostId).catch(() => {});
+  }
+}
+
+function handleOpenSettings() {
+  router.push("/settings");
+}
+
 const sidebarWidth = ref(220);
 const isResizing = ref(false);
 

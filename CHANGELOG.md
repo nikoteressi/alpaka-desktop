@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
+
 ### Added
 - Host Manager quick-switch (#155): `Ctrl+H` opens/closes the Host Manager modal from anywhere; modal uses `BaseModal` with CSS variables; other shortcuts are suppressed while it is open
 - Arrow-key navigation in model selector: `↑`/`↓` move through installed models, `Enter` selects, `Escape` closes; `Ctrl+M` is suppressed when the model selector is already open
