@@ -58,8 +58,8 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | C-05 | **Code blocks with copy button** | P0 | ✅ | Language detection, Shiki syntax highlighting, one-click copy (`CodeBlock.vue`) |
 | C-06 | **Chat history persistence** | P0 | ✅ | SQLite-backed; pin, rename, delete, and search by title (`Ctrl+K` inside `ConversationList.vue`) |
 | C-07 | **Multi-chat tabs/panels** | P1 | 🔲 Backlog | Side-by-side or tabbed conversations |
-| C-08 | **Chat export to JSON** | P1 | 🟡 | `export_conversation` Tauri command implemented and exposed in `lib/tauri.ts`, but no UI button calls it |
-| C-08b | **Chat export to Markdown** | P1 | 🔲 Backlog | Not implemented in backend or UI |
+| C-08 | **Chat export to JSON** | P1 | ✅ | Export submenu in sidebar context menu → JSON option triggers `export_conversation` |
+| C-08b | **Chat export to Markdown** | P1 | ✅ | Export submenu in sidebar context menu → Markdown option triggers `export_conversation_markdown` |
 | C-09 | **Chat branching** | P2 | ✅ | Regenerate assistant responses to create sibling branches; navigate between versions with `<` / `>` controls in `MessageBubble.vue` (`useVersionSwitcher`). Edit message truncates conversation from the edited point before resending. |
 | C-10 | **Chat backup & restore** | P1 | ⚠️ | Raw SQLite backup/restore wired in `Settings → Maintenance`; no per-conversation JSON import/export UI |
 | C-11 | **Compact / TWM mode** | P1 | ⚠️ | `Ctrl+Shift+M` collapses the 48 px icon strip (`App.vue:14`). Padding, font sizes and the top-bar layout described in §3.6 are **not** implemented |
