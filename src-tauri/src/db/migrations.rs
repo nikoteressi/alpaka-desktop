@@ -56,6 +56,11 @@ const MIGRATIONS: &[Migration] = &[
         description: "fix role CHECK constraint to include compact_summary",
         sql: include_str!("sql/008_fix_role_check.sql"),
     },
+    Migration {
+        version: 17,
+        description: "native roles: thinking, tool_calls_json, tool_name columns",
+        sql: include_str!("sql/009_native_roles.sql"),
+    },
 ];
 
 // ── Runner ─────────────────────────────────────────────────────────────────────
