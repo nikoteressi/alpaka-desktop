@@ -82,6 +82,7 @@ export interface LinkedContext {
   content: string;
   tokens: number;
   includedFiles?: string[]; // undefined = all files included (no filter)
+  autoRefresh?: boolean;
 }
 
 export interface ChatDraft {
@@ -178,6 +179,7 @@ export interface FolderContextPayload {
   name?: string;
   token_count?: number;
   included_files_json?: string | null;
+  auto_refresh?: boolean;
 }
 
 export interface StreamingCallbacks {
