@@ -47,8 +47,8 @@ export const useChatStore = defineStore("chat", {
   state: () => ({
     conversations: [] as Conversation[],
     activeConversationId: null as string | null,
-    messages: {} as Record<string, Message[]>,
-    folderContexts: {} as Record<string, LinkedContext[]>,
+    messages: {} as Record<string, Message[]>, // NOSONAR
+    folderContexts: {} as Record<string, LinkedContext[]>, // NOSONAR
     expandedStats: new Set<string>(), // Track which message IDs have full stats visible
     streaming: {
       isStreaming: false,
@@ -68,7 +68,7 @@ export const useChatStore = defineStore("chat", {
       evalTokens: 0,
       activeMessageParts: [] as MessagePart[],
       regeneratingMessageId: null,
-    } as StreamingState,
+    } as StreamingState, // NOSONAR
     _listenersInitialized: false,
     /** Draft conversation — local-only, not yet persisted to DB */
     draftConversation: null as Conversation | null,
@@ -77,13 +77,13 @@ export const useChatStore = defineStore("chat", {
     isLoadingMore: false,
     nextOffset: 0,
     /** In-memory cache of drafts for loaded conversations */
-    drafts: {} as Record<string, ChatDraft>,
+    drafts: {} as Record<string, ChatDraft>, // NOSONAR
     /** Temporary system prompt for drafts or newly created chats */
-    draftSystemPrompt: "" as string,
-    compactionInProgress: {} as Record<string, boolean>,
-    compactionTokens: {} as Record<string, string>,
-    archivedMessages: {} as Record<string, import("../types/chat").Message[]>,
-    showingHistory: new Set<string>() as Set<string>,
+    draftSystemPrompt: "",
+    compactionInProgress: {} as Record<string, boolean>, // NOSONAR
+    compactionTokens: {} as Record<string, string>, // NOSONAR
+    archivedMessages: {} as Record<string, import("../types/chat").Message[]>, // NOSONAR
+    showingHistory: new Set<string>(),
   }),
 
   getters: {
@@ -233,7 +233,7 @@ export const useChatStore = defineStore("chat", {
         type,
         content,
         ...metadata,
-      } as MessagePart);
+      } as MessagePart); // NOSONAR
     },
 
     updatePartMetadata(
@@ -471,7 +471,8 @@ export const useChatStore = defineStore("chat", {
             images = base64s.map((b) => {
               const bin = atob(b);
               const arr = new Uint8Array(bin.length);
-              for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+              for (let i = 0; i < bin.length; i++)
+                arr[i] = bin.codePointAt(i) ?? 0;
               return arr;
             });
           }

@@ -5,7 +5,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue([]),
 }));
 
-type EventHandler<T> = (event: { payload: T }) => void;
+type EventHandler<T> = (event: { payload: T }) => void | Promise<void>;
 
 const handlers: Record<string, EventHandler<unknown>> = {};
 const unlistenFns: Record<string, ReturnType<typeof vi.fn>> = {};
@@ -75,7 +75,8 @@ describe("useCompactionEvents", () => {
     await handlers["compact:done"]({ payload: { conversation_id: "conv-1" } });
 
     expect(store.compactionInProgress["conv-1"]).toBeUndefined();
-    expect(store.messages["conv-1"]).toBeUndefined();
+    // messages are cleared then reloaded (invoke returns [])
+    expect(store.messages["conv-1"]).toEqual([]);
   });
 
   it("compact:error handler finishes compaction", async () => {

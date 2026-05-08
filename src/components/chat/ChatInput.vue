@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
 import { tauriApi } from "../../lib/tauri";
 import { useChatStore } from "../../stores/chat";
 import { useModelStore } from "../../stores/models";

@@ -21,8 +21,8 @@ const archivedMessages = computed(
 
 const renderedSummary = computed(() => renderMarkdown(props.message.content));
 
-function toggle() {
-  void chatStore.toggleHistory(props.conversationId);
+async function toggle() {
+  await chatStore.toggleHistory(props.conversationId);
 }
 </script>
 

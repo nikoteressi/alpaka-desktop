@@ -24,12 +24,12 @@ export function useCompactionEvents() {
 
     const unlistenDone = await listen<{ conversation_id: string }>(
       "compact:done",
-      (event) => {
+      async (event) => {
         const convId = event.payload.conversation_id;
         chatStore.finishCompaction(convId);
         if (chatStore.activeConversationId === convId) {
           chatStore.clearMessages(convId);
-          void chatStore.loadConversation(convId);
+          await chatStore.loadConversation(convId);
         }
       },
     );
