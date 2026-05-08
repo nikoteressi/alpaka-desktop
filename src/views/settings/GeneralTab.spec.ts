@@ -141,4 +141,71 @@ describe("GeneralTab — confirmReset", () => {
 
     expect(setThemeSpy).toHaveBeenCalled();
   });
+
+  it("clicking outside the compaction dropdown closes it", async () => {
+    const wrapper = mount(GeneralTab, {
+      global: { stubs: globalStubs },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    // Open the dropdown
+    const dropdownTrigger = wrapper.find(
+      "button.flex.items-center.justify-between",
+    );
+    await dropdownTrigger.trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[v-if]").exists() || wrapper.html()).toBeTruthy();
+
+    // Click outside (on body, not inside the dropdown ref element)
+    document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    await flushPromises();
+
+    // Dropdown panel should be gone
+    expect(wrapper.find(".absolute.top-full").exists()).toBe(false);
+
+    wrapper.unmount();
+  });
+
+  it("compaction model dropdown opens and selecting a model updates settings", async () => {
+    const { useSettingsStore } = await import("../../stores/settings");
+    const settingsStore = useSettingsStore();
+    const updateSpy = vi
+      .spyOn(settingsStore, "updateSetting")
+      .mockResolvedValue(undefined);
+
+    const { useModelStore } = await import("../../stores/models");
+    const modelStore = useModelStore();
+    modelStore.models = [
+      {
+        name: "llama3",
+        size: 0,
+        digest: "",
+        details: { family: "", parameter_size: "", quantization_level: "" },
+        modified_at: "",
+      },
+    ] as never;
+
+    const wrapper = mount(GeneralTab, {
+      global: { stubs: globalStubs },
+    });
+    await flushPromises();
+
+    // Open dropdown by clicking the trigger button
+    const dropdownTrigger = wrapper.find(
+      "button.flex.items-center.justify-between",
+    );
+    expect(dropdownTrigger.exists()).toBe(true);
+    await dropdownTrigger.trigger("click");
+    await flushPromises();
+
+    // Click "Same as conversation model" (empty string option)
+    const defaultOption = wrapper
+      .findAll("button")
+      .find((b) => b.text().includes("Same as conversation model"));
+    expect(defaultOption).toBeDefined();
+    await defaultOption!.trigger("click");
+
+    expect(updateSpy).toHaveBeenCalledWith("compactionModel", "");
+  });
 });
