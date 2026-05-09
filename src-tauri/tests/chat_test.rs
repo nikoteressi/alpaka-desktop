@@ -894,7 +894,6 @@ mod native_roles {
         assert_eq!(dispatch_2.sibling_order, 1, "new dispatch must be order 1");
         assert!(dispatch_2.is_active, "new dispatch must be active");
 
-        // dispatch_1 must be inactive after create_sibling
         let dispatch_1_refreshed: bool = conn
             .query_row(
                 "SELECT is_active FROM messages WHERE id = ?1",
@@ -906,15 +905,14 @@ mod native_roles {
 
         // sibling_count for dispatch_2 — fetch via list_for_conversation since
         // create_sibling returns 1 (the value is computed in the list query)
-        let all = messages::list_for_conversation(&conn, "c1").unwrap();
-        let dispatch_2_in_path = all.iter().find(|m| m.id == dispatch_2.id).unwrap();
+        let path = messages::list_for_conversation(&conn, "c1").unwrap();
+        let dispatch_2_in_path = path.iter().find(|m| m.id == dispatch_2.id).unwrap();
         assert_eq!(
             dispatch_2_in_path.sibling_count, 2,
             "sibling_count must reflect both dispatches"
         );
 
         // ── Assertions: active path shows only second chain ───────────────────
-        let path = messages::list_for_conversation(&conn, "c1").unwrap();
         let contents: Vec<&str> = path.iter().map(|m| m.content.as_str()).collect();
         assert!(
             contents.contains(&"Second answer"),
