@@ -119,17 +119,15 @@ async fn stream_once<R: Runtime>(
                                         let content_token = data.message.content.as_str();
 
                                         if !thinking_token.is_empty() {
-                                            // Mode A: separate thinking field (modern Ollama v0.5+ API)
+                                            // Mode A: Ollama provides thinking in a separate field
                                             if !in_think_block {
                                                 in_think_block = true;
                                                 think_start = Some(std::time::Instant::now());
-                                                assembled.push_str("<think>");
                                                 if let Err(e) = app.emit("chat:thinking-start", json!({ "conversation_id": conversation_id })) {
                                                     log::warn!("Failed to emit chat:thinking-start: {} — continuing stream", e);
                                                 }
                                             }
                                             thinking_assembled.push_str(thinking_token);
-                                            assembled.push_str(thinking_token); // CRITICAL: must add to main content too!
                                             if let Err(e) = app.emit("chat:thinking-token", json!({
                                                 "conversation_id": conversation_id,
                                                 "content": thinking_token,
@@ -139,18 +137,13 @@ async fn stream_once<R: Runtime>(
                                                 log::warn!("Failed to emit chat:thinking-token: {} — continuing stream", e);
                                             }
                                         } else if !content_token.is_empty() {
-                                            // Close think block when switching from thinking to content (Mode A)
-                                            if in_think_block && !content_token.contains("</think>") {
+                                            // Close Mode A think block when we receive content after thinking
+                                            if in_think_block && thinking_token.is_empty() {
                                                 in_think_block = false;
-                                                let duration_ms = think_start.take()
+                                                let duration_ms = think_start
+                                                    .take()
                                                     .map(|s| s.elapsed().as_millis() as u64)
                                                     .unwrap_or(0);
-
-                                                // Inject time into the opening tag retrospectively
-                                                let time_secs = (duration_ms as f64) / 1000.0;
-                                                assembled = assembled.replacen("<think>", &format!("<think time={:.1}>", time_secs), 1);
-
-                                                assembled.push_str("</think>\n\n");
                                                 if let Err(e) = app.emit("chat:thinking-end", json!({
                                                     "conversation_id": conversation_id,
                                                     "duration_ms": duration_ms,
@@ -159,36 +152,105 @@ async fn stream_once<R: Runtime>(
                                                 }
                                             }
 
-                                            // Mode B fallback: embedded <think> tags in content
-                                            if content_token.contains("<think>") && !in_think_block {
+                                            // Mode B: embedded <think> tags in content tokens.
+                                            // Route content to thinking_assembled while inside a think block.
+                                            if in_think_block {
+                                                if let Some(close_pos) = content_token.find("</think>") {
+                                                    // Block closes in this token
+                                                    let inner = &content_token[..close_pos];
+                                                    if !inner.is_empty() {
+                                                        thinking_assembled.push_str(inner);
+                                                        let _ = app.emit("chat:thinking-token", json!({
+                                                            "conversation_id": conversation_id,
+                                                            "content": inner,
+                                                        }));
+                                                    }
+                                                    in_think_block = false;
+                                                    let duration_ms = think_start
+                                                        .take()
+                                                        .map(|s| s.elapsed().as_millis() as u64)
+                                                        .unwrap_or(0);
+                                                    let _ = app.emit("chat:thinking-end", json!({
+                                                        "conversation_id": conversation_id,
+                                                        "duration_ms": duration_ms,
+                                                    }));
+                                                    let after = &content_token[close_pos + "</think>".len()..];
+                                                    if !after.is_empty() {
+                                                        assembled.push_str(after);
+                                                        let _ = app.emit("chat:token", json!({
+                                                            "conversation_id": conversation_id,
+                                                            "content": after,
+                                                            "done": data.done,
+                                                            "prompt_tokens": data.prompt_eval_count,
+                                                            "eval_tokens": data.eval_count,
+                                                        }));
+                                                    }
+                                                } else {
+                                                    thinking_assembled.push_str(content_token);
+                                                    let _ = app.emit("chat:thinking-token", json!({
+                                                        "conversation_id": conversation_id,
+                                                        "content": content_token,
+                                                    }));
+                                                }
+                                            } else if let Some(open_pos) = content_token.find("<think>") {
+                                                // Mode B: think block opens in this token
+                                                let before = &content_token[..open_pos];
+                                                if !before.is_empty() {
+                                                    assembled.push_str(before);
+                                                    let _ = app.emit("chat:token", json!({
+                                                        "conversation_id": conversation_id,
+                                                        "content": before,
+                                                        "done": false,
+                                                        "prompt_tokens": data.prompt_eval_count,
+                                                        "eval_tokens": data.eval_count,
+                                                    }));
+                                                }
                                                 in_think_block = true;
                                                 think_start = Some(std::time::Instant::now());
-                                                if let Err(e) = app.emit("chat:thinking-start", json!({ "conversation_id": conversation_id })) {
-                                                    log::warn!("Failed to emit chat:thinking-start: {} — continuing stream", e);
+                                                let _ = app.emit("chat:thinking-start", json!({ "conversation_id": conversation_id }));
+                                                let after_open = &content_token[open_pos + "<think>".len()..];
+                                                if let Some(close_pos) = after_open.find("</think>") {
+                                                    // Opens and closes in same token
+                                                    let inner = &after_open[..close_pos];
+                                                    thinking_assembled.push_str(inner);
+                                                    in_think_block = false;
+                                                    let duration_ms = think_start
+                                                        .take()
+                                                        .map(|s| s.elapsed().as_millis() as u64)
+                                                        .unwrap_or(0);
+                                                    let _ = app.emit("chat:thinking-end", json!({
+                                                        "conversation_id": conversation_id,
+                                                        "duration_ms": duration_ms,
+                                                    }));
+                                                    let rest = &after_open[close_pos + "</think>".len()..];
+                                                    if !rest.is_empty() {
+                                                        assembled.push_str(rest);
+                                                        let _ = app.emit("chat:token", json!({
+                                                            "conversation_id": conversation_id,
+                                                            "content": rest,
+                                                            "done": data.done,
+                                                            "prompt_tokens": data.prompt_eval_count,
+                                                            "eval_tokens": data.eval_count,
+                                                        }));
+                                                    }
+                                                } else if !after_open.is_empty() {
+                                                    thinking_assembled.push_str(after_open);
+                                                    let _ = app.emit("chat:thinking-token", json!({
+                                                        "conversation_id": conversation_id,
+                                                        "content": after_open,
+                                                    }));
                                                 }
-                                            }
-
-                                            assembled.push_str(content_token);
-                                            if let Err(e) = app.emit("chat:token", json!({
-                                                "conversation_id": conversation_id,
-                                                "content": content_token,
-                                                "done": data.done,
-                                                "prompt_tokens": data.prompt_eval_count,
-                                                "eval_tokens": data.eval_count,
-                                            })) {
-                                                log::warn!("Failed to emit chat:token: {} — continuing stream", e);
-                                            }
-
-                                            if content_token.contains("</think>") && in_think_block {
-                                                in_think_block = false;
-                                                let duration_ms = think_start.take()
-                                                    .map(|s| s.elapsed().as_millis() as u64)
-                                                    .unwrap_or(0);
-                                                if let Err(e) = app.emit("chat:thinking-end", json!({
+                                            } else {
+                                                // Plain content token
+                                                assembled.push_str(content_token);
+                                                if let Err(e) = app.emit("chat:token", json!({
                                                     "conversation_id": conversation_id,
-                                                    "duration_ms": duration_ms,
+                                                    "content": content_token,
+                                                    "done": data.done,
+                                                    "prompt_tokens": data.prompt_eval_count,
+                                                    "eval_tokens": data.eval_count,
                                                 })) {
-                                                    log::warn!("Failed to emit chat:thinking-end: {} — continuing stream", e);
+                                                    log::warn!("Failed to emit chat:token: {} — continuing stream", e);
                                                 }
                                             }
                                         }
@@ -201,14 +263,11 @@ async fn stream_once<R: Runtime>(
                                         if data.done {
                                             // Close any unclosed think block (edge case: stream ended mid-think)
                                             if in_think_block {
-                                                let duration_ms = think_start.take()
+                                                in_think_block = false;
+                                                let duration_ms = think_start
+                                                    .take()
                                                     .map(|s| s.elapsed().as_millis() as u64)
                                                     .unwrap_or(0);
-
-                                                let time_secs = (duration_ms as f64) / 1000.0;
-                                                assembled = assembled.replacen("<think>", &format!("<think time={:.1}>", time_secs), 1);
-                                                assembled.push_str("</think>\n\n");
-
                                                 if let Err(e) = app.emit("chat:thinking-end", json!({
                                                     "conversation_id": conversation_id,
                                                     "duration_ms": duration_ms,
@@ -299,5 +358,77 @@ async fn stream_once<R: Runtime>(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn mode_b_open_close_same_token() {
+        let token = "<think>text</think>answer";
+        let mut assembled = String::new();
+        let mut thinking = String::new();
+
+        if let Some(open) = token.find("<think>") {
+            let before = &token[..open];
+            assembled.push_str(before);
+            let after_open = &token[open + "<think>".len()..];
+            if let Some(close) = after_open.find("</think>") {
+                thinking.push_str(&after_open[..close]);
+                let rest = &after_open[close + "</think>".len()..];
+                assembled.push_str(rest);
+            }
+        }
+
+        assert_eq!(assembled, "answer");
+        assert_eq!(thinking, "text");
+        assert!(!assembled.contains("<think>"));
+        assert!(!assembled.contains("</think>"));
+    }
+
+    #[test]
+    fn mode_b_split_across_tokens() {
+        let token1 = "<think>inner";
+        let token2 = "</think>answer";
+        let mut assembled = String::new();
+        let mut thinking = String::new();
+        let mut in_think_block = false;
+
+        // Token 1: opens think block
+        if let Some(open) = token1.find("<think>") {
+            assembled.push_str(&token1[..open]);
+            in_think_block = true;
+            let after = &token1[open + "<think>".len()..];
+            thinking.push_str(after);
+        }
+
+        // Token 2: closes think block
+        if in_think_block {
+            if let Some(close) = token2.find("</think>") {
+                thinking.push_str(&token2[..close]);
+                in_think_block = false;
+                let after = &token2[close + "</think>".len()..];
+                assembled.push_str(after);
+            }
+        }
+
+        assert!(!in_think_block);
+        assert_eq!(assembled, "answer");
+        assert_eq!(thinking, "inner");
+        assert!(!assembled.contains("<think>"));
+    }
+
+    #[test]
+    fn mode_a_thinking_not_in_assembled() {
+        let mut assembled = String::new();
+        let mut thinking_assembled = String::new();
+        let thinking_token = "I am thinking";
+
+        // Mode A: only goes to thinking_assembled
+        thinking_assembled.push_str(thinking_token);
+        // assembled is NOT touched
+
+        assert!(assembled.is_empty());
+        assert_eq!(thinking_assembled, "I am thinking");
     }
 }
