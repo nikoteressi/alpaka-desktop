@@ -318,10 +318,10 @@ pub fn export_to_markdown_path(
             crate::db::messages::MessageRole::User => "User",
             crate::db::messages::MessageRole::Assistant => "Assistant",
             crate::db::messages::MessageRole::System => "System",
-            crate::db::messages::MessageRole::CompactSummary => continue,
+            crate::db::messages::MessageRole::CompactSummary
+            | crate::db::messages::MessageRole::Tool => continue,
         };
-        let clean = crate::services::chat::strip_history_content(&msg.content);
-        out.push_str(&format!("**{}:**\n\n{}\n\n---\n\n", label, clean));
+        out.push_str(&format!("**{}:**\n\n{}\n\n---\n\n", label, msg.content));
     }
     std::fs::write(path, out)?;
     Ok(())
