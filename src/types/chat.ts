@@ -15,7 +15,7 @@ export type MessagePart = {
 export interface Message {
   id?: string;
   conversation_id?: string;
-  role: "user" | "assistant" | "system" | "compact_summary" | "tool";
+  role: "user" | "assistant" | "system" | "compact_summary";
   content: string;
   images?: Uint8Array[];
   tokens?: number;
@@ -32,15 +32,12 @@ export interface Message {
   siblingOrder?: number;
   siblingCount?: number;
   isActive?: boolean;
-  thinking?: string | null;
-  toolCallsJson?: string | null;
-  toolName?: string | null;
 }
 
 export interface BackendMessage {
   id: string;
   conversation_id: string;
-  role: "user" | "assistant" | "system" | "compact_summary" | "tool";
+  role: "user" | "assistant" | "system" | "compact_summary";
   content: string;
   images_json: string;
   files_json: string;
@@ -58,9 +55,6 @@ export interface BackendMessage {
   sibling_order?: number;
   sibling_count?: number;
   is_active?: boolean;
-  thinking: string | null;
-  tool_calls_json: string | null;
-  tool_name: string | null;
 }
 
 export interface Conversation {

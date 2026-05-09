@@ -311,12 +311,7 @@ const editModalMessage = ref<Message | null>(null);
 
 const messages = computed(() => chatStore.activeMessages);
 const nonSystemMessages = computed(() =>
-  messages.value.filter(
-    (m) =>
-      m.role !== "system" &&
-      m.role !== "tool" &&
-      !(m.role === "assistant" && m.toolCallsJson != null && !m.content),
-  ),
+  messages.value.filter((m) => m.role !== "system"),
 );
 const streaming = computed(() => chatStore.streaming);
 /** Pull progress for the currently selected model in this chat */

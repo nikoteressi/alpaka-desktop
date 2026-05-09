@@ -1,8 +1,52 @@
 import type { MessagePart } from "../types/chat";
 
 // Matches fully-closed blocks (strict — code fence requires closing ```)
-const STRICT_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)\`\`\``;
-const TAIL_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)(?:\`\`\`|$)`;
+const STRICT_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)\`\`\`|<think.*?<\/think>|<tool_call\b[^>]*>.*?<\/tool_call>`;
+const TAIL_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)(?:\`\`\`|$)|<think.*?(?:<\/think>|$)|<tool_call\b[^>]*>(?:.*?<\/tool_call>|.*)`;
+
+function parseThink(matchText: string): MessagePart {
+  const startTagMatch = matchText.match(/^<think([^>]*)>/i);
+  const startTag = startTagMatch ? startTagMatch[1] : "";
+  const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
+  const contentMatch = matchText.match(/^<think[^>]*>(.*)<\/think>$/is);
+  return {
+    type: "think",
+    content: contentMatch
+      ? contentMatch[1]
+      : matchText.replace(/^<think[^>]*>/i, ""),
+    thinkDuration: timeMatch ? parseFloat(timeMatch[1]) : undefined,
+  };
+}
+
+function parseToolCall(matchText: string): MessagePart {
+  const nameM = matchText.match(/\bname="([^"]*)"/i);
+  const queryM = matchText.match(/\bquery="([^"]*)"/i);
+  const openEnd = matchText.indexOf(">");
+  const closeStart = matchText.lastIndexOf("</tool_call>");
+  const rawContent =
+    openEnd >= 0 && closeStart > openEnd
+      ? matchText.slice(openEnd + 1, closeStart)
+      : "";
+
+  let results = undefined;
+  if (nameM?.[1] === "web_search" && rawContent.trim()) {
+    try {
+      const parsed = JSON.parse(rawContent);
+      results = Array.isArray(parsed?.results) ? parsed.results : undefined;
+    } catch {
+      // not JSON
+    }
+  }
+
+  return {
+    type: "tool",
+    toolName: nameM?.[1],
+    toolQuery: queryM?.[1],
+    content: rawContent,
+    toolResults: results,
+    isDone: true, // Finished messages are always done
+  };
+}
 
 function parseCode(match: RegExpExecArray): MessagePart {
   return {
@@ -26,7 +70,12 @@ function pushMarkdown(
 }
 
 export function parseBlockMatch(match: RegExpExecArray): MessagePart | null {
-  if (match[0].startsWith("```")) return parseCode(match);
+  const matchText = match[0];
+  if (matchText.toLowerCase().startsWith("<think"))
+    return parseThink(matchText);
+  if (matchText.toLowerCase().startsWith("<tool_call"))
+    return parseToolCall(matchText);
+  if (matchText.startsWith("```")) return parseCode(match);
   return null;
 }
 

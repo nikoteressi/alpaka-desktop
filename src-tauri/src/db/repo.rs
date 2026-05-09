@@ -59,9 +59,6 @@ impl ConversationRepository {
                 prompt_eval_duration_ms: None,
                 eval_duration_ms: None,
                 seed: None,
-                thinking: None,
-                tool_calls_json: None,
-                tool_name: None,
             };
 
             messages::create(&tx, new_user_msg)?;
@@ -110,9 +107,6 @@ impl ConversationRepository {
                     prompt_eval_duration_ms: metrics.prompt_eval_duration_ms,
                     eval_duration_ms: metrics.eval_duration_ms,
                     seed: metrics.seed,
-                    thinking: None,
-                    tool_calls_json: None,
-                    tool_name: None,
                 },
             )?;
             Ok(())

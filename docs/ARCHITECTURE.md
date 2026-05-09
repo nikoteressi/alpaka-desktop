@@ -110,8 +110,9 @@ alpaka-desktop/
 │       ├── services/             # Business logic layer
 │       │   ├── mod.rs
 │       │   ├── chat/             # ChatService split across files
-│       │   │   ├── mod.rs        # SendParams, send() lifecycle, apply_sliding_window (inline, 0.85 × num_ctx)
+│       │   │   ├── mod.rs        # SendParams, send() lifecycle
 │       │   │   ├── compact.rs    # Conversation summarisation flow
+│       │   │   ├── context.rs    # apply_sliding_window (0.85 × num_ctx)
 │       │   │   └── orchestrator.rs # Agent loop (tool calls, max 5 iters)
 │       │   ├── library.rs        # LibraryService: scrape ollama.com/library
 │       │   ├── model_updates.rs  # ModelUpdateService: background 6h loop, digest comparison, do_update_check
@@ -121,7 +122,7 @@ alpaka-desktop/
 │       ├── ollama/               # Ollama API client
 │       │   ├── mod.rs
 │       │   ├── client.rs         # HTTP client (reqwest), host routing
-│       │   ├── streaming.rs      # NDJSON stream parser; routes message.thinking (Mode A) and embedded <think> content (Mode B) to thinking_assembled; no XML injected into content
+│       │   ├── streaming.rs      # NDJSON stream parser, think-tag detection
 │       │   ├── types.rs          # API request/response types
 │       │   └── search.rs         # Web search API integration
 │       │
@@ -265,7 +266,7 @@ alpaka-desktop/
 │   ├── lib/
 │   │   ├── tauri.ts               # Typed invoke() wrappers
 │   │   ├── markdown.ts            # markdown-it + Shiki + KaTeX pipeline
-│   │   ├── messageParser.ts       # Block-level message parser; handles code fences and plain markdown only (think/tool_call branches removed)
+│   │   ├── messageParser.ts       # Block-level message parser (code / think / tool_call / markdown parts)
 │   │   ├── appEvents.ts           # App-level custom event bus (APP_EVENT: FOCUS_SEARCH, OPEN_MODEL_SWITCHER, OPEN_HOST_MANAGER)
 │   │   ├── clipboard.ts           # Clipboard write with secure-context check
 │   │   ├── urlOpener.ts           # Cross-platform URL open helper
@@ -526,10 +527,8 @@ Ollama API ──(NDJSON stream)──► Rust (reqwest bytes_stream)
                                        │
                            ┌───────────▼────────────┐
                            │   streaming.rs          │
-                           │   routes message.thinking│
-                           │   field (Mode A) and    │
-                           │   embedded <think> (B)  │
-                           │   to thinking_assembled │
+                           │   detect <think> tags   │
+                           │   detect tool calls     │
                            └───────────┬────────────┘
                                        │ app.emit(event, payload)
                                        │
@@ -651,8 +650,8 @@ The `services/` directory owns business logic. Command handlers are thin adapter
 
 ### 6.1 ChatService (`services/chat/`)
 
-Split into three files: `mod.rs` (entry + `send()`, includes inline sliding-window truncation with tool-chain atomicity guard),
-`compact.rs` (summarisation), `orchestrator.rs` (agent loop). History building uses native field mapping (`tool_calls_json`, `thinking`) — no XML parsing.
+Split into four files: `mod.rs` (entry + `send()`), `context.rs` (sliding window),
+`compact.rs` (summarisation), `orchestrator.rs` (agent loop).
 
 ```rust
 pub struct SendParams {
@@ -692,16 +691,21 @@ impl<R: Runtime> ChatService<'_, R> {
     /// Regenerate an assistant response as a new sibling branch:
     /// 1. Create a sibling message record (db::messages::create_sibling)
     /// 2. Activate the new sibling (db::messages::set_active_sibling)
-    /// 3. Load active-path history using native field mapping (thinking, tool_calls_json)
+    /// 3. Load active-path history, strip <think>/<tool_call> blocks via strip_history_content()
     /// 4. Stream a new response via the agent loop
     /// 5. Persist and emit chat:done
     pub async fn send_regenerate(&self, params: RegenerateParams) -> Result<(), AppError>;
 }
+
+/// Strips <think> and <tool_call> blocks from assistant message content
+/// before it is included in the LLM history context.
+/// Called by send_regenerate() and send() to keep context clean.
+pub fn strip_history_content(content: &str) -> String;
 ```
 
-Sliding-window logic (inline in `services/chat/mod.rs`): walks history in reverse,
+Sliding-window logic (`services/chat/context.rs`): walks history in reverse,
 estimating tokens as `content.len() / 4`, accumulating until `budget` is
-reached. System messages and complete tool-call chains are always preserved atomically.
+reached. System messages at the head of the message list are always preserved.
 
 ### 6.2 PromptService (`services/prompt.rs`)
 
@@ -907,7 +911,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE TABLE IF NOT EXISTS messages (
     id                      TEXT    PRIMARY KEY NOT NULL,
     conversation_id         TEXT    NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-    role                    TEXT    NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+    role                    TEXT    NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
     content                 TEXT    NOT NULL DEFAULT '',
     images_json             TEXT    NOT NULL DEFAULT '[]',
     files_json              TEXT    NOT NULL DEFAULT '[]',
@@ -925,12 +929,7 @@ CREATE TABLE IF NOT EXISTS messages (
     sibling_order           INTEGER NOT NULL DEFAULT 0,
     is_active               INTEGER NOT NULL DEFAULT 1,
     -- compaction columns (migration v15)
-    is_archived             INTEGER NOT NULL DEFAULT 0,
-    -- native roles columns (migration v17)
-    thinking                TEXT,                          -- nullable; stored thinking content from reasoning models
-    tool_calls_json         TEXT,                          -- nullable; JSON array of tool calls for intermediate assistant messages
-    tool_name               TEXT                           -- nullable; tool name for role=tool messages
-    -- role CHECK extended to include 'tool' in migration v17
+    is_archived             INTEGER NOT NULL DEFAULT 0
 );
 
 -- compaction_events (migration v15)

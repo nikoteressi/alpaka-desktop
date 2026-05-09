@@ -64,8 +64,7 @@ A **first-class, lightweight Linux desktop client** for Ollama that:
 | C-10 | **Chat backup & restore** | P1 | ⚠️ | Raw SQLite backup/restore wired in `Settings → Maintenance`; no per-conversation JSON import/export UI |
 | C-11 | **Compact / TWM mode** | P1 | ⚠️ | `Ctrl+Shift+M` collapses the 48 px icon strip (`App.vue:14`). Padding, font sizes and the top-bar layout described in §3.6 are **not** implemented |
 | C-12 | **Conversation summarisation (Compact)** | P1 | ✅ | In-place compaction: messages soft-archived (migration v15 `is_archived` + `compaction_events` table), streaming summary progress bar in ChatInput, expandable history toggle via `CompactSummaryBubble.vue`, background support with sidebar spinner, cancel button, compaction model setting in Settings → General (`services/chat/compact.rs`) |
-| C-13 | **Sliding-window context truncation** | P0 | ✅ | Automatic on every send; trims oldest user/assistant messages to fit `0.85 × num_ctx`; inline in `services/chat/mod.rs` with tool-chain atomicity guard |
-| C-17 | **Native message roles storage (#164)** | P1 | ✅ | Thinking content stored in native `thinking` DB column; tool-call exchanges stored as chained messages (`role=assistant/tool_calls` → `role=tool` → `role=assistant/final`); one-time startup migration backfills existing data; XML-parsing code removed from Rust and frontend |
+| C-13 | **Sliding-window context truncation** | P0 | ✅ | Automatic on every send; trims oldest user/assistant messages to fit `0.85 × num_ctx` (`services/chat/context.rs`) |
 | C-14 | **Stop generation** | P0 | ✅ | `Escape` key + Send button toggles to "Stop" while streaming; cancel via `tokio::broadcast` channel |
 | C-15 | **Drafts per-conversation** | P1 | ✅ | Input + advanced options auto-saved per conversation (`useDraftSync`) |
 | C-16 | **Undo/redo in chat input** | P1 | ✅ | Custom history stack (`Ctrl+Z` / `Ctrl+Shift+Z`); needed because WebKitGTK on Wayland doesn't drive native undo |

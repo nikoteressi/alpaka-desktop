@@ -32,23 +32,20 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         // 2. Build dialogue from user+assistant turns (plus prior compact summary for re-compaction)
         let dialogue: String = history
             .iter()
-            .filter_map(|m| {
-                // Skip pure tool-dispatch rows (assistant with tool_calls but no content)
-                if m.role == messages::MessageRole::Assistant
-                    && m.tool_calls_json.is_some()
-                    && m.content.is_empty()
-                {
-                    return None;
-                }
+            .filter(|m| {
+                matches!(
+                    m.role,
+                    messages::MessageRole::User
+                        | messages::MessageRole::Assistant
+                        | messages::MessageRole::CompactSummary
+                )
+            })
+            .map(|m| {
                 let label = match m.role {
                     messages::MessageRole::CompactSummary => "PREVIOUS SUMMARY".to_string(),
-                    messages::MessageRole::Tool => "TOOL RESULT".to_string(),
-                    messages::MessageRole::User | messages::MessageRole::Assistant => {
-                        m.role.as_str().to_uppercase()
-                    }
-                    _ => return None,
+                    _ => m.role.as_str().to_uppercase(),
                 };
-                Some(format!("{label}: {}", m.content))
+                format!("{label}: {}", m.content)
             })
             .collect::<Vec<_>>()
             .join("\n\n");
@@ -62,9 +59,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             .filter(|m| {
                 matches!(
                     m.role,
-                    messages::MessageRole::User
-                        | messages::MessageRole::Assistant
-                        | messages::MessageRole::Tool
+                    messages::MessageRole::User | messages::MessageRole::Assistant
                 )
             })
             .count();
@@ -252,9 +247,6 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     prompt_eval_duration_ms: None,
                     eval_duration_ms: None,
                     seed: None,
-                    thinking: None,
-                    tool_calls_json: None,
-                    tool_name: None,
                 },
             )?;
             tx.commit()?;
