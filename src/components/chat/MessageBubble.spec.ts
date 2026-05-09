@@ -108,7 +108,13 @@ describe("MessageBubble.vue", () => {
         id: "t1",
         role: "tool",
         content: JSON.stringify({
-          results: [{ title: "Result", url: "https://example.com", snippet: "A snippet" }],
+          results: [
+            {
+              title: "Result",
+              url: "https://example.com",
+              snippet: "A snippet",
+            },
+          ],
         }),
         toolName: "web_search",
       },
@@ -156,7 +162,11 @@ describe("MessageBubble.vue", () => {
   it("loadedThinkPart — renders native ThinkBlock when message.thinking is set and not streaming", async () => {
     const wrapper = mount(MessageBubble, {
       props: {
-        message: { role: "assistant", content: "Answer", thinking: "inner thoughts" },
+        message: {
+          role: "assistant",
+          content: "Answer",
+          thinking: "inner thoughts",
+        },
         isStreaming: false,
       },
     });
@@ -203,7 +213,11 @@ describe("MessageBubble.vue", () => {
   it("onRegenerate — emits regenerate with the message parentId", async () => {
     const wrapper = mount(MessageBubble, {
       props: {
-        message: { role: "assistant", content: "Answer", parentId: "parent-123" },
+        message: {
+          role: "assistant",
+          content: "Answer",
+          parentId: "parent-123",
+        },
         isStreaming: false,
       },
     });
