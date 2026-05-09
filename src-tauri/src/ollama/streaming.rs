@@ -65,13 +65,15 @@ async fn stream_once<R: Runtime>(
         };
 
         log::error!("Ollama API returned error: {}", err_msg);
-        let _ = app.emit(
+        if let Err(e) = app.emit(
             "chat:error",
             json!({
                 "conversation_id": conversation_id,
                 "error": err_msg
             }),
-        );
+        ) {
+            log::warn!("Failed to emit chat:error: {} — continuing", e);
+        }
         return Err(AppError::Http(err_msg));
     }
 
@@ -86,9 +88,11 @@ async fn stream_once<R: Runtime>(
     loop {
         tokio::select! {
             _ = cancel_rx.recv() => {
-                let _ = app.emit("chat:cancelled", serde_json::json!({
+                if let Err(e) = app.emit("chat:cancelled", serde_json::json!({
                     "conversation_id": conversation_id,
-                }));
+                })) {
+                    log::warn!("Failed to emit chat:cancelled: {} — continuing", e);
+                }
                 return Err(AppError::Cancelled);
             }
             chunk_res = stream.next() => {
@@ -160,85 +164,111 @@ async fn stream_once<R: Runtime>(
                                                     let inner = &content_token[..close_pos];
                                                     if !inner.is_empty() {
                                                         thinking_assembled.push_str(inner);
-                                                        let _ = app.emit("chat:thinking-token", json!({
+                                                        if let Err(e) = app.emit("chat:thinking-token", json!({
                                                             "conversation_id": conversation_id,
                                                             "content": inner,
-                                                        }));
+                                                        })) {
+                                                            log::warn!("Failed to emit chat:thinking-token: {} — continuing stream", e);
+                                                        }
                                                     }
                                                     in_think_block = false;
                                                     let duration_ms = think_start
                                                         .take()
                                                         .map(|s| s.elapsed().as_millis() as u64)
                                                         .unwrap_or(0);
-                                                    let _ = app.emit("chat:thinking-end", json!({
+                                                    if let Err(e) = app.emit("chat:thinking-end", json!({
                                                         "conversation_id": conversation_id,
                                                         "duration_ms": duration_ms,
-                                                    }));
+                                                    })) {
+                                                        log::warn!("Failed to emit chat:thinking-end: {} — continuing stream", e);
+                                                    }
                                                     let after = &content_token[close_pos + "</think>".len()..];
                                                     if !after.is_empty() {
                                                         assembled.push_str(after);
-                                                        let _ = app.emit("chat:token", json!({
+                                                        if let Err(e) = app.emit("chat:token", json!({
                                                             "conversation_id": conversation_id,
                                                             "content": after,
                                                             "done": data.done,
                                                             "prompt_tokens": data.prompt_eval_count,
                                                             "eval_tokens": data.eval_count,
-                                                        }));
+                                                        })) {
+                                                            log::warn!("Failed to emit chat:token: {} — continuing stream", e);
+                                                        }
                                                     }
                                                 } else {
                                                     thinking_assembled.push_str(content_token);
-                                                    let _ = app.emit("chat:thinking-token", json!({
+                                                    if let Err(e) = app.emit("chat:thinking-token", json!({
                                                         "conversation_id": conversation_id,
                                                         "content": content_token,
-                                                    }));
+                                                    })) {
+                                                        log::warn!("Failed to emit chat:thinking-token: {} — continuing stream", e);
+                                                    }
                                                 }
                                             } else if let Some(open_pos) = content_token.find("<think>") {
                                                 // Mode B: think block opens in this token
                                                 let before = &content_token[..open_pos];
                                                 if !before.is_empty() {
                                                     assembled.push_str(before);
-                                                    let _ = app.emit("chat:token", json!({
+                                                    if let Err(e) = app.emit("chat:token", json!({
                                                         "conversation_id": conversation_id,
                                                         "content": before,
                                                         "done": false,
                                                         "prompt_tokens": data.prompt_eval_count,
                                                         "eval_tokens": data.eval_count,
-                                                    }));
+                                                    })) {
+                                                        log::warn!("Failed to emit chat:token: {} — continuing stream", e);
+                                                    }
                                                 }
                                                 in_think_block = true;
                                                 think_start = Some(std::time::Instant::now());
-                                                let _ = app.emit("chat:thinking-start", json!({ "conversation_id": conversation_id }));
+                                                if let Err(e) = app.emit("chat:thinking-start", json!({ "conversation_id": conversation_id })) {
+                                                    log::warn!("Failed to emit chat:thinking-start: {} — continuing stream", e);
+                                                }
                                                 let after_open = &content_token[open_pos + "<think>".len()..];
                                                 if let Some(close_pos) = after_open.find("</think>") {
                                                     // Opens and closes in same token
                                                     let inner = &after_open[..close_pos];
                                                     thinking_assembled.push_str(inner);
+                                                    if !inner.is_empty() {
+                                                        if let Err(e) = app.emit("chat:thinking-token", json!({
+                                                            "conversation_id": conversation_id,
+                                                            "content": inner,
+                                                        })) {
+                                                            log::warn!("Failed to emit chat:thinking-token: {} — continuing stream", e);
+                                                        }
+                                                    }
                                                     in_think_block = false;
                                                     let duration_ms = think_start
                                                         .take()
                                                         .map(|s| s.elapsed().as_millis() as u64)
                                                         .unwrap_or(0);
-                                                    let _ = app.emit("chat:thinking-end", json!({
+                                                    if let Err(e) = app.emit("chat:thinking-end", json!({
                                                         "conversation_id": conversation_id,
                                                         "duration_ms": duration_ms,
-                                                    }));
+                                                    })) {
+                                                        log::warn!("Failed to emit chat:thinking-end: {} — continuing stream", e);
+                                                    }
                                                     let rest = &after_open[close_pos + "</think>".len()..];
                                                     if !rest.is_empty() {
                                                         assembled.push_str(rest);
-                                                        let _ = app.emit("chat:token", json!({
+                                                        if let Err(e) = app.emit("chat:token", json!({
                                                             "conversation_id": conversation_id,
                                                             "content": rest,
                                                             "done": data.done,
                                                             "prompt_tokens": data.prompt_eval_count,
                                                             "eval_tokens": data.eval_count,
-                                                        }));
+                                                        })) {
+                                                            log::warn!("Failed to emit chat:token: {} — continuing stream", e);
+                                                        }
                                                     }
                                                 } else if !after_open.is_empty() {
                                                     thinking_assembled.push_str(after_open);
-                                                    let _ = app.emit("chat:thinking-token", json!({
+                                                    if let Err(e) = app.emit("chat:thinking-token", json!({
                                                         "conversation_id": conversation_id,
                                                         "content": after_open,
-                                                    }));
+                                                    })) {
+                                                        log::warn!("Failed to emit chat:thinking-token: {} — continuing stream", e);
+                                                    }
                                                 }
                                             } else {
                                                 // Plain content token
@@ -310,10 +340,12 @@ async fn stream_once<R: Runtime>(
                                         if let Ok(err_val) = serde_json::from_str::<serde_json::Value>(&line) {
                                             if let Some(err_msg) = err_val.get("error").and_then(|v| v.as_str()) {
                                                 log::warn!("Ollama returned an error: {}", err_msg);
-                                                let _ = app.emit("chat:error", json!({
+                                                if let Err(emit_err) = app.emit("chat:error", json!({
                                                     "conversation_id": conversation_id,
                                                     "error": err_msg
-                                                }));
+                                                })) {
+                                                    log::warn!("Failed to emit chat:error: {} — continuing", emit_err);
+                                                }
                                                 return Err(AppError::Http(err_msg.to_string()));
                                             }
                                         }
