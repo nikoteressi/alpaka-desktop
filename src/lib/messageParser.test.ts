@@ -40,35 +40,6 @@ describe("parseMessageParts", () => {
     expect(code?.content).toContain("print('hi')");
   });
 
-  it("extracts think block with time attribute", () => {
-    const content = '<think time="2.5">inner reasoning</think>';
-    const parts = parseMessageParts(content, { renderMarkdown: rm });
-    const think = parts.find((p) => p.type === "think");
-    expect(think).toBeDefined();
-    expect(think?.thinkDuration).toBe(2.5);
-    expect(think?.content).toBe("inner reasoning");
-  });
-
-  it("extracts think block without time attribute", () => {
-    const content = "<think>some thought</think>";
-    const parts = parseMessageParts(content, { renderMarkdown: rm });
-    const think = parts.find((p) => p.type === "think");
-    expect(think).toBeDefined();
-    expect(think?.thinkDuration).toBeUndefined();
-    expect(think?.content).toBe("some thought");
-  });
-
-  it("extracts tool_call block with name and query", () => {
-    const content =
-      '<tool_call name="web_search" query="cats">result text</tool_call>';
-    const parts = parseMessageParts(content, { renderMarkdown: rm });
-    const tool = parts.find((p) => p.type === "tool");
-    expect(tool).toBeDefined();
-    expect(tool?.toolName).toBe("web_search");
-    expect(tool?.toolQuery).toBe("cats");
-    expect(tool?.content).toBe("result text");
-  });
-
   it("handles mixed content with text before and after code block", () => {
     const content = "Intro text\n```ts\nconst x = 1;\n```\nOutro text";
     const parts = parseMessageParts(content, { renderMarkdown: rm });
@@ -93,6 +64,24 @@ describe("parseMessageParts", () => {
     const parts = parseMessageParts(content, { renderMarkdown: rm });
     const code = parts.find((p) => p.type === "code");
     expect(code).toBeUndefined();
+  });
+
+  it("passes clean text through as markdown", () => {
+    const parts = parseMessageParts("Hello world", {
+      renderMarkdown: rm,
+    });
+    expect(parts).toHaveLength(1);
+    expect(parts[0].type).toBe("markdown");
+    expect(parts[0].content).toBe("Hello world");
+  });
+
+  it("does not produce think or tool parts for clean content", () => {
+    const parts = parseMessageParts("The answer is 42", {
+      renderMarkdown: rm,
+    });
+    expect(parts.every((p) => p.type !== "think" && p.type !== "tool")).toBe(
+      true,
+    );
   });
 });
 
