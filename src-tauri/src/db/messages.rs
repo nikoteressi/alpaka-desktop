@@ -30,6 +30,9 @@ pub struct Message {
     pub is_active: bool,
     pub sibling_count: i64,
     pub is_archived: bool,
+    pub thinking: Option<String>,
+    pub tool_calls_json: Option<String>,
+    pub tool_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -40,6 +43,7 @@ pub enum MessageRole {
     System,
     #[serde(rename = "compact_summary")]
     CompactSummary,
+    Tool,
 }
 
 impl MessageRole {
@@ -49,6 +53,7 @@ impl MessageRole {
             MessageRole::Assistant => "assistant",
             MessageRole::System => "system",
             MessageRole::CompactSummary => "compact_summary",
+            MessageRole::Tool => "tool",
         }
     }
 }
@@ -62,6 +67,7 @@ impl std::str::FromStr for MessageRole {
             "assistant" => Ok(MessageRole::Assistant),
             "system" => Ok(MessageRole::System),
             "compact_summary" => Ok(MessageRole::CompactSummary),
+            "tool" => Ok(MessageRole::Tool),
             other => Err(AppError::Internal(format!("Unknown role: '{other}'"))),
         }
     }
@@ -87,6 +93,9 @@ pub struct NewMessage {
     pub prompt_eval_duration_ms: Option<i64>,
     pub eval_duration_ms: Option<i64>,
     pub seed: Option<i64>,
+    pub thinking: Option<String>,
+    pub tool_calls_json: Option<String>,
+    pub tool_name: Option<String>,
 }
 
 impl Default for NewMessage {
@@ -109,6 +118,9 @@ impl Default for NewMessage {
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
             seed: None,
+            thinking: None,
+            tool_calls_json: None,
+            tool_name: None,
         }
     }
 }
@@ -141,6 +153,9 @@ fn row_to_message(row: &rusqlite::Row<'_>) -> rusqlite::Result<Message> {
         is_active: is_active_int != 0,
         sibling_count: row.get(19).unwrap_or(1),
         is_archived: is_archived_int != 0,
+        thinking: row.get(21)?,
+        tool_calls_json: row.get(22)?,
+        tool_name: row.get(23)?,
     })
 }
 
@@ -167,7 +182,8 @@ pub fn list_for_conversation(
          SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at, parent_id, sibling_order, is_active, sibling_count, is_archived
+                seed, created_at, parent_id, sibling_order, is_active, sibling_count, is_archived,
+                thinking, tool_calls_json, tool_name
          FROM active_path ORDER BY created_at ASC",
     )?;
 
@@ -189,8 +205,9 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
              (id, conversation_id, role, content, images_json, files_json,
               tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
               total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-              seed, created_at, parent_id, sibling_order, is_active)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+              seed, created_at, parent_id, sibling_order, is_active,
+              thinking, tool_calls_json, tool_name)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
         params![
             id,
             new.conversation_id,
@@ -211,6 +228,9 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
             new.parent_id,
             new.sibling_order,
             is_active_int,
+            new.thinking,
+            new.tool_calls_json,
+            new.tool_name,
         ],
     )?;
 
@@ -218,7 +238,8 @@ pub fn create(conn: &Connection, new: NewMessage) -> Result<Message, AppError> {
         "SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count, is_archived
+                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count, is_archived,
+                thinking, tool_calls_json, tool_name
          FROM messages WHERE id = ?1",
         params![id],
         row_to_message,
@@ -248,7 +269,8 @@ pub fn get_siblings(conn: &Connection, parent_id: &str) -> Result<Vec<Message>, 
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
                 seed, created_at, parent_id, sibling_order, is_active,
-                (SELECT COUNT(*) FROM messages s WHERE s.parent_id = ?1) as sibling_count, is_archived
+                (SELECT COUNT(*) FROM messages s WHERE s.parent_id = ?1) as sibling_count, is_archived,
+                thinking, tool_calls_json, tool_name
          FROM messages WHERE parent_id = ?1 ORDER BY sibling_order ASC",
     )?;
     let rows = stmt.query_map(params![parent_id], row_to_message)?;
@@ -387,7 +409,8 @@ pub fn list_archived_for_conversation(
         "SELECT id, conversation_id, role, content, images_json, files_json,
                 tokens_used, generation_time_ms, prompt_tokens, tokens_per_sec,
                 total_duration_ms, load_duration_ms, prompt_eval_duration_ms, eval_duration_ms,
-                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count, is_archived
+                seed, created_at, parent_id, sibling_order, is_active, 1 as sibling_count, is_archived,
+                thinking, tool_calls_json, tool_name
          FROM messages
          WHERE conversation_id = ?1 AND is_archived = 1
          ORDER BY created_at ASC",
@@ -825,5 +848,48 @@ mod tests {
         .unwrap();
         assert_eq!(msg.role, MessageRole::CompactSummary);
         assert_eq!(msg.role.as_str(), "compact_summary");
+    }
+
+    #[test]
+    fn thinking_and_tool_fields_round_trip() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+        let msg = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid,
+                role: MessageRole::Assistant,
+                content: "answer".to_string(),
+                thinking: Some("I thought about this".to_string()),
+                tool_calls_json: Some(
+                    r#"[{"type":"function","function":{"name":"web_search","arguments":{"query":"rust"}}}]"#
+                        .to_string(),
+                ),
+                tool_name: None,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(msg.thinking.as_deref(), Some("I thought about this"));
+        assert!(msg.tool_calls_json.is_some());
+    }
+
+    #[test]
+    fn tool_role_round_trip() {
+        let conn = in_memory_conn();
+        let cid = make_conversation(&conn);
+        let msg = create(
+            &conn,
+            NewMessage {
+                conversation_id: cid,
+                role: MessageRole::Tool,
+                content: r#"{"results":[]}"#.to_string(),
+                tool_name: Some("web_search".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(msg.role, MessageRole::Tool);
+        assert_eq!(msg.tool_name.as_deref(), Some("web_search"));
     }
 }

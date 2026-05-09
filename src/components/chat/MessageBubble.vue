@@ -102,15 +102,52 @@ const unifiedGroups = computed(() => {
   return groups;
 });
 
+const toolMessages = computed(() => {
+  if (props.isStreaming || props.message.role !== "assistant") return [];
+  const convId = chatStore.activeConversationId;
+  if (!convId || !props.messageId) return [];
+  const allMsgs = chatStore.messages[convId] ?? [];
+  const myIdx = allMsgs.findIndex((m) => m.id === props.messageId);
+  if (myIdx < 0) return [];
+  const result: import("../../types/chat").Message[] = [];
+  for (let i = myIdx - 1; i >= 0; i--) {
+    if (allMsgs[i].role === "tool") {
+      result.unshift(allMsgs[i]);
+    } else {
+      break;
+    }
+  }
+  return result;
+});
+
 // Detect if any search results exist in the message for the final badge
 const finalSearchResults = computed(() => {
   if (props.isStreaming) return chatStore.streaming.searchResults;
-  const toolParts = displayParts.value.filter(
-    (p) => p.type === "tool" && p.toolName === "web_search",
-  );
-  if (toolParts.length === 0) return [];
-  return toolParts[toolParts.length - 1].toolResults || [];
+  // Collect search results from adjacent role=tool messages (native DB format)
+  if (!toolMessages.value.length) return [];
+  const searchMsg = [...toolMessages.value]
+    .reverse()
+    .find((m) => m.toolName === "web_search");
+  if (!searchMsg || !searchMsg.content) return [];
+  try {
+    const parsed = JSON.parse(searchMsg.content) as {
+      results?: import("../../types/chat").SearchResult[];
+    };
+    return Array.isArray(parsed?.results) ? parsed.results : [];
+  } catch {
+    return [];
+  }
 });
+
+const loadedThinkPart = computed(
+  (): import("../../types/chat").MessagePart | null => {
+    if (props.isStreaming || !props.message.thinking) return null;
+    return {
+      type: "think",
+      content: props.message.thinking,
+    };
+  },
+);
 
 function isThoughtGroupVisible(
   group: { parts: MessagePart[] },
@@ -174,6 +211,17 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
       class="assistant-content rendered-markdown-container"
       :class="{ 'opacity-40': isRegenerating }"
     >
+      <!-- Thinking block from native DB field (non-streaming) -->
+      <ThinkBlock
+        v-if="!isStreaming && loadedThinkPart"
+        :parts="[loadedThinkPart]"
+        :is-thinking="false"
+        :is-overall-streaming="false"
+        :think-time="null"
+        :message-id="messageId"
+        :message-key="`${messageId}-think-native`"
+      />
+
       <template v-for="(group, gIdx) in unifiedGroups" :key="gIdx">
         <ThinkBlock
           v-if="group.type === 'thought' && isThoughtGroupVisible(group, gIdx)"

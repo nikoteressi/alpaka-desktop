@@ -414,6 +414,9 @@ async fn test_create_conversation_and_get_messages() {
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
             seed: None,
+            thinking: None,
+            tool_calls_json: None,
+            tool_name: None,
         },
     )
     .unwrap();
@@ -438,6 +441,9 @@ async fn test_create_conversation_and_get_messages() {
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
             seed: None,
+            thinking: None,
+            tool_calls_json: None,
+            tool_name: None,
         },
     )
     .unwrap();
@@ -673,6 +679,111 @@ async fn test_chunked_boundary_streaming() {
         *done_received.lock().unwrap(),
         "chat:done not received after chunked boundary stream"
     );
+}
+
+mod native_roles {
+    use alpaka_desktop_lib::db::{messages, migrations};
+
+    fn in_memory_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        migrations::run(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO conversations (id, title, model) VALUES ('c1', 'T', 'm')",
+            [],
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn tool_chain_messages_round_trip() {
+        let conn = in_memory_conn();
+
+        // User message
+        let user = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::User,
+                content: "What is the weather?".to_string(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // Intermediate assistant (tool dispatch)
+        let asst_tool = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "".to_string(),
+                parent_id: Some(user.id.clone()),
+                tool_calls_json: Some(r#"[{"type":"function","function":{"name":"web_search","arguments":{"query":"weather"}}}]"#.to_string()),
+                thinking: Some("I should search for this".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(asst_tool.tool_calls_json.is_some());
+        assert!(asst_tool.content.is_empty());
+
+        // Tool result
+        let tool_result = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Tool,
+                content: r#"{"results":[{"title":"Weather","url":"https://example.com","content":"Sunny 72°F"}]}"#.to_string(),
+                parent_id: Some(asst_tool.id.clone()),
+                tool_name: Some("web_search".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(tool_result.role, messages::MessageRole::Tool);
+        assert_eq!(tool_result.tool_name.as_deref(), Some("web_search"));
+
+        // Final assistant answer
+        let asst_final = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "The weather is sunny and 72°F.".to_string(),
+                parent_id: Some(tool_result.id.clone()),
+                thinking: Some("The search results show sunny 72°F".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(asst_final.content, "The weather is sunny and 72°F.");
+        assert!(!asst_final.content.contains("<tool_call>"));
+        assert!(!asst_final.content.contains("<think>"));
+
+        // Verify active path traversal includes all four messages
+        let path = messages::list_for_conversation(&conn, "c1").unwrap();
+        assert_eq!(
+            path.len(),
+            4,
+            "active path must include user + asst_tool + tool_result + asst_final"
+        );
+        assert_eq!(path[1].role, messages::MessageRole::Assistant);
+        assert!(path[1].tool_calls_json.is_some());
+        assert_eq!(path[2].role, messages::MessageRole::Tool);
+        assert_eq!(path[3].role, messages::MessageRole::Assistant);
+        assert!(path[3].tool_calls_json.is_none());
+    }
 }
 
 // ── Chat options / preset forwarding ─────────────────────────────────────────

@@ -3,11 +3,7 @@
 // commands/chat.rs::send_message and compact_conversation are thin adapters that delegate here.
 
 mod compact;
-mod context;
 mod orchestrator;
-
-pub(crate) use context::apply_sliding_window;
-pub(crate) use context::strip_history_content;
 
 use crate::db::repo::AssistantMetrics;
 use crate::db::{messages, spawn_db};
@@ -57,7 +53,9 @@ pub struct ChatService<'a, R: Runtime> {
 /// The result of a successfully completed orchestration.
 pub struct OrchestrationResult {
     pub content: String,
+    pub thinking: Option<String>,
     pub metrics: AssistantMetrics,
+    pub last_parent_id: Option<String>,
 }
 
 impl<'a, R: Runtime> ChatService<'a, R> {
@@ -122,6 +120,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     prompt_eval_duration_ms: None,
                     eval_duration_ms: None,
                     seed: None,
+                    thinking: None,
+                    tool_calls_json: None,
+                    tool_name: None,
                 },
             )?;
 
@@ -167,7 +168,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             });
         }
 
-        for msg in history {
+        for msg in &history {
             let msg_imgs: Option<Vec<String>> =
                 if msg.images_json != "[]" && !msg.images_json.is_empty() {
                     serde_json::from_str(&msg.images_json).map_err(|e| {
@@ -176,19 +177,44 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 } else {
                     None
                 };
-            let content = if msg.role.as_str() == "assistant" {
-                context::strip_history_content(&msg.content)
-            } else {
-                msg.content
-            };
-            initial_messages.push(Message {
-                role: msg.role.as_str().to_string(),
-                content,
-                images: msg_imgs,
-                thinking: None,
-                tool_calls: None,
-                name: None,
-            });
+
+            match msg.role {
+                messages::MessageRole::Tool => {
+                    initial_messages.push(Message {
+                        role: "tool".to_string(),
+                        content: msg.content.clone(),
+                        images: None,
+                        thinking: None,
+                        tool_calls: None,
+                        name: msg.tool_name.clone(),
+                    });
+                }
+                messages::MessageRole::Assistant => {
+                    let tool_calls = msg.tool_calls_json.as_deref().and_then(|j| {
+                        serde_json::from_str::<Vec<crate::ollama::types::ToolCall>>(j)
+                            .map_err(|e| log::warn!("Failed to parse tool_calls_json: {e}"))
+                            .ok()
+                    });
+                    initial_messages.push(Message {
+                        role: "assistant".to_string(),
+                        content: msg.content.clone(),
+                        images: None,
+                        thinking: msg.thinking.clone(),
+                        tool_calls,
+                        name: None,
+                    });
+                }
+                _ => {
+                    initial_messages.push(Message {
+                        role: msg.role.as_str().to_string(),
+                        content: msg.content.clone(),
+                        images: msg_imgs,
+                        thinking: None,
+                        tool_calls: None,
+                        name: None,
+                    });
+                }
+            }
         }
 
         // 3. Build think param
@@ -271,6 +297,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 tools,
                 options,
                 Some(original_content.as_str()),
+                user_msg_id.clone(),
             ),
         )
         .await
@@ -297,6 +324,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             let conv_id = conversation_id.clone();
             let m = result.metrics;
             let final_content = result.content;
+            let final_thinking = result.thinking;
+            let parent = result.last_parent_id.unwrap_or_else(|| user_msg_id.clone());
             spawn_db(self.state.db.clone(), move |conn| {
                 messages::create(
                     conn,
@@ -304,11 +333,10 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         conversation_id: conv_id,
                         role: messages::MessageRole::Assistant,
                         content: final_content,
-                        parent_id: Some(user_msg_id),
+                        parent_id: Some(parent),
+                        thinking: final_thinking,
                         sibling_order: 0,
                         is_active: true,
-                        images_json: None,
-                        files_json: None,
                         tokens_used: m.tokens_used,
                         generation_time_ms: m.generation_time_ms,
                         prompt_tokens: m.prompt_tokens,
@@ -318,6 +346,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         prompt_eval_duration_ms: m.prompt_eval_duration_ms,
                         eval_duration_ms: m.eval_duration_ms,
                         seed: m.seed,
+                        ..Default::default()
                     },
                 )
             })
@@ -388,7 +417,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             });
         }
 
-        for msg in history {
+        for msg in &history {
             let msg_imgs: Option<Vec<String>> =
                 if msg.images_json != "[]" && !msg.images_json.is_empty() {
                     serde_json::from_str(&msg.images_json).map_err(|e| {
@@ -397,19 +426,44 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 } else {
                     None
                 };
-            let content = if msg.role.as_str() == "assistant" {
-                context::strip_history_content(&msg.content)
-            } else {
-                msg.content
-            };
-            initial_messages.push(Message {
-                role: msg.role.as_str().to_string(),
-                content,
-                images: msg_imgs,
-                thinking: None,
-                tool_calls: None,
-                name: None,
-            });
+
+            match msg.role {
+                messages::MessageRole::Tool => {
+                    initial_messages.push(Message {
+                        role: "tool".to_string(),
+                        content: msg.content.clone(),
+                        images: None,
+                        thinking: None,
+                        tool_calls: None,
+                        name: msg.tool_name.clone(),
+                    });
+                }
+                messages::MessageRole::Assistant => {
+                    let tool_calls = msg.tool_calls_json.as_deref().and_then(|j| {
+                        serde_json::from_str::<Vec<crate::ollama::types::ToolCall>>(j)
+                            .map_err(|e| log::warn!("Failed to parse tool_calls_json: {e}"))
+                            .ok()
+                    });
+                    initial_messages.push(Message {
+                        role: "assistant".to_string(),
+                        content: msg.content.clone(),
+                        images: None,
+                        thinking: msg.thinking.clone(),
+                        tool_calls,
+                        name: None,
+                    });
+                }
+                _ => {
+                    initial_messages.push(Message {
+                        role: msg.role.as_str().to_string(),
+                        content: msg.content.clone(),
+                        images: msg_imgs,
+                        thinking: None,
+                        tool_calls: None,
+                        name: None,
+                    });
+                }
+            }
         }
 
         // Build think param.
@@ -489,6 +543,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 tools,
                 options,
                 None,
+                parent_message_id.clone(),
             ),
         )
         .await
@@ -510,24 +565,25 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             Err(e) => return Err(e),
         };
 
-        // Persist as a sibling of the parent message.
+        // Persist as a sibling of the parent message (or the last tool-chain
+        // node when the orchestration ran tool calls).
         if !result.content.is_empty() {
             let conv_id = conversation_id.clone();
             let m = result.metrics;
             let final_content = result.content;
+            let final_thinking = result.thinking;
+            let sibling_parent = result
+                .last_parent_id
+                .unwrap_or_else(|| parent_message_id.clone());
             spawn_db(self.state.db.clone(), move |conn| {
                 messages::create_sibling(
                     conn,
-                    &parent_message_id,
+                    &sibling_parent,
                     messages::NewMessage {
                         conversation_id: conv_id,
                         role: messages::MessageRole::Assistant,
                         content: final_content,
-                        parent_id: None,
-                        sibling_order: 0,
-                        is_active: true,
-                        images_json: None,
-                        files_json: None,
+                        thinking: final_thinking,
                         tokens_used: m.tokens_used,
                         generation_time_ms: m.generation_time_ms,
                         prompt_tokens: m.prompt_tokens,
@@ -537,6 +593,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                         prompt_eval_duration_ms: m.prompt_eval_duration_ms,
                         eval_duration_ms: m.eval_duration_ms,
                         seed: m.seed,
+                        ..Default::default()
                     },
                 )
             })
@@ -544,6 +601,42 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         }
 
         Ok(())
+    }
+}
+
+fn apply_sliding_window(messages: &mut Vec<crate::ollama::types::Message>, budget: usize) {
+    let system_count = messages.iter().take_while(|m| m.role == "system").count();
+    let history = &messages[system_count..];
+    let mut accumulated = 0usize;
+    let mut keep_from = 0usize;
+    for (i, msg) in history.iter().enumerate().rev() {
+        let est = (msg.content.len() / 4).max(1);
+        if accumulated + est > budget {
+            keep_from = i + 1;
+            break;
+        }
+        accumulated += est;
+    }
+    if keep_from > 0 {
+        // Ensure we don't leave a dangling tool-chain tail at the cut point.
+        // Advance keep_from past any role=tool messages or intermediate role=assistant
+        // with tool_calls that would be orphaned by the trim.
+        while keep_from < history.len() {
+            let msg = &history[keep_from];
+            if msg.role == "tool" || (msg.role == "assistant" && msg.tool_calls.is_some()) {
+                keep_from += 1;
+            } else {
+                break;
+            }
+        }
+        let mut trimmed = messages[..system_count].to_vec();
+        trimmed.extend_from_slice(&messages[system_count + keep_from..]);
+        *messages = trimmed;
+        log::info!(
+            "Context sliding window: trimmed {} history messages to fit budget={}",
+            keep_from,
+            budget
+        );
     }
 }
 
@@ -725,6 +818,97 @@ mod tests {
             merged2.stop,
             Some(vec!["###".to_string()]),
             "global stop fills when custom absent"
+        );
+    }
+
+    #[test]
+    fn sliding_window_keeps_system_and_recent_messages() {
+        use crate::ollama::types::Message;
+
+        let make_msg = |role: &str, content: &str| Message {
+            role: role.to_string(),
+            content: content.to_string(),
+            images: None,
+            thinking: None,
+            tool_calls: None,
+            name: None,
+        };
+
+        let mut messages = vec![
+            make_msg("system", "sys"),
+            make_msg("user", &"x".repeat(400)),
+            make_msg("user", &"x".repeat(400)),
+            make_msg("user", &"x".repeat(400)),
+            make_msg("user", &"x".repeat(400)),
+            make_msg("user", &"x".repeat(400)),
+        ];
+
+        let budget = (300_f32 * 0.85) as usize;
+        apply_sliding_window(&mut messages, budget);
+
+        assert_eq!(messages[0].role, "system", "system message always kept");
+        assert_eq!(
+            messages.len(),
+            3,
+            "expected 1 system + 2 history messages after trim, got {}",
+            messages.len()
+        );
+        assert_eq!(
+            messages.last().unwrap().content,
+            "x".repeat(400),
+            "most recent kept"
+        );
+    }
+
+    #[test]
+    fn sliding_window_removes_tool_chain_atomically() {
+        use crate::ollama::types::{Message, ToolCall, ToolCallFunction};
+
+        let make_msg = |role: &str, content: &str| Message {
+            role: role.to_string(),
+            content: content.to_string(),
+            images: None,
+            thinking: None,
+            tool_calls: None,
+            name: None,
+        };
+        let asst_tool = Message {
+            role: "assistant".to_string(),
+            content: "".to_string(),
+            images: None,
+            thinking: None,
+            tool_calls: Some(vec![ToolCall {
+                function: ToolCallFunction {
+                    name: "web_search".to_string(),
+                    arguments: serde_json::json!({"query": "test"}),
+                },
+            }]),
+            name: None,
+        };
+        let tool_result = make_msg("tool", &"x".repeat(400));
+        let asst_final = make_msg("assistant", &"x".repeat(400));
+
+        let mut messages = vec![
+            make_msg("user", "short"),
+            asst_tool,
+            tool_result,
+            asst_final,
+        ];
+        let budget = 200;
+
+        apply_sliding_window(&mut messages, budget);
+
+        assert!(
+            messages.first().map(|m| m.role.as_str()) != Some("tool"),
+            "tool message must not appear at start of trimmed history"
+        );
+        assert!(
+            messages.first().map(|m| m.role.as_str()) != Some("assistant")
+                || messages
+                    .first()
+                    .and_then(|m| m.tool_calls.as_ref())
+                    .is_none(),
+            "intermediate assistant must not appear at start of trimmed history"
         );
     }
 }

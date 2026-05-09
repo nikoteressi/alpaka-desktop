@@ -65,6 +65,9 @@ export function mapBackendMessage(m: BackendMessage): Message {
     siblingOrder: m.sibling_order ?? 0,
     siblingCount: m.sibling_count ?? 1,
     isActive: m.is_active ?? true,
+    thinking: m.thinking,
+    toolCallsJson: m.tool_calls_json,
+    toolName: m.tool_name,
   };
 }
 

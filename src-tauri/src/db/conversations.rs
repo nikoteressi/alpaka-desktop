@@ -212,6 +212,9 @@ pub fn update_system_prompt(
                 prompt_eval_duration_ms: None,
                 eval_duration_ms: None,
                 seed: None,
+                thinking: None,
+                tool_calls_json: None,
+                tool_name: None,
             },
         )?;
     }
@@ -315,10 +318,10 @@ pub fn export_to_markdown_path(
             crate::db::messages::MessageRole::User => "User",
             crate::db::messages::MessageRole::Assistant => "Assistant",
             crate::db::messages::MessageRole::System => "System",
-            crate::db::messages::MessageRole::CompactSummary => continue,
+            crate::db::messages::MessageRole::CompactSummary
+            | crate::db::messages::MessageRole::Tool => continue,
         };
-        let clean = crate::services::chat::strip_history_content(&msg.content);
-        out.push_str(&format!("**{}:**\n\n{}\n\n---\n\n", label, clean));
+        out.push_str(&format!("**{}:**\n\n{}\n\n---\n\n", label, msg.content));
     }
     std::fs::write(path, out)?;
     Ok(())
@@ -537,12 +540,14 @@ mod tests {
     }
 
     #[test]
-    fn export_to_markdown_strips_think_and_tool_call_tags() {
+    fn export_to_markdown_exports_clean_content() {
+        // Content is now always clean (no XML tags) — thinking is stored in the
+        // native `thinking` column, not embedded in content.
         let conn = in_memory_conn();
         let conv = create(
             &conn,
             NewConversation {
-                title: "Strip Test".into(),
+                title: "Export Test".into(),
                 model: "llama3".into(),
                 settings_json: None,
                 tags: None,
@@ -554,22 +559,20 @@ mod tests {
             crate::db::messages::NewMessage {
                 conversation_id: conv.id.clone(),
                 role: crate::db::messages::MessageRole::Assistant,
-                content: "<think>internal reasoning</think>Answer<tool_call>{}</tool_call>".into(),
+                content: "Here is the answer.".into(),
+                thinking: Some("internal reasoning".into()),
                 ..Default::default()
             },
         )
         .unwrap();
 
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("strip.md");
+        let path = dir.path().join("export.md");
         export_to_markdown_path(&conn, &conv.id, &path).unwrap();
 
         let content = std::fs::read_to_string(&path).unwrap();
-        assert!(content.contains("Answer"));
-        assert!(!content.contains("<think>"));
-        assert!(!content.contains("</think>"));
-        assert!(!content.contains("<tool_call>"));
-        assert!(!content.contains("</tool_call>"));
+        assert!(content.contains("Here is the answer."));
+        // thinking is not part of exported content
         assert!(!content.contains("internal reasoning"));
     }
 }

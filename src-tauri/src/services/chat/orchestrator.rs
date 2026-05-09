@@ -18,6 +18,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
     /// - The multi-turn agent loop (max 5 iterations).
     /// - Gathering and aggregating performance metrics across all turns.
     /// - Emission of the final `chat:done` event.
+    #[allow(clippy::too_many_arguments)]
     pub async fn orchestrate_stream(
         &self,
         conversation_id: String,
@@ -26,6 +27,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         think: Option<ThinkParam>,
         tools: Option<Vec<Tool>>,
         options: Option<ChatOptions>,
+        initial_parent_id: String,
     ) -> Result<OrchestrationResult, AppError> {
         self.orchestrate_stream_with_context(
             conversation_id,
@@ -35,6 +37,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             tools,
             options,
             None,
+            initial_parent_id,
         )
         .await
     }
@@ -51,6 +54,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         tools: Option<Vec<Tool>>,
         options: Option<ChatOptions>,
         original_user_content: Option<&str>,
+        initial_parent_id: String,
     ) -> Result<OrchestrationResult, AppError> {
         let http = self
             .state
@@ -88,6 +92,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         let generation_result: Result<OrchestrationResult, AppError> = async {
             let mut current_messages = initial_messages;
             let mut final_content = String::new();
+            let mut final_thinking: Option<String> = None;
+            let mut current_parent_id = initial_parent_id.clone();
             let mut metrics = AssistantMetrics::default();
 
             let mut iteration = 0;
@@ -132,8 +138,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     }
                 };
 
-                // Aggregate results
-                final_content.push_str(&result.content);
+                // Aggregate metrics across all agent turns
                 metrics.tokens_used =
                     Some(metrics.tokens_used.unwrap_or(0) + result.tokens_used.unwrap_or(0));
 
@@ -164,13 +169,41 @@ impl<'a, R: Runtime> ChatService<'a, R> {
 
                 // Handle tool calls
                 if let Some(tool_calls) = result.tool_calls {
-                    // Add the assistant's response that requested the tool call to history
+                    // Persist the intermediate assistant message (tool dispatch) to DB
+                    let tool_calls_json_str =
+                        serde_json::to_string(&tool_calls).unwrap_or_else(|_| "[]".to_string());
+                    let intermediate_content = result.content.clone();
+                    let intermediate_thinking = result.thinking.clone();
+                    let conv_id = conversation_id.clone();
+                    let cur_parent = current_parent_id.clone();
+                    let db_clone = self.state.db.clone();
+
+                    let asst_tool_msg = crate::db::spawn_db(db_clone, move |conn| {
+                        crate::db::messages::create(
+                            conn,
+                            crate::db::messages::NewMessage {
+                                conversation_id: conv_id,
+                                role: crate::db::messages::MessageRole::Assistant,
+                                content: intermediate_content,
+                                parent_id: Some(cur_parent),
+                                tool_calls_json: Some(tool_calls_json_str),
+                                thinking: intermediate_thinking,
+                                sibling_order: 0,
+                                is_active: true,
+                                ..Default::default()
+                            },
+                        )
+                    })
+                    .await?;
+                    current_parent_id = asst_tool_msg.id.clone();
+
+                    // Add the assistant's response to the replay history
                     current_messages.push(Message {
                         role: "assistant".to_string(),
                         content: result.content.clone(),
                         images: None,
                         thinking: result.thinking.clone(),
-                        tool_calls: Some(tool_calls.clone()), // Mirror tool calls back
+                        tool_calls: Some(tool_calls.clone()),
                         name: None,
                     });
 
@@ -190,20 +223,33 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                                 .await?
                         };
 
-                    for (tc, result_text) in tool_results {
-                        let query = tc
-                            .function
-                            .arguments
-                            .get("query")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
-                        final_content.push_str(&format!(
-                            "\n<tool_call name=\"{}\" query=\"{}\">{}</tool_call>\n",
-                            tc.function.name, query, result_text
-                        ));
+                    // Persist each tool result as a role=tool DB message
+                    for (tc, result_text) in &tool_results {
+                        let tool_name = tc.function.name.clone();
+                        let result_content = result_text.clone();
+                        let conv_id2 = conversation_id.clone();
+                        let parent_id = current_parent_id.clone();
+                        let db_clone2 = self.state.db.clone();
+
+                        let tool_msg = crate::db::spawn_db(db_clone2, move |conn| {
+                            crate::db::messages::create(
+                                conn,
+                                crate::db::messages::NewMessage {
+                                    conversation_id: conv_id2,
+                                    role: crate::db::messages::MessageRole::Tool,
+                                    content: result_content,
+                                    parent_id: Some(parent_id),
+                                    tool_name: Some(tool_name),
+                                    sibling_order: 0,
+                                    is_active: true,
+                                    ..Default::default()
+                                },
+                            )
+                        })
+                        .await?;
+                        current_parent_id = tool_msg.id.clone();
                     }
 
-                    // If every tool call in this iteration failed, break immediately
                     if !any_succeeded && !tool_responses.is_empty() {
                         log::warn!(
                             "All tool calls failed in agent iteration {}; aborting loop",
@@ -214,13 +260,14 @@ impl<'a, R: Runtime> ChatService<'a, R> {
 
                     if !tool_responses.is_empty() {
                         current_messages.append(&mut tool_responses);
-                        // Continue to next turn of the agent loop
                         continue;
                     } else {
                         break;
                     }
                 } else {
-                    // No tool calls, generation is complete
+                    // No tool calls — this is the final answer
+                    final_content = result.content.clone();
+                    final_thinking = result.thinking.clone();
                     break;
                 }
             }
@@ -252,7 +299,9 @@ impl<'a, R: Runtime> ChatService<'a, R> {
 
             Ok(OrchestrationResult {
                 content: final_content,
+                thinking: final_thinking,
                 metrics,
+                last_parent_id: Some(current_parent_id),
             })
         }
         .await;
