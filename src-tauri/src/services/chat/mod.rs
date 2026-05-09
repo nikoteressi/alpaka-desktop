@@ -621,9 +621,8 @@ fn apply_sliding_window(messages: &mut Vec<crate::ollama::types::Message>, budge
         // Ensure we don't leave a dangling tool-chain tail at the cut point.
         // Advance keep_from past any role=tool messages or intermediate role=assistant
         // with tool_calls that would be orphaned by the trim.
-        let history_slice = &messages[system_count..];
-        while keep_from < history_slice.len() {
-            let msg = &history_slice[keep_from];
+        while keep_from < history.len() {
+            let msg = &history[keep_from];
             if msg.role == "tool" || (msg.role == "assistant" && msg.tool_calls.is_some()) {
                 keep_from += 1;
             } else {

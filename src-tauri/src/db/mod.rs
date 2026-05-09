@@ -96,27 +96,20 @@ pub fn backfill_thinking_and_strip(conn: &rusqlite::Connection) -> Result<(), Ap
 }
 
 fn extract_thinking_from_content(content: &str) -> (Option<String>, String) {
-    let thinking = if let Some(open) = content.find("<think") {
-        if let Some(tag_end) = content[open..].find('>') {
-            let inner_start = open + tag_end + 1;
-            if let Some(close) = content.find("</think>") {
-                if close >= inner_start {
-                    Some(content[inner_start..close].to_string())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
+    let thinking = extract_think_inner(content);
     let clean = strip_xml_blocks(content);
     (thinking, clean)
+}
+
+fn extract_think_inner(content: &str) -> Option<String> {
+    let open = content.find("<think")?;
+    let tag_end = content[open..].find('>')?;
+    let inner_start = open + tag_end + 1;
+    let close = content.find("</think>")?;
+    if close < inner_start {
+        return None;
+    }
+    Some(content[inner_start..close].to_string())
 }
 
 fn strip_xml_blocks(content: &str) -> String {
