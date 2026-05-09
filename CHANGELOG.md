@@ -25,7 +25,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `regenerate_message` Tauri command — streams a new assistant response as a sibling branch of the existing message
 - `switch_version` Tauri command — activates a sibling message, updating the active conversation path
 - `truncate_from` Tauri command — removes a message and all its descendants (used by edit-message to reset from the edited point)
-- History stripping: `<think>` and `<tool_call>` blocks are stripped from assistant messages before they are included in LLM history context (`strip_history_content` in `services/chat/mod.rs`)
+- History context now uses native DB fields — `thinking` sent back as `message.thinking`, tool calls via `tool_calls_json`, tool results as `role=tool` messages; no XML stripping at replay time
 
 ### Changed
 - Thinking content now stored in native `thinking` DB column; no longer embedded as `<think>` XML in `content`
