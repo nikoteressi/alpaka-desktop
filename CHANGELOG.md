@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- Tool-chain regeneration now creates a proper dispatch sibling, fixing broken version navigation when regenerating a web-search response (#167)
 - L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
 
 ### Added
