@@ -80,13 +80,15 @@ pub fn backfill_thinking_and_strip(conn: &rusqlite::Connection) -> Result<(), Ap
             .map_err(AppError::from)?
     };
 
+    let tx = conn.unchecked_transaction()?;
     for (id, content) in targets {
         let (thinking, clean) = extract_thinking_from_content(&content);
-        conn.execute(
+        tx.execute(
             "UPDATE messages SET thinking = ?1, content = ?2 WHERE id = ?3",
             rusqlite::params![thinking, clean, id],
         )?;
     }
+    tx.commit()?;
 
     settings::set(conn, "thinking_backfill_v1", "done")?;
     tracing::info!("thinking_backfill_v1: backfill complete");
@@ -373,6 +375,6 @@ mod tests {
     fn strip_xml_blocks_removes_tool_calls() {
         let content = "Here is <tool_call>{\"name\":\"search\"}</tool_call> some text";
         let clean = strip_xml_blocks(content);
-        assert_eq!(clean, "Here is  some text".trim());
+        assert_eq!(clean, "Here is  some text");
     }
 }
