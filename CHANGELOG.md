@@ -28,8 +28,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - History stripping: `<think>` and `<tool_call>` blocks are stripped from assistant messages before they are included in LLM history context (`strip_history_content` in `services/chat/mod.rs`)
 
 ### Changed
+- Thinking content now stored in native `thinking` DB column; no longer embedded as `<think>` XML in `content`
+- Tool-call exchanges stored as chained DB messages (`role=assistant/tool_calls` → `role=tool` → `role=assistant/final`); no longer embedded as `<tool_call>` XML
+- One-time startup migration backfills all existing messages to native format
 - Edit message now calls `truncate_from` before setting the draft, so the conversation resets cleanly from the edited point instead of appending after stale messages
 - Like, Dislike, and Share buttons removed from `MessageActions.vue`
+
+### Removed
+- `strip_history_content` function and all XML-parsing code from both Rust and frontend
+- `<think>` and `<tool_call>` regex branches from `messageParser.ts`
 
 ### Fixed
 - `message.id` was always `undefined` in the store message mapping, causing edit/index lookups to silently fail
