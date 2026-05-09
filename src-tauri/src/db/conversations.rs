@@ -540,12 +540,14 @@ mod tests {
     }
 
     #[test]
-    fn export_to_markdown_strips_think_and_tool_call_tags() {
+    fn export_to_markdown_exports_clean_content() {
+        // Content is now always clean (no XML tags) — thinking is stored in the
+        // native `thinking` column, not embedded in content.
         let conn = in_memory_conn();
         let conv = create(
             &conn,
             NewConversation {
-                title: "Strip Test".into(),
+                title: "Export Test".into(),
                 model: "llama3".into(),
                 settings_json: None,
                 tags: None,
@@ -557,22 +559,20 @@ mod tests {
             crate::db::messages::NewMessage {
                 conversation_id: conv.id.clone(),
                 role: crate::db::messages::MessageRole::Assistant,
-                content: "<think>internal reasoning</think>Answer<tool_call>{}</tool_call>".into(),
+                content: "Here is the answer.".into(),
+                thinking: Some("internal reasoning".into()),
                 ..Default::default()
             },
         )
         .unwrap();
 
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("strip.md");
+        let path = dir.path().join("export.md");
         export_to_markdown_path(&conn, &conv.id, &path).unwrap();
 
         let content = std::fs::read_to_string(&path).unwrap();
-        assert!(content.contains("Answer"));
-        assert!(!content.contains("<think>"));
-        assert!(!content.contains("</think>"));
-        assert!(!content.contains("<tool_call>"));
-        assert!(!content.contains("</tool_call>"));
+        assert!(content.contains("Here is the answer."));
+        // thinking is not part of exported content
         assert!(!content.contains("internal reasoning"));
     }
 }
