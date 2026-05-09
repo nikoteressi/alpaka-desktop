@@ -293,7 +293,6 @@ async fn stream_once<R: Runtime>(
                                         if data.done {
                                             // Close any unclosed think block (edge case: stream ended mid-think)
                                             if in_think_block {
-                                                in_think_block = false;
                                                 let duration_ms = think_start
                                                     .take()
                                                     .map(|s| s.elapsed().as_millis() as u64)
@@ -452,7 +451,7 @@ mod tests {
 
     #[test]
     fn mode_a_thinking_not_in_assembled() {
-        let mut assembled = String::new();
+        let assembled = String::new();
         let mut thinking_assembled = String::new();
         let thinking_token = "I am thinking";
 

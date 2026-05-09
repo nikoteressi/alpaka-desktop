@@ -18,6 +18,7 @@ impl<'a, R: Runtime> ChatService<'a, R> {
     /// - The multi-turn agent loop (max 5 iterations).
     /// - Gathering and aggregating performance metrics across all turns.
     /// - Emission of the final `chat:done` event.
+    #[allow(clippy::too_many_arguments)]
     pub async fn orchestrate_stream(
         &self,
         conversation_id: String,
