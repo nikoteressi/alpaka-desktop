@@ -179,17 +179,15 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                     let db_clone = self.state.db.clone();
 
                     let asst_tool_msg = crate::db::spawn_db(db_clone, move |conn| {
-                        crate::db::messages::create(
+                        crate::db::messages::create_sibling(
                             conn,
+                            &cur_parent,
                             crate::db::messages::NewMessage {
                                 conversation_id: conv_id,
                                 role: crate::db::messages::MessageRole::Assistant,
                                 content: intermediate_content,
-                                parent_id: Some(cur_parent),
                                 tool_calls_json: Some(tool_calls_json_str),
                                 thinking: intermediate_thinking,
-                                sibling_order: 0,
-                                is_active: true,
                                 ..Default::default()
                             },
                         )
