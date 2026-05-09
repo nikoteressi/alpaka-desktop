@@ -565,16 +565,20 @@ impl<'a, R: Runtime> ChatService<'a, R> {
             Err(e) => return Err(e),
         };
 
-        // Persist as a sibling of the parent message.
+        // Persist as a sibling of the parent message (or the last tool-chain
+        // node when the orchestration ran tool calls).
         if !result.content.is_empty() {
             let conv_id = conversation_id.clone();
             let m = result.metrics;
             let final_content = result.content;
             let final_thinking = result.thinking;
+            let sibling_parent = result
+                .last_parent_id
+                .unwrap_or_else(|| parent_message_id.clone());
             spawn_db(self.state.db.clone(), move |conn| {
                 messages::create_sibling(
                     conn,
-                    &parent_message_id,
+                    &sibling_parent,
                     messages::NewMessage {
                         conversation_id: conv_id,
                         role: messages::MessageRole::Assistant,

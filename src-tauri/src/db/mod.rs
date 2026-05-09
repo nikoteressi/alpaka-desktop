@@ -142,6 +142,8 @@ fn strip_xml_blocks(content: &str) -> String {
         if let Some(end_pos) = remaining.find(end_tag) {
             remaining = &remaining[end_pos + end_tag.len()..];
         } else {
+            // No closing tag — preserve everything from the opening tag onward.
+            result.push_str(remaining);
             remaining = "";
             break;
         }
@@ -376,5 +378,14 @@ mod tests {
         let content = "Here is <tool_call>{\"name\":\"search\"}</tool_call> some text";
         let clean = strip_xml_blocks(content);
         assert_eq!(clean, "Here is  some text");
+    }
+
+    #[test]
+    fn strip_xml_blocks_preserves_content_after_unmatched_open_tag() {
+        // An unmatched <think> (e.g. from a crashed mid-stream write) must
+        // not silently discard the rest of the message.
+        let content = "Answer: <think>orphaned";
+        let clean = strip_xml_blocks(content);
+        assert_eq!(clean, "Answer: <think>orphaned");
     }
 }
