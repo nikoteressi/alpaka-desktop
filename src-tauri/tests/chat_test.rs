@@ -784,6 +784,160 @@ mod native_roles {
         assert_eq!(path[3].role, messages::MessageRole::Assistant);
         assert!(path[3].tool_calls_json.is_none());
     }
+
+    #[test]
+    fn tool_chain_regenerate_sibling() {
+        let conn = in_memory_conn();
+
+        // ── First generation ──────────────────────────────────────────────────
+        let user = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::User,
+                content: "Search for something".to_string(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // dispatch_1 — created the old way (plain create), simulating how the
+        // first generation is currently persisted by the orchestrator
+        let dispatch_1 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "".to_string(),
+                parent_id: Some(user.id.clone()),
+                tool_calls_json: Some(r#"[{"type":"function","function":{"name":"web_search","arguments":{"query":"x"}}}]"#.to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let tool_result_1 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Tool,
+                content: r#"{"results":[]}"#.to_string(),
+                parent_id: Some(dispatch_1.id.clone()),
+                tool_name: Some("web_search".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let _final_1 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "First answer".to_string(),
+                parent_id: Some(tool_result_1.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // ── Regeneration — dispatch_2 via create_sibling (the fix) ────────────
+        let dispatch_2 = messages::create_sibling(
+            &conn,
+            &user.id,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "".to_string(),
+                tool_calls_json: Some(r#"[{"type":"function","function":{"name":"web_search","arguments":{"query":"x"}}}]"#.to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let tool_result_2 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Tool,
+                content: r#"{"results":[]}"#.to_string(),
+                parent_id: Some(dispatch_2.id.clone()),
+                tool_name: Some("web_search".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let _final_2 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "Second answer".to_string(),
+                parent_id: Some(tool_result_2.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // ── Assertions: sibling structure ─────────────────────────────────────
+        assert_eq!(dispatch_2.sibling_order, 1, "new dispatch must be order 1");
+        assert!(dispatch_2.is_active, "new dispatch must be active");
+
+        // dispatch_1 must be inactive after create_sibling
+        let dispatch_1_refreshed: bool = conn
+            .query_row(
+                "SELECT is_active FROM messages WHERE id = ?1",
+                rusqlite::params![dispatch_1.id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!dispatch_1_refreshed, "old dispatch must be deactivated");
+
+        // sibling_count for dispatch_2 — fetch via list_for_conversation since
+        // create_sibling returns 1 (the value is computed in the list query)
+        let all = messages::list_for_conversation(&conn, "c1").unwrap();
+        let dispatch_2_in_path = all.iter().find(|m| m.id == dispatch_2.id).unwrap();
+        assert_eq!(
+            dispatch_2_in_path.sibling_count, 2,
+            "sibling_count must reflect both dispatches"
+        );
+
+        // ── Assertions: active path shows only second chain ───────────────────
+        let path = messages::list_for_conversation(&conn, "c1").unwrap();
+        let contents: Vec<&str> = path.iter().map(|m| m.content.as_str()).collect();
+        assert!(
+            contents.contains(&"Second answer"),
+            "active path must include second chain final"
+        );
+        assert!(
+            !contents.contains(&"First answer"),
+            "active path must NOT include first chain final"
+        );
+
+        // ── Navigate back to first chain ──────────────────────────────────────
+        messages::set_active_sibling(&conn, &dispatch_1.id).unwrap();
+        let path2 = messages::list_for_conversation(&conn, "c1").unwrap();
+        let contents2: Vec<&str> = path2.iter().map(|m| m.content.as_str()).collect();
+        assert!(
+            contents2.contains(&"First answer"),
+            "after navigate, active path must include first chain final"
+        );
+        assert!(
+            !contents2.contains(&"Second answer"),
+            "after navigate, active path must NOT include second chain final"
+        );
+    }
 }
 
 // ── Chat options / preset forwarding ─────────────────────────────────────────
