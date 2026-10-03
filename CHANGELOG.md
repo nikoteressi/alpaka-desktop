@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- AppImage: `.DirIcon` is now a relative symlink instead of an absolute path into the CI build directory, so the app icon resolves on users' machines and the AppImage passes AppImageHub validation (`@tauri-apps/cli` 2.11.2 → 2.11.5, tauri-apps/tauri#15596)
+
+### Security
+- Consolidated dependency update picking up upstream security fixes: `tauri` 2.11.6, `markdown-it` 14.3.2, `vue` 3.5.43 (patched `postcss`/`nanoid`), and Rust lockfile updates clearing open RustSec advisories (`quinn-proto`, `h2`, `rustls`, `crossbeam-epoch`, `quick-xml`, `rkyv`); bundled SQLCipher engine updated to 4.14.0 via `rusqlite` 0.40.2
+
 ---
 
 ## [1.3.0] - 2026-05-06
