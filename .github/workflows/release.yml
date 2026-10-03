@@ -95,7 +95,7 @@ jobs:
       # 1. Checkout — full history so changelog generation works correctly  #
       # ------------------------------------------------------------------ #
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
 
@@ -135,7 +135,7 @@ jobs:
       # 3. pnpm + Node.js 20                                                #
       # ------------------------------------------------------------------ #
       - name: Setup pnpm
-        uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6.0.7
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         # No 'version' key — reads from package.json "packageManager" field
 
       - name: Setup Node.js 20
@@ -268,7 +268,7 @@ jobs:
             echo "::notice::AUR_SSH_PRIVATE_KEY not configured — skipping AUR publish."
           fi
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         if: steps.guard.outputs.run == 'true'
 
       - name: Get version and AppImage sha256
