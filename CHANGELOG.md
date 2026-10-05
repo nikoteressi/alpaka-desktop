@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Security
+- Dev tooling: `brace-expansion` pinned to patched releases (1.1.21 / 2.1.7 / 5.0.12) for GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895, GHSA-6j4f-fj2g-mc7p and GHSA-qhr7-859c-m2p7; not shipped in the app
 - `dompurify` 3.4.2 → 3.4.16 (Markdown HTML sanitizer), picking up the upstream fixes released since 3.4.2
 
 ### Removed
