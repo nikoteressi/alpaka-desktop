@@ -17,6 +17,7 @@ const makeHost = (
     id: string;
     name: string;
     url: string;
+    kind: "local" | "cloud";
     is_default: boolean;
     is_active: boolean;
     last_ping_status: "online" | "offline" | "unknown";
@@ -27,6 +28,7 @@ const makeHost = (
   id: "1",
   name: "Local",
   url: "",
+  kind: "local" as const,
   is_default: true,
   is_active: true,
   last_ping_status: "online" as const,

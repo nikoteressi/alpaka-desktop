@@ -63,9 +63,7 @@ describe("useSettingsStore", () => {
     mockInvoke.mockResolvedValue(undefined);
     await store.updateChatOptions({ stop: ["\\n\\n", "END"] });
 
-    const call = mockInvoke.mock.calls.find(
-      ([cmd]: [string]) => cmd === "set_setting",
-    );
+    const call = mockInvoke.mock.calls.find(([cmd]) => cmd === "set_setting");
     expect(call).toBeDefined();
     const serialized = JSON.parse(call![1].value as string);
     expect(serialized.stop).toEqual(["\\n\\n", "END"]);

@@ -1,10 +1,10 @@
 import { describe, it, expectTypeOf } from "vitest";
-import type { ModelCapabilities } from "../models";
+import type { ModelCapabilities, ModelName } from "../models";
 
 describe("ModelCapabilities", () => {
   it("has optional context_length field", () => {
     const caps: ModelCapabilities = {
-      name: "llama3",
+      name: "llama3" as ModelName,
       thinking: false,
       thinking_toggleable: false,
       thinking_levels: [],
