@@ -34,6 +34,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - History context now uses native DB fields — `thinking` sent back as `message.thinking`, tool calls via `tool_calls_json`, tool results as `role=tool` messages; no XML stripping at replay time
 
 ### Changed
+- CI: GitHub Actions pins updated: actions/checkout 7.0.1, actions/setup-node 7.0.0, actions/attest-build-provenance 4.2.2, pnpm/action-setup 6.1.0, anchore/sbom-action 0.24.2, softprops/action-gh-release 3.0.3, taiki-e/install-action 2.87.21
 - Dev tooling: TypeScript 5.9 → 6.0 (type checking only; no change to the built app)
 - Thinking content now stored in native `thinking` DB column; no longer embedded as `<think>` XML in `content`
 - Tool-call exchanges stored as chained DB messages (`role=assistant/tool_calls` → `role=tool` → `role=assistant/final`); no longer embedded as `<tool_call>` XML
