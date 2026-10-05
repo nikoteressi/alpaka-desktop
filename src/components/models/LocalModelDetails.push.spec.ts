@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 import LocalModelDetails from "./LocalModelDetails.vue";
+import type { ModelName } from "../../types/models";
 
 const baseModel = {
   name: "llama3:8b",
@@ -20,6 +21,7 @@ const baseModel = {
     parent_model: "",
     format: "",
     family: "",
+    families: null,
     parameter_size: "",
     quantization_level: "",
   },
@@ -30,7 +32,7 @@ describe("LocalModelDetails — Push to Cloud button", () => {
 
   it("does NOT render push button for non-namespaced model", () => {
     const wrapper = mount(LocalModelDetails, {
-      props: { model: { ...baseModel, name: "llama3:8b" } },
+      props: { model: { ...baseModel, name: "llama3:8b" as ModelName } },
     });
     expect(wrapper.find("[data-testid='push-to-cloud-btn']").exists()).toBe(
       false,
@@ -39,7 +41,9 @@ describe("LocalModelDetails — Push to Cloud button", () => {
 
   it("renders push button for namespaced model", () => {
     const wrapper = mount(LocalModelDetails, {
-      props: { model: { ...baseModel, name: "myuser/mymodel:latest" } },
+      props: {
+        model: { ...baseModel, name: "myuser/mymodel:latest" as ModelName },
+      },
     });
     expect(wrapper.find("[data-testid='push-to-cloud-btn']").exists()).toBe(
       true,
@@ -48,7 +52,9 @@ describe("LocalModelDetails — Push to Cloud button", () => {
 
   it("push button is disabled when not signed in", async () => {
     const wrapper = mount(LocalModelDetails, {
-      props: { model: { ...baseModel, name: "myuser/mymodel:latest" } },
+      props: {
+        model: { ...baseModel, name: "myuser/mymodel:latest" as ModelName },
+      },
     });
     // isSignedIn defaults to false before mount resolves
     await wrapper.vm.$nextTick();

@@ -27,7 +27,7 @@
         <div class="source-card__header">
           <div class="source-card__index">{{ idx + 1 }}</div>
           <img
-            :src="getFavicon(res.url)"
+            :src="getFavicon(res.url) ?? undefined"
             class="source-card__favicon"
             @error="handleFaviconError"
           />

@@ -62,7 +62,6 @@
                       >
                         <span
                           v-if="isThinking && idx === parts.length - 1"
-                          ref="contentEl"
                           class="think-step__active"
                           >{{ step
                           }}<span
@@ -156,7 +155,6 @@ const { isOpen, toggle: _toggle } = useCollapsibleState({
   initialOpen: !!props.isOverallStreaming,
 });
 
-const contentEl = ref<HTMLElement | null>(null);
 const scrollArea = ref<HTMLElement | null>(null);
 
 const label = computed(() => {

@@ -387,7 +387,7 @@ const {
 });
 
 // ---- Context Window Tracking ----
-const { maxContext, contextTokens, isContextNearFull } = useContextWindow({
+const { maxContext, contextTokens } = useContextWindow({
   inputLength: computed(() => inputContent.value.length),
   attachmentCount: computed(() => attachments.value.length),
   numCtxOverride: computed(
