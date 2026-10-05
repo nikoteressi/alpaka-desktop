@@ -158,8 +158,7 @@
               <div class="p-4 bg-[var(--bg-code)] overflow-x-auto">
                 <pre
                   class="text-[13px] font-mono text-[var(--text-code)] leading-relaxed"
-                  >{{ displayCode }}</pre
-                >
+                  >{{ displayCode }}</pre>
               </div>
             </div>
 

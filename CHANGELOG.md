@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- Dev tooling: `brace-expansion` pinned to patched releases (1.1.21 / 2.1.7 / 5.0.12) for GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895, GHSA-6j4f-fj2g-mc7p and GHSA-qhr7-859c-m2p7; not shipped in the app
+- `dompurify` 3.4.2 → 3.4.16 (Markdown HTML sanitizer), picking up the upstream fixes released since 3.4.2
+
 ### Fixed
 - Tool-chain regeneration now creates a proper dispatch sibling, fixing broken version navigation when regenerating a web-search response (#167)
 - L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
@@ -38,6 +42,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Removed
 - `strip_history_content` function and all XML-parsing code from both Rust and frontend
 - `<think>` and `<tool_call>` regex branches from `messageParser.ts`
+- Unused `ed25519-dalek` Rust dependency (and 10 crypto crates it pulled in)
 
 ### Fixed
 - `message.id` was always `undefined` in the store message mapping, causing edit/index lookups to silently fail

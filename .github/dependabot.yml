@@ -24,6 +24,30 @@ updates:
       # same major.minor as the crates. Remove when the MSRV is raised.
       - dependency-name: "@tauri-apps/*"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # @traptitech/markdown-it-katex renders with its own katex ^0.16, while
+      # src/main.ts loads the CSS from our direct katex dep. 0.17+ prefixes the
+      # CSS classes (.katex-*), which would silently break math layout. Lift
+      # this when the markdown-it KaTeX plugin is replaced.
+      - dependency-name: "katex"
+        versions: [">=0.17"]
+      # TypeScript 7 (native compiler) is outside typescript-eslint's supported
+      # range and vue-tsc can't drive it yet.
+      - dependency-name: "typescript"
+        versions: [">=7"]
+      # vitest 3.x leaves @vitest/ui and @vitest/coverage-v8 behind and breaks
+      # ChatView.spec (rAF faking); the plan is a single vitest 4.1.x + vite 8
+      # migration. 4.1.11+ stays allowed.
+      - dependency-name: "vitest"
+        versions: [">=3.0.0 <4.1.11"]
+      - dependency-name: "@vitest/mocker"
+        versions: [">=3.0.0 <4.1.11"]
+      # jsdom 28+ needs Node >= 22; CI and release builds run Node 20.
+      - dependency-name: "jsdom"
+        versions: [">=28"]
+      # markdown-it 15: linkify-it v6 (fuzzy links off by default), own types,
+      # lib/* subpath exports removed - needs a deliberate migration.
+      - dependency-name: "markdown-it"
+        versions: [">=15"]
     groups:
       # Tauri NPM packages must stay in sync with the Rust crates (major.minor).
       # Must be listed FIRST: a dependency goes to the first group it matches.

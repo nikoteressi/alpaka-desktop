@@ -186,6 +186,7 @@ jobs:
     if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
+      pull-requests: read # Check CHANGELOG step reads the PR's live labels
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -264,6 +265,8 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
@@ -276,7 +279,12 @@ jobs:
             exit 0
           fi
 
-          ADVISORY=$(echo "$PR_LABELS" | jq -r '.[].name' | grep -E '^(type: (ci|docs)|dependencies)$' | head -1 || true)
+          # Read the PR's current labels: bots such as Dependabot add labels a few
+          # seconds after opening the PR, so the event payload can lack them.
+          # Fall back to the payload if the API call fails.
+          LABELS=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name' 2>/dev/null) \
+            || LABELS=$(echo "$PR_LABELS" | jq -r '.[].name')
+          ADVISORY=$(echo "$LABELS" | grep -E '^(type: (ci|docs)|dependencies)$' | head -1 || true)
 
           if [[ -n "$ADVISORY" ]]; then
             echo "WARNING: CHANGELOG.md not updated, but PR is labeled '${ADVISORY}' — advisory only."
@@ -429,7 +437,7 @@ jobs:
           shared-key: e2e
 
       - name: Cache tauri-driver binary
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: cache-tauri-driver-smoke
         with:
           path: ~/.cargo/bin/tauri-driver
@@ -511,7 +519,7 @@ jobs:
           shared-key: e2e
 
       - name: Cache tauri-driver binary
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: cache-tauri-driver-integration
         with:
           path: ~/.cargo/bin/tauri-driver
