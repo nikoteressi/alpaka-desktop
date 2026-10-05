@@ -736,8 +736,8 @@ describe("ChatInput — onBeforeUnmount cleanup", () => {
     setActivePinia(createPinia());
     vi.useFakeTimers();
     mockInvoke.mockImplementation(() => Promise.resolve([]));
-    global.URL.createObjectURL = vi.fn(() => "blob:mock-url");
-    global.URL.revokeObjectURL = vi.fn();
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    globalThis.URL.revokeObjectURL = vi.fn();
   });
 
   afterEach(() => {
@@ -783,8 +783,8 @@ describe("ChatInput — Attachments", () => {
     setActivePinia(createPinia());
     mockInvoke.mockImplementation(() => Promise.resolve([]));
     // Mock URL.createObjectURL/revokeObjectURL for blob simulation
-    global.URL.createObjectURL = vi.fn(() => "blob:mock-url");
-    global.URL.revokeObjectURL = vi.fn();
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    globalThis.URL.revokeObjectURL = vi.fn();
   });
 
   it("handles image files and adds to attachments list", async () => {
