@@ -153,7 +153,20 @@ describe("ChatView.vue", () => {
   let modelStore: ReturnType<typeof useModelStore>;
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    // Fake only the timer APIs. Vitest 3+ also fakes requestAnimationFrame by
+    // default, which would stall scrollToBottom()'s nextTick -> rAF chain that
+    // these tests flush with nextTick/runAllTimers.
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "setImmediate",
+        "clearImmediate",
+        "Date",
+      ],
+    });
     mockStartNewChat.mockClear();
     mockSwitchHost.mockClear();
     setActivePinia(createPinia());

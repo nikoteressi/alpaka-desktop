@@ -1,4 +1,4 @@
-/// <reference types="vitest" />
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
@@ -24,7 +24,10 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: 'coverage',
       include: ['src/**/*.{ts,vue}'],
-      thresholds: { lines: 80, functions: 80, branches: 75, statements: 80 },
+      // Measured on vitest 4 (AST-aware v8 remapping), rounded down. vitest 2
+      // reported never-imported .vue files as 100% covered, inflating the old
+      // 80/80/75/80 baseline.
+      thresholds: { lines: 79, functions: 71, branches: 69, statements: 77 },
       exclude: [
         '**/*.config.{ts,js}',
         'src/main.ts',
