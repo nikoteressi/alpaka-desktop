@@ -39,7 +39,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - One-time startup migration backfills all existing messages to native format
 - Edit message now calls `truncate_from` before setting the draft, so the conversation resets cleanly from the edited point instead of appending after stale messages
 - Like, Dislike, and Share buttons removed from `MessageActions.vue`
-- Dev tooling: vitest 2.1 → 4.1 and vite 6 → 8 (test and build toolchain only; no app behaviour change)
+- Dev tooling: vitest 2.1 → 4.1 and vite 6 → 8 (test and build toolchain only; no app behaviour change); `pnpm typecheck` now also type-checks `vite.config.ts` (`tsconfig.node.json`)
 
 ### Removed
 - `strip_history_content` function and all XML-parsing code from both Rust and frontend
