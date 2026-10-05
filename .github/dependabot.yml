@@ -34,6 +34,11 @@ updates:
       # range and vue-tsc can't drive it yet.
       - dependency-name: "typescript"
         versions: [">=7"]
+      # vitest 5 needs Node >= 22.12; CI and release builds run Node 20.
+      - dependency-name: "vitest"
+        versions: [">=5"]
+      - dependency-name: "@vitest/*"
+        versions: [">=5"]
       # jsdom 28+ needs Node >= 22; CI and release builds run Node 20.
       - dependency-name: "jsdom"
         versions: [">=28"]
