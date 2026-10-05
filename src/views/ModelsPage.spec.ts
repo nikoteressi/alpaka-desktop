@@ -1451,7 +1451,17 @@ describe("ModelsPage", () => {
       store.error = null;
       store.models = [makeModel("llama3:8b")];
       store.capabilities = {
-        "llama3:8b": { vision: true, tools: true, thinking: true },
+        "llama3:8b": {
+          name: "llama3:8b" as ModelName,
+          vision: true,
+          tools: true,
+          thinking: true,
+          thinking_toggleable: false,
+          thinking_levels: [],
+          embedding: false,
+          audio: false,
+          cloud: false,
+        },
       };
     });
 
