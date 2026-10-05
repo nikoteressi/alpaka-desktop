@@ -165,8 +165,7 @@
         <pre
           ref="logEl"
           class="text-[12px] text-[var(--text-muted)] font-mono whitespace-pre-wrap break-words h-full overflow-y-auto"
-          >{{ logText }}</pre
-        >
+          >{{ logText }}</pre>
       </div>
 
       <!-- Action buttons — always visible below the log -->
