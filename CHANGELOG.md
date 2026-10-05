@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.3.1] - 2026-10-05
+
 ### Fixed
 - AppImage: `.DirIcon` is now a relative symlink instead of an absolute path into the CI build directory, so the app icon resolves on users' machines and the AppImage passes AppImageHub validation (`@tauri-apps/cli` 2.11.2 → 2.11.5, tauri-apps/tauri#15596)
 
@@ -133,7 +137,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.1...v1.3.0
 [1.2.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.0...v1.1.1
