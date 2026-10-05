@@ -24,6 +24,16 @@ updates:
       # same major.minor as the crates. Remove when the MSRV is raised.
       - dependency-name: "@tauri-apps/*"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # @traptitech/markdown-it-katex renders with its own katex ^0.16, while
+      # src/main.ts loads the CSS from our direct katex dep. 0.17+ prefixes the
+      # CSS classes (.katex-*), which would silently break math layout. Lift
+      # this when the markdown-it KaTeX plugin is replaced.
+      - dependency-name: "katex"
+        versions: [">=0.17"]
+      # TypeScript 7 (native compiler) is outside typescript-eslint's supported
+      # range and vue-tsc can't drive it yet.
+      - dependency-name: "typescript"
+        versions: [">=7"]
     groups:
       # Tauri NPM packages must stay in sync with the Rust crates (major.minor).
       # Must be listed FIRST: a dependency goes to the first group it matches.

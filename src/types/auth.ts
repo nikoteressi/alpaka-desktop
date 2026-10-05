@@ -6,12 +6,7 @@ export interface UserProfile {
 }
 
 export type ApiKeyStatus =
-  | "not_set"
-  | "set"
-  | "valid"
-  | "invalid"
-  | "checking"
-  | "unknown";
+  "not_set" | "set" | "valid" | "invalid" | "checking" | "unknown";
 
 export interface AuthState {
   user: UserProfile | null;
