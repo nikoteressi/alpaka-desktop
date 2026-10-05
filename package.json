@@ -41,7 +41,7 @@
     "@vueuse/core": "^14.0.0",
     "codemirror": "^6.0.2",
     "dompurify": "^3.4.16",
-    "katex": "^0.16.0",
+    "katex": "^0.16.47",
     "markdown-it": "^14.3.2",
     "markdown-it-footnote": "^4.0.0",
     "pinia": "^3.0.4",
