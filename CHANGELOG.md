@@ -12,6 +12,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Security
 - `dompurify` 3.4.2 → 3.4.16 (Markdown HTML sanitizer), picking up the upstream fixes released since 3.4.2
 
+### Removed
+- Unused `ed25519-dalek` Rust dependency (and 10 crypto crates it pulled in)
+
 ---
 
 ## [1.3.1] - 2026-10-05
