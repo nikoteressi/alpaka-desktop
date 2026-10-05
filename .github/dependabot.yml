@@ -34,6 +34,20 @@ updates:
       # range and vue-tsc can't drive it yet.
       - dependency-name: "typescript"
         versions: [">=7"]
+      # vitest 3.x leaves @vitest/ui and @vitest/coverage-v8 behind and breaks
+      # ChatView.spec (rAF faking); the plan is a single vitest 4.1.x + vite 8
+      # migration. 4.1.11+ stays allowed.
+      - dependency-name: "vitest"
+        versions: [">=3.0.0 <4.1.11"]
+      - dependency-name: "@vitest/mocker"
+        versions: [">=3.0.0 <4.1.11"]
+      # jsdom 28+ needs Node >= 22; CI and release builds run Node 20.
+      - dependency-name: "jsdom"
+        versions: [">=28"]
+      # markdown-it 15: linkify-it v6 (fuzzy links off by default), own types,
+      # lib/* subpath exports removed - needs a deliberate migration.
+      - dependency-name: "markdown-it"
+        versions: [">=15"]
     groups:
       # Tauri NPM packages must stay in sync with the Rust crates (major.minor).
       # Must be listed FIRST: a dependency goes to the first group it matches.
