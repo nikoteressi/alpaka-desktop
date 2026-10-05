@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeAll } from "vitest";
 import { initMarkdown, renderMarkdown, renderInline } from "./markdown";
 

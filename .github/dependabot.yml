@@ -7,13 +7,63 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+      time: "05:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5          # counts version-update PRs only; groups make this ample
+    commit-message:
+      prefix: "chore"
+      include: "scope"                   # -> "chore(deps): ..." / "chore(deps-dev): ..."
+    # NOTE: do not set `labels:` unless "dependencies" is kept — ci.yml's
+    # "Check CHANGELOG updated" step relies on that default label.
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    ignore:
+      # Tauri 2.12+ crates need Rust 1.90 (MSRV is 1.88) and npm must stay on the
+      # same major.minor as the crates. Remove when the MSRV is raised.
+      - dependency-name: "@tauri-apps/*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # @traptitech/markdown-it-katex renders with its own katex ^0.16, while
+      # src/main.ts loads the CSS from our direct katex dep. 0.17+ prefixes the
+      # CSS classes (.katex-*), which would silently break math layout. Lift
+      # this when the markdown-it KaTeX plugin is replaced.
+      - dependency-name: "katex"
+        versions: [">=0.17"]
+      # TypeScript 7 (native compiler) is outside typescript-eslint's supported
+      # range and vue-tsc can't drive it yet.
+      - dependency-name: "typescript"
+        versions: [">=7"]
+      # vitest 3.x leaves @vitest/ui and @vitest/coverage-v8 behind and breaks
+      # ChatView.spec (rAF faking); the plan is a single vitest 4.1.x + vite 8
+      # migration. 4.1.11+ stays allowed.
+      - dependency-name: "vitest"
+        versions: [">=3.0.0 <4.1.11"]
+      - dependency-name: "@vitest/mocker"
+        versions: [">=3.0.0 <4.1.11"]
+      # jsdom 28+ needs Node >= 22; CI and release builds run Node 20.
+      - dependency-name: "jsdom"
+        versions: [">=28"]
+      # markdown-it 15: linkify-it v6 (fuzzy links off by default), own types,
+      # lib/* subpath exports removed - needs a deliberate migration.
+      - dependency-name: "markdown-it"
+        versions: [">=15"]
     groups:
-      # Tauri NPM packages must stay in sync with Rust crate versions (major.minor must match).
-      # Grouping ensures both sides land in the same PR and the build never sees a mismatch.
+      # Tauri NPM packages must stay in sync with the Rust crates (major.minor).
+      # Must be listed FIRST: a dependency goes to the first group it matches.
       tauri:
         patterns:
           - "@tauri-apps/*"
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+        exclude-patterns:
+          - "@tauri-apps/*"
+      # Security PRs: one grouped PR per ecosystem instead of one per advisory.
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    # Majors fall through every version-update group above and therefore
+    # still arrive as individual PRs (one per dependency).
 
   # Cargo / Rust dependencies
   - package-ecosystem: "cargo"
@@ -21,18 +71,53 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 10
+      time: "05:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    ignore:
+      # Same MSRV hold as the npm "@tauri-apps/*" rule above.
+      - dependency-name: "tauri"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      - dependency-name: "tauri-*"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
-      # Must mirror the NPM "tauri" group so both ecosystems update together.
+      # Mirrors the NPM "tauri" group. Same-named groups in different ecosystems
+      # still open separate PRs, so merge the npm and cargo tauri PRs together.
       tauri:
         patterns:
           - "tauri"
           - "tauri-*"
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+        exclude-patterns:
+          - "tauri"
+          - "tauri-*"
+      cargo-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   # GitHub Actions — keep action versions and their SHA pins up to date.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "monthly"
+      time: "05:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    cooldown:
+      default-days: 7                    # github-actions supports default-days only
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
+    # Majors (e.g. actions/* vN -> vN+1) stay individual PRs so release.yml-only
+    # actions (attest-build-provenance) can be validated on their own.

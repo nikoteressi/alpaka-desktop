@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- Dev tooling: `brace-expansion` pinned to patched releases (1.1.21 / 2.1.7 / 5.0.12) for GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895, GHSA-6j4f-fj2g-mc7p and GHSA-qhr7-859c-m2p7; not shipped in the app
+- `dompurify` 3.4.2 → 3.4.16 (Markdown HTML sanitizer), picking up the upstream fixes released since 3.4.2
+
 ### Fixed
 - Tool-chain regeneration now creates a proper dispatch sibling, fixing broken version navigation when regenerating a web-search response (#167)
 - L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
@@ -38,11 +42,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Removed
 - `strip_history_content` function and all XML-parsing code from both Rust and frontend
 - `<think>` and `<tool_call>` regex branches from `messageParser.ts`
+- Unused `ed25519-dalek` Rust dependency (and 10 crypto crates it pulled in)
 
 ### Fixed
 - `message.id` was always `undefined` in the store message mapping, causing edit/index lookups to silently fail
 - `--bg-elevated-rgb` CSS variable was undefined, breaking `rgba()` usage in `SearchBlock.vue` and `MessageActions.vue`
 - Comprehensive `.rendered-markdown` typography stylesheet — Tailwind v4 Preflight stripped all browser defaults; headings, lists, inline code, blockquotes, and links now render correctly without `@tailwindcss/typography`
+
+---
+
+## [1.3.1] - 2026-10-05
+
+### Fixed
+- AppImage: `.DirIcon` is now a relative symlink instead of an absolute path into the CI build directory, so the app icon resolves on users' machines and the AppImage passes AppImageHub validation (`@tauri-apps/cli` 2.11.2 → 2.11.5, tauri-apps/tauri#15596)
+
+### Security
+- Consolidated dependency update picking up upstream security fixes: `tauri` 2.11.6, `markdown-it` 14.3.2, `vue` 3.5.43 (patched `postcss`/`nanoid`), and Rust lockfile updates clearing open RustSec advisories (`quinn-proto`, `h2`, `rustls`, `crossbeam-epoch`, `quick-xml`, `rkyv`); bundled SQLCipher engine updated to 4.14.0 via `rusqlite` 0.40.2
 
 ---
 
@@ -162,7 +177,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.1...v1.3.0
 [1.2.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.0...v1.1.1

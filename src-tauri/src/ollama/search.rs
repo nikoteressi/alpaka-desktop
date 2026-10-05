@@ -11,7 +11,7 @@ pub async fn execute_web_search(
 ) -> Result<String, AppError> {
     log::info!(
         "Executing native Ollama web search for query: {}...",
-        &query.chars().take(8).collect::<String>()
+        query.chars().take(8).collect::<String>()
     );
 
     // 0. Try the local daemon's experimental proxy (best for Linux/Native auth)
