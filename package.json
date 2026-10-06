@@ -36,12 +36,11 @@
     "@tauri-apps/plugin-global-shortcut": "^2.3.2",
     "@tauri-apps/plugin-notification": "^2.0.0",
     "@traptitech/markdown-it-katex": "^3.6.0",
-    "@types/katex": "^0.16.0",
     "@types/markdown-it": "^14.1.0",
     "@vueuse/core": "^14.0.0",
     "codemirror": "^6.0.2",
     "dompurify": "^3.4.16",
-    "katex": "^0.16.47",
+    "katex": "^0.18.11",
     "markdown-it": "^14.3.2",
     "markdown-it-footnote": "^4.0.0",
     "pinia": "^3.0.4",
@@ -110,7 +109,8 @@
       "@humanfs/node@<0.16.8": "^0.16.8",
       "fflate@>=0.8.0 <0.8.3": "^0.8.3",
       "postcss-selector-parser@<7.1.6": "^7.1.6",
-      "source-map-js@>=1.0.0 <1.2.2": "^1.2.2"
+      "source-map-js@>=1.0.0 <1.2.2": "^1.2.2",
+      "katex@<0.18.2": "^0.18.11"
     }
   }
 }
