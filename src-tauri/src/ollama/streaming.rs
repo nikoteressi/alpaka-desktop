@@ -496,7 +496,7 @@ mod tests {
 
     #[tokio::test]
     async fn stalled_stream_hits_idle_timeout() {
-        let body = "{\"message\":{\"role\":\"assistant\",\"content\":\"Hel\"},\"done\":false}\n";
+        let body = "{\"message\":{\"role\":\"assistant\",\"content\":\"Hello\"},\"done\":false}\n";
         let started = std::time::Instant::now();
         let err = run_with_idle(Some(body), 300)
             .await
