@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- Attached images and search-result favicons now carry `alt` text (accessibility), plus SonarQube code-quality fixes: simpler thinking-block status logic and citation parser, a duplicate CSS rule, an unhandled refresh promise, and duplicate imports
+
 ### Security
 - `katex` 0.16 → 0.18.11 (math rendering) for GHSA-238p-pmpm-9mq7; `@types/katex` dropped since KaTeX now ships its own types
 
