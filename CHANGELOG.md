@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- The app no longer crashes at startup when no system keyring (Secret Service) is available, e.g. on minimal window managers or in sandboxes. A fresh install without a keyring now keeps its database key in a private `db.key` file (mode 0600) in the app data directory, with a warning in the log. An existing keyring-encrypted database is never re-keyed; if the keyring is down, startup reports a clear error instead
 - `pnpm typecheck` (and the type-check step of `pnpm build`) checked nothing: the root `tsconfig.json` has `files: []`. Both now run against `tsconfig.app.json`, and the 14 type errors this exposed are fixed (unused bindings, test fixtures missing required fields or branded `ModelName` types, a `null` favicon URL bound to `<img src>`)
 - Tool-chain regeneration now creates a proper dispatch sibling, fixing broken version navigation when regenerating a web-search response (#167)
 - L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
