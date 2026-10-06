@@ -104,7 +104,7 @@ alpaka-desktop/
 │       │   ├── proxy.rs          # get_proxy_config, save_proxy, delete_proxy, test_proxy
 │       │   ├── service.rs        # Start/stop ollama systemd service
 │       │   ├── settings.rs       # KV settings get/set/delete
-│       │   ├── system.rs         # report_active_view, open_browser
+│       │   ├── system.rs         # report_active_view, open_browser, get_db_key_in_file
 │       │   └── system_info.rs    # detect_hardware (GPU/VRAM/RAM)
 │       │
 │       ├── services/             # Business logic layer
@@ -401,6 +401,7 @@ tauri::generate_handler![
     commands::system_info::detect_hardware,  // reads /proc/meminfo + DRM sysfs
     commands::system::report_active_view,    // tracks current page for tray
     commands::system::open_browser,          // opens URL via xdg-open
+    commands::system::get_db_key_in_file,    // true when the DB key uses the db.key fallback
 ]
 ```
 

@@ -102,6 +102,7 @@ pub fn run() {
             commands::system_info::detect_hardware,
             commands::system::report_active_view,
             commands::system::open_browser,
+            commands::system::get_db_key_in_file,
             commands::model_updates::get_models_with_updates,
             commands::model_updates::check_model_updates,
             commands::attachments::read_image_file,

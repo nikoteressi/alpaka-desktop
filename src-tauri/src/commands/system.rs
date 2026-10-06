@@ -60,6 +60,17 @@ pub async fn report_active_view(
     Ok(())
 }
 
+/// Whether the database key is kept in the `db.key` fallback file because no
+/// system keyring was available on first run. Settings shows a notice when true.
+#[command]
+pub async fn get_db_key_in_file(state: State<'_, AppState>) -> Result<bool, AppError> {
+    let dir = state
+        .db_path
+        .parent()
+        .ok_or_else(|| AppError::Internal("database path has no parent directory".into()))?;
+    Ok(crate::db::uses_key_file(dir))
+}
+
 #[command]
 pub async fn open_browser(app: tauri::AppHandle, url: String) -> Result<(), AppError> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
