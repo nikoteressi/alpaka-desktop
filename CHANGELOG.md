@@ -12,6 +12,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - CI: GitHub Actions pins updated: actions/checkout 7.0.1, actions/setup-node 7.0.0, actions/attest-build-provenance 4.2.2, pnpm/action-setup 6.1.0, anchore/sbom-action 0.24.2, softprops/action-gh-release 3.0.3, taiki-e/install-action 2.87.21
 
+### Fixed
+- AppImage: the bundled `AppRun.wrapped` launcher is now world-executable (it was packaged root-owned with mode 0770, so the AppImage could not start for non-root users and AppImageHub's test failed with "Permission denied"); the release workflow now pre-seeds Tauri's AppRun with mode 0755 and fails the build if any file in the AppImage is not usable by other users
+
 ### Security
 - `source-map-js` 1.2.2 (transitive via the Vue compiler) for GHSA-68fv-2mgg-jv7q
 - Dev tooling: `postcss-selector-parser` 7.1.6 (used only by eslint-plugin-vue) for GHSA-rj75-hqrm-r3gf, which has no 6.x fix; not shipped in the app
