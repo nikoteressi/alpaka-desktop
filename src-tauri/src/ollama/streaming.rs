@@ -3,8 +3,16 @@ use crate::ollama::client::OllamaClient;
 use crate::ollama::types::{ChatRequest, StreamResponse};
 use futures_util::StreamExt;
 use serde_json::json;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Runtime};
 use tokio::sync::broadcast;
+
+/// How long a chat request may go without receiving any bytes before it is
+/// abandoned. This bounds a stalled connection, not the length of a response:
+/// a long generation keeps the timer reset with every chunk. It is generous
+/// because Ollama sends nothing while it loads the model and evaluates the
+/// prompt, which can take minutes for a large context on slow hardware.
+pub const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// The result returned by `stream_chat` after the stream finishes.
 pub struct StreamResult {
@@ -37,7 +45,37 @@ pub async fn stream_chat<R: Runtime>(
     conversation_id: &str,
     mut cancel_rx: broadcast::Receiver<()>,
 ) -> Result<StreamResult, AppError> {
-    stream_once(app, client, &request, conversation_id, &mut cancel_rx).await
+    stream_once(
+        app,
+        client,
+        &request,
+        conversation_id,
+        &mut cancel_rx,
+        STREAM_IDLE_TIMEOUT,
+    )
+    .await
+}
+
+fn idle_timeout_error<R: Runtime>(
+    app: &AppHandle<R>,
+    conversation_id: &str,
+    idle: Duration,
+) -> AppError {
+    let err_msg = format!("No response from the model for {} seconds", idle.as_secs());
+    log::error!(
+        "Chat stream idle timeout for conversation {}",
+        conversation_id
+    );
+    if let Err(e) = app.emit(
+        "chat:error",
+        json!({
+            "conversation_id": conversation_id,
+            "error": err_msg
+        }),
+    ) {
+        log::warn!("Failed to emit chat:error: {} — continuing", e);
+    }
+    AppError::Http(err_msg)
 }
 
 async fn stream_once<R: Runtime>(
@@ -46,8 +84,13 @@ async fn stream_once<R: Runtime>(
     request: &ChatRequest,
     conversation_id: &str,
     cancel_rx: &mut broadcast::Receiver<()>,
+    idle: Duration,
 ) -> Result<StreamResult, AppError> {
-    let response = client.post("/api/chat").json(&request).send().await?;
+    let send = client.post("/api/chat").json(&request).send();
+    let Ok(response) = tokio::time::timeout(idle, send).await else {
+        return Err(idle_timeout_error(app, conversation_id, idle));
+    };
+    let response = response?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -95,7 +138,10 @@ async fn stream_once<R: Runtime>(
                 }
                 return Err(AppError::Cancelled);
             }
-            chunk_res = stream.next() => {
+            chunk_res = tokio::time::timeout(idle, stream.next()) => {
+                let Ok(chunk_res) = chunk_res else {
+                    return Err(idle_timeout_error(app, conversation_id, idle));
+                };
                 match chunk_res {
                     Some(Ok(bytes)) => {
                         {
@@ -394,6 +440,98 @@ async fn stream_once<R: Runtime>(
 
 #[cfg(test)]
 mod tests {
+
+    /// Serves one HTTP request on a random port, then holds the connection open.
+    /// `body: None` never sends response headers; `Some(b)` sends headers and `b`.
+    async fn stalling_server(body: Option<&'static str>) -> String {
+        use tokio::io::AsyncWriteExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut req = [0u8; 4096];
+            let _ = tokio::io::AsyncReadExt::read(&mut sock, &mut req).await;
+            let Some(body) = body else {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                return;
+            };
+            let head = "HTTP/1.1 200 OK\r\nContent-Type: application/x-ndjson\r\nTransfer-Encoding: chunked\r\n\r\n";
+            sock.write_all(head.as_bytes()).await.unwrap();
+            if !body.is_empty() {
+                let chunk = format!("{:x}\r\n{}\r\n", body.len(), body);
+                sock.write_all(chunk.as_bytes()).await.unwrap();
+            }
+            sock.flush().await.unwrap();
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        });
+        format!("http://{}", addr)
+    }
+
+    async fn run_with_idle(
+        body: Option<&'static str>,
+        idle_ms: u64,
+    ) -> Result<super::StreamResult, crate::error::AppError> {
+        let url = stalling_server(body).await;
+        let app = tauri::test::mock_app();
+        let client = crate::ollama::client::OllamaClient::new(reqwest::Client::new(), url, None);
+        let request = crate::ollama::types::ChatRequest {
+            model: "m".into(),
+            messages: vec![],
+            stream: true,
+            think: None,
+            tools: None,
+            options: None,
+        };
+        let (_tx, mut rx) = tokio::sync::broadcast::channel(1);
+        super::stream_once(
+            app.handle(),
+            &client,
+            &request,
+            "conv",
+            &mut rx,
+            std::time::Duration::from_millis(idle_ms),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn stalled_stream_hits_idle_timeout() {
+        let body = "{\"message\":{\"role\":\"assistant\",\"content\":\"Hel\"},\"done\":false}\n";
+        let started = std::time::Instant::now();
+        let err = run_with_idle(Some(body), 300)
+            .await
+            .err()
+            .expect("stalled stream must fail");
+        assert!(
+            err.to_string().contains("No response from the model"),
+            "{err}"
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    }
+
+    #[tokio::test]
+    async fn headers_without_body_hit_idle_timeout() {
+        let err = run_with_idle(Some(""), 300)
+            .await
+            .err()
+            .expect("silent stream must fail");
+        assert!(
+            err.to_string().contains("No response from the model"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_response_headers_hit_idle_timeout() {
+        let err = run_with_idle(None, 300)
+            .await
+            .err()
+            .expect("silent stream must fail");
+        assert!(
+            err.to_string().contains("No response from the model"),
+            "{err}"
+        );
+    }
     #[test]
     fn mode_b_open_close_same_token() {
         let token = "<think>text</think>answer";
