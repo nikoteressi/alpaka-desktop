@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- The context length set in Settings → Engine is now actually used (#233). Every preset, built-in and custom, carried its own `num_ctx` (4096 or 8192) that silently overrode it, and there was no control to change it. Presets now cover sampling options only; `num_ctx` is dropped from custom presets saved by older versions
+
 ### Changed
 - Dependabot version-update PRs now target `develop` instead of `main`, so dependency bumps follow the normal GitFlow path
 
