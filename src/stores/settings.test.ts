@@ -12,7 +12,6 @@ const TEST_OPTIONS: PresetOptions = {
   temperature: 0.5,
   top_p: 0.8,
   top_k: 30,
-  num_ctx: 4096,
   repeat_penalty: 1.05,
   repeat_last_n: 64,
 };
@@ -197,5 +196,44 @@ describe("useSettingsStore", () => {
     await store.deletePreset("creative");
 
     expect(store.presets).toHaveLength(initialCount);
+  });
+
+  describe("context length is not part of presets (#233)", () => {
+    it("built-in presets carry no num_ctx", async () => {
+      const { BUILTIN_PRESETS } = await import("./settings");
+      for (const preset of BUILTIN_PRESETS) {
+        expect(preset.options).not.toHaveProperty("num_ctx");
+      }
+    });
+
+    it("initialize drops num_ctx from user presets saved by older versions", async () => {
+      const store = useSettingsStore();
+      mockInvoke.mockResolvedValue({
+        userPresets: JSON.stringify([
+          {
+            id: "old",
+            name: "Old",
+            isBuiltin: false,
+            options: { ...TEST_OPTIONS, num_ctx: 4096 },
+          },
+        ]),
+      });
+
+      await store.initialize();
+
+      const old = store.presets.find((p) => p.id === "old");
+      expect(old?.options).toEqual(TEST_OPTIONS);
+    });
+
+    it("choosing a default preset keeps the Engine context length", async () => {
+      const store = useSettingsStore();
+      mockInvoke.mockResolvedValue(null);
+      store.chatOptions = { ...store.chatOptions, num_ctx: 65536 };
+
+      for (const id of ["creative", "balanced", "precise", "code"]) {
+        await store.updateDefaultPreset(id);
+        expect(store.chatOptions.num_ctx).toBe(65536);
+      }
+    });
   });
 });
