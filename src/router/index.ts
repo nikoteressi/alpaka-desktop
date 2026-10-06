@@ -54,7 +54,7 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((_to, from, next) => {
   try {
     const chatStore = useChatStore();
     if (chatStore.streaming?.isStreaming) {

@@ -49,6 +49,68 @@
       </template>
     </SettingsRow>
 
+    <SettingsRow icon="sliders">
+      <template #label>Compaction model</template>
+      <template #subtitle
+        >Model used to summarize conversations when compacting. Defaults to the
+        active conversation's model.</template
+      >
+      <template #control>
+        <div class="relative" ref="compactionModelDropdownRef">
+          <button
+            @click="compactionModelOpen = !compactionModelOpen"
+            class="flex items-center justify-between gap-1.5 bg-[var(--bg-input)] border border-[var(--border)] text-[var(--text)] rounded-lg px-2 py-1.5 text-[11px] cursor-pointer hover:border-[var(--accent)] transition-colors w-44"
+            :class="compactionModelOpen ? 'border-[var(--accent)]' : ''"
+          >
+            <span class="truncate">{{
+              settingsStore.compactionModel || "Same as conversation"
+            }}</span>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              class="transition-transform flex-shrink-0"
+              :class="compactionModelOpen ? 'rotate-180' : ''"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div
+            v-if="compactionModelOpen"
+            class="absolute top-full right-0 mt-1 w-44 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-lg shadow-xl z-50 max-h-[240px] overflow-y-auto"
+          >
+            <button
+              @click="selectCompactionModel('')"
+              class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+              :class="
+                !settingsStore.compactionModel
+                  ? 'text-[var(--accent)] font-semibold'
+                  : 'text-[var(--text)]'
+              "
+            >
+              Same as conversation model
+            </button>
+            <button
+              v-for="m in modelStore.models"
+              :key="m.name"
+              @click="selectCompactionModel(m.name)"
+              class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer truncate"
+              :class="
+                settingsStore.compactionModel === m.name
+                  ? 'text-[var(--accent)] font-semibold'
+                  : 'text-[var(--text)]'
+              "
+            >
+              {{ m.name }}
+            </button>
+          </div>
+        </div>
+      </template>
+    </SettingsRow>
+
     <!-- Appearance / Theme Picker -->
     <div class="settings-card">
       <div>
@@ -144,14 +206,39 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from "vue";
 import ToggleSwitch from "../../components/shared/ToggleSwitch.vue";
 import SettingsRow from "../../components/settings/SettingsRow.vue";
 import ConfirmationModal from "../../components/shared/ConfirmationModal.vue";
 import { useSettingsStore } from "../../stores/settings";
+import { useModelStore } from "../../stores/models";
 import { useConfirmationModal } from "../../composables/useConfirmationModal";
 
 const settingsStore = useSettingsStore();
+const modelStore = useModelStore();
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
+
+const compactionModelOpen = ref(false);
+const compactionModelDropdownRef = ref<HTMLElement | null>(null);
+
+function selectCompactionModel(name: string) {
+  settingsStore.updateSetting("compactionModel", name);
+  compactionModelOpen.value = false;
+}
+
+function handleClickOutside(e: MouseEvent) {
+  if (
+    compactionModelDropdownRef.value &&
+    !compactionModelDropdownRef.value.contains(e.target as Node)
+  ) {
+    compactionModelOpen.value = false;
+  }
+}
+
+onMounted(() => document.addEventListener("mousedown", handleClickOutside));
+onUnmounted(() =>
+  document.removeEventListener("mousedown", handleClickOutside),
+);
 
 const themeOptions = [
   { id: "system" as const, label: "System", sub: "Follows OS" },

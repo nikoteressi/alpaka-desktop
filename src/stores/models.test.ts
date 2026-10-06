@@ -62,6 +62,10 @@ describe("useModelStore", () => {
     });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("fetchModels stores results from list_models", async () => {
     const store = useModelStore();
     mockInvoke.mockImplementation(async (cmd: string) => {
@@ -100,8 +104,10 @@ describe("useModelStore", () => {
       },
     );
 
-    // confirm() must never be called — if it were, vitest would throw (no window.confirm in jsdom)
-    const confirmSpy = vi.spyOn(globalThis, "confirm").mockReturnValue(false);
+    // confirm() must never be called. The DOM environment provides no
+    // confirm(), so install a spy as the global (undone by unstubAllGlobals).
+    const confirmSpy = vi.fn().mockReturnValue(false);
+    vi.stubGlobal("confirm", confirmSpy);
 
     await store.deleteModel("llama3:latest");
 
@@ -109,8 +115,6 @@ describe("useModelStore", () => {
       name: "llama3:latest",
     });
     expect(confirmSpy).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
   });
 
   it("pullModel sets pulling state and calls pull_model", async () => {

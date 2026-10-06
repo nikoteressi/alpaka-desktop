@@ -125,6 +125,45 @@ md.renderer.rules.table_close = (tokens, idx, options, env, self) => {
 md.use(footnote);
 md.use(mk, { throwOnError: false, errorColor: "#ef4444" });
 
+// Replaces [1], [1 2], [1, 2] etc. in plain text nodes only — never inside HTML attributes.
+const CITATION_RE = /(\[\d+(?:[\s,]+\d+)*\])/;
+type CoreState = Parameters<Parameters<typeof md.core.ruler.push>[1]>[0];
+type InlineToken = CoreState["tokens"][number];
+
+function textToken(state: CoreState, type: string, content: string) {
+  const tok = new state.Token(type, "", 0);
+  tok.content = content;
+  return tok;
+}
+
+// Splits one text token into text and citation_pill tokens ("[1, 2]" -> two pills).
+function splitCitations(state: CoreState, child: InlineToken): InlineToken[] {
+  const parts = child.content.split(CITATION_RE);
+  if (parts.length === 1) return [child];
+  return parts.filter(Boolean).flatMap((part) =>
+    CITATION_RE.test(part)
+      ? part
+          .slice(1, -1)
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map((n) => textToken(state, "citation_pill", n))
+      : [textToken(state, "text", part)],
+  );
+}
+
+md.core.ruler.push("citation_pills", (state) => {
+  for (const block of state.tokens) {
+    if (block.type !== "inline" || !block.children) continue;
+    block.children = block.children.flatMap((child) =>
+      child.type === "text" ? splitCitations(state, child) : [child],
+    );
+  }
+});
+md.renderer.rules["citation_pill"] = (tokens, idx) => {
+  const n = escapeHtml(tokens[idx].content);
+  return `<span class="citation-pill" data-citation="${n}">${n}</span>`;
+};
+
 export function renderMarkdown(content: string): string {
   return DOMPurify.sanitize(md.render(content));
 }

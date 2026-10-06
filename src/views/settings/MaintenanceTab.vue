@@ -1,5 +1,33 @@
 <template>
   <div class="flex flex-col gap-[8px]">
+    <SettingsRow v-if="dbKeyInFile" icon="key" data-testid="db-key-file-notice">
+      <template #icon>
+        <svg
+          class="w-[14px] h-[14px] text-[var(--warning)]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path
+            d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"
+          />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </template>
+      <template #label>Database key stored in a file</template>
+      <template #subtitle
+        >No system keyring was available when Alpaka was set up, so the key that
+        encrypts your history is kept in <code>db.key</code> in the app data
+        folder, readable only by your user account. Your data is still
+        encrypted, but anyone who can read your files can also read the
+        key.</template
+      >
+    </SettingsRow>
+
     <SettingsRow icon="database">
       <template #label>Backup Database</template>
       <template #subtitle
@@ -45,12 +73,23 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import SettingsRow from "../../components/settings/SettingsRow.vue";
 import ConfirmationModal from "../../components/shared/ConfirmationModal.vue";
 import { useConfirmationModal } from "../../composables/useConfirmationModal";
 
 const { modal, openModal, onConfirm, onCancel } = useConfirmationModal();
+
+const dbKeyInFile = ref(false);
+
+onMounted(async () => {
+  try {
+    dbKeyInFile.value = await invoke<boolean>("get_db_key_in_file");
+  } catch (err: unknown) {
+    console.error("Could not read database key storage:", err);
+  }
+});
 
 async function backupDatabase() {
   try {

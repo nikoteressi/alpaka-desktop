@@ -45,6 +45,9 @@ impl ConversationRepository {
                 conversation_id: conversation_id.clone(),
                 role: messages::MessageRole::User,
                 content,
+                parent_id: None,
+                sibling_order: 0,
+                is_active: true,
                 images_json,
                 files_json: None,
                 tokens_used: None,
@@ -56,6 +59,9 @@ impl ConversationRepository {
                 prompt_eval_duration_ms: None,
                 eval_duration_ms: None,
                 seed: None,
+                thinking: None,
+                tool_calls_json: None,
+                tool_name: None,
             };
 
             messages::create(&tx, new_user_msg)?;
@@ -90,6 +96,9 @@ impl ConversationRepository {
                     conversation_id,
                     role: messages::MessageRole::Assistant,
                     content,
+                    parent_id: None,
+                    sibling_order: 0,
+                    is_active: true,
                     images_json: None,
                     files_json: None,
                     tokens_used: metrics.tokens_used,
@@ -101,6 +110,9 @@ impl ConversationRepository {
                     prompt_eval_duration_ms: metrics.prompt_eval_duration_ms,
                     eval_duration_ms: metrics.eval_duration_ms,
                     seed: metrics.seed,
+                    thinking: None,
+                    tool_calls_json: None,
+                    tool_name: None,
                 },
             )?;
             Ok(())

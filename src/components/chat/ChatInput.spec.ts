@@ -1,5 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { listen as listenMock } from "@tauri-apps/api/event";
 import { setActivePinia, createPinia } from "pinia";
 import ChatInput from "./ChatInput.vue";
 import { useChatStore } from "../../stores/chat";
@@ -727,8 +736,8 @@ describe("ChatInput — onBeforeUnmount cleanup", () => {
     setActivePinia(createPinia());
     vi.useFakeTimers();
     mockInvoke.mockImplementation(() => Promise.resolve([]));
-    global.URL.createObjectURL = vi.fn(() => "blob:mock-url");
-    global.URL.revokeObjectURL = vi.fn();
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    globalThis.URL.revokeObjectURL = vi.fn();
   });
 
   afterEach(() => {
@@ -774,8 +783,8 @@ describe("ChatInput — Attachments", () => {
     setActivePinia(createPinia());
     mockInvoke.mockImplementation(() => Promise.resolve([]));
     // Mock URL.createObjectURL/revokeObjectURL for blob simulation
-    global.URL.createObjectURL = vi.fn(() => "blob:mock-url");
-    global.URL.revokeObjectURL = vi.fn();
+    globalThis.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    globalThis.URL.revokeObjectURL = vi.fn();
   });
 
   it("handles image files and adds to attachments list", async () => {
@@ -1120,6 +1129,39 @@ describe("ChatInput — resetChatOptions", () => {
   });
 });
 
+describe("ChatInput — linked context icon rendering", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("renders folder icon when linked context path has no file extension", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", {
+      id: "ctx-folder",
+      name: "MyFolder",
+      path: "/home/user/MyFolder",
+      content: "folder content",
+      tokens: 10,
+    });
+
+    const wrapper = mountInput();
+    await wrapper.vm.$nextTick();
+
+    // The folder SVG (v-else branch) should render for a path without a dot
+    const folderIcon = wrapper.find(
+      "svg path[d='M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z']",
+    );
+    expect(folderIcon.exists()).toBe(true);
+  });
+});
+
 describe("ChatInput — removeContext", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -1233,15 +1275,15 @@ describe("ChatInput — handleCompact", () => {
     const wrapper = mountInput();
     const vm = wrapper.vm as unknown as {
       handleCompact: () => Promise<void>;
-      isCompacting: boolean;
     };
+    const chatStore = useChatStore();
 
     await vm.handleCompact();
-    // Should not set isCompacting if no conversation
-    expect(vm.isCompacting).toBe(false);
+    // No compaction should be in progress since there's no active conversation
+    expect(chatStore.compactionInProgress).toEqual({});
   });
 
-  it("sets isCompacting to false after compact completes", async () => {
+  it("calls compactConversation after compact completes", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "get_model_capabilities")
         return Promise.reject(new Error("mock"));
@@ -1256,18 +1298,247 @@ describe("ChatInput — handleCompact", () => {
 
     const compactSpy = vi
       .spyOn(chatStore, "compactConversation")
-      .mockResolvedValue("new-conv-id");
+      .mockResolvedValue();
     vi.spyOn(chatStore, "loadConversation").mockResolvedValue();
 
     const wrapper = mountInput();
     const vm = wrapper.vm as unknown as {
       handleCompact: () => Promise<void>;
-      isCompacting: boolean;
     };
 
     await vm.handleCompact();
 
     expect(compactSpy).toHaveBeenCalled();
-    expect(vm.isCompacting).toBe(false);
+  });
+});
+
+describe("ChatInput — folder file picker", () => {
+  const folderPickerStub = {
+    name: "FolderFilePickerModal",
+    template: '<div data-test="picker-modal-stub" />',
+    emits: ["apply", "detach", "close", "update-auto-refresh"],
+  };
+
+  function mountWithPicker() {
+    return mount(ChatInput, {
+      props: { isStreaming: false },
+      global: {
+        stubs: { FolderFilePickerModal: folderPickerStub },
+      },
+    });
+  }
+
+  function makeLinkedContext() {
+    return {
+      id: "ctx-picker-1",
+      name: "notes.txt",
+      path: "/home/user/notes.txt",
+      content: "file content",
+      tokens: 20,
+    };
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      if (cmd === "unlink_folder") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+  });
+
+  it("openFilePicker sets pickerContext and renders FolderFilePickerModal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(true);
+  });
+
+  it("FolderFilePickerModal @apply calls updateContextFiles and closes modal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const updateSpy = vi.spyOn(chatStore, "updateContextFiles");
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    const modal = wrapper.findComponent({ name: "FolderFilePickerModal" });
+    await modal.vm.$emit("apply", ["file-a.txt"], 42, "new content");
+    await wrapper.vm.$nextTick();
+
+    expect(updateSpy).toHaveBeenCalledWith(
+      "conv-test-1",
+      "ctx-picker-1",
+      ["file-a.txt"],
+      42,
+      "new content",
+    );
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+  });
+
+  it("FolderFilePickerModal @detach calls unlink_folder and closes modal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    const modal = wrapper.findComponent({ name: "FolderFilePickerModal" });
+    await modal.vm.$emit("detach");
+    // handlePickerDetach is async — wait for unlink_folder to resolve
+    await new Promise((r) => setTimeout(r, 0));
+    await wrapper.vm.$nextTick();
+
+    expect(mockInvoke).toHaveBeenCalledWith("unlink_folder", {
+      id: "ctx-picker-1",
+    });
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+  });
+
+  it("FolderFilePickerModal @close clears pickerContext and hides modal", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", makeLinkedContext());
+
+    const wrapper = mountWithPicker();
+    const vm = wrapper.vm as unknown as {
+      openFilePicker: (ctx: object) => void;
+    };
+
+    vm.openFilePicker(makeLinkedContext());
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(true);
+
+    const modal = wrapper.findComponent({ name: "FolderFilePickerModal" });
+    await modal.vm.$emit("close");
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.findComponent({ name: "FolderFilePickerModal" }).exists(),
+    ).toBe(false);
+  });
+});
+
+describe("ChatInput — folder:refreshed event", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_model_capabilities")
+        return Promise.reject(new Error("mock"));
+      return Promise.resolve(undefined);
+    });
+    (listenMock as unknown as Mock).mockResolvedValue(() => {});
+  });
+
+  function getRefreshedCallback() {
+    const calls = (listenMock as unknown as Mock).mock.calls as [
+      string,
+      (e: { payload: { context_id: string; token_estimate: number } }) => void,
+    ][];
+    const call = calls.find(([event]) => event === "folder:refreshed");
+    return call?.[1];
+  }
+
+  it("calls updateContextTokens when folder:refreshed fires", async () => {
+    const chatStore = useChatStore();
+    chatStore.conversations.push(makeConversation("llama3"));
+    chatStore.activeConversationId = "conv-test-1";
+    chatStore.addFolderContext("conv-test-1", {
+      id: "ctx-1",
+      name: "MyFolder",
+      path: "/home/user/MyFolder",
+      content: "content",
+      tokens: 10,
+    });
+
+    mountInput();
+    await flushPromises();
+
+    const cb = getRefreshedCallback();
+    expect(cb).toBeDefined();
+
+    const updateSpy = vi.spyOn(chatStore, "updateContextTokens");
+    cb!({ payload: { context_id: "ctx-1", token_estimate: 99 } });
+
+    expect(updateSpy).toHaveBeenCalledWith("ctx-1", 99);
+  });
+
+  it("applies is-refreshing class to the matching pill and removes it after 2s", async () => {
+    vi.useFakeTimers();
+    try {
+      const chatStore = useChatStore();
+      chatStore.conversations.push(makeConversation("llama3"));
+      chatStore.activeConversationId = "conv-test-1";
+      chatStore.addFolderContext("conv-test-1", {
+        id: "ctx-flash",
+        name: "MyFolder",
+        path: "/home/user/MyFolder",
+        content: "content",
+        tokens: 10,
+      });
+
+      const wrapper = mountInput();
+      // Flush the listen() promise with fake timers active
+      await vi.runAllTimersAsync();
+      await wrapper.vm.$nextTick();
+
+      const cb = getRefreshedCallback();
+      expect(cb).toBeDefined();
+
+      cb!({ payload: { context_id: "ctx-flash", token_estimate: 55 } });
+      await wrapper.vm.$nextTick();
+
+      const pill = wrapper.find('[data-testid="refresh-flash-ctx-flash"]');
+      expect(pill.exists()).toBe(true);
+      expect(pill.classes()).toContain("is-refreshing");
+
+      vi.advanceTimersByTime(2000);
+      await wrapper.vm.$nextTick();
+
+      expect(pill.classes()).not.toContain("is-refreshing");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

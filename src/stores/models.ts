@@ -109,6 +109,7 @@ export const useModelStore = defineStore("models", {
       );
       // Ollama capability tags present on at least one installed model
       Object.values(state.capabilities).forEach((caps) => {
+        if (!caps) return;
         if (caps.vision) tagSet.add("vision");
         if (caps.tools) tagSet.add("tools");
         if (caps.thinking) tagSet.add("thinking");

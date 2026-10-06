@@ -228,6 +228,62 @@ describe("useChatStore", () => {
     expect(store.folderContexts["nonexistent"]).toBeUndefined();
   });
 
+  // --- updateContextFiles ---
+
+  describe("updateContextFiles", () => {
+    it("patches tokens, content, and includedFiles in place", () => {
+      const store = useChatStore();
+      store.folderContexts["conv1"] = [
+        {
+          id: "ctx1",
+          name: "my-project",
+          path: "/home/user/my-project",
+          content: "old content",
+          tokens: 100,
+          includedFiles: undefined,
+        },
+      ];
+
+      store.updateContextFiles(
+        "conv1",
+        "ctx1",
+        ["src/main.rs"],
+        42,
+        "new content",
+      );
+
+      const ctx = store.folderContexts["conv1"][0];
+      expect(ctx.tokens).toBe(42);
+      expect(ctx.content).toBe("new content");
+      expect(ctx.includedFiles).toEqual(["src/main.rs"]);
+    });
+
+    it("sets includedFiles to undefined when files array is empty", () => {
+      const store = useChatStore();
+      store.folderContexts["conv1"] = [
+        {
+          id: "ctx1",
+          name: "my-project",
+          path: "/home/user/my-project",
+          content: "old content",
+          tokens: 100,
+          includedFiles: ["a.ts"],
+        },
+      ];
+
+      store.updateContextFiles("conv1", "ctx1", [], 0, "");
+
+      expect(store.folderContexts["conv1"][0].includedFiles).toBeUndefined();
+    });
+
+    it("is a no-op when contextId does not exist", () => {
+      const store = useChatStore();
+      store.folderContexts["conv1"] = [];
+      store.updateContextFiles("conv1", "missing", ["a.ts"], 10, "x");
+      expect(store.folderContexts["conv1"]).toEqual([]);
+    });
+  });
+
   // --- clearFolderContext ---
 
   it("clearFolderContext deletes folderContexts[conversationId] entirely", () => {
@@ -247,42 +303,34 @@ describe("useChatStore", () => {
 
   // --- compactConversation ---
 
-  it("compactConversation calls invoke('compact_conversation') and returns the new conversation ID", async () => {
+  it("compactConversation calls invoke('compact_conversation') with conversationId and model", async () => {
     const store = useChatStore();
     mockInvoke.mockImplementation(async (cmd, _args) => {
-      if (cmd === "compact_conversation") return "new-conv-id";
-      if (cmd === "list_conversations") return [];
-      if (cmd === "get_folder_contexts") return [];
-      return null;
-    });
-
-    const result = await store.compactConversation(
-      "old-conv-id",
-      "llama3:latest",
-      "Compacted",
-    );
-    expect(result).toBe("new-conv-id");
-    expect(mockInvoke).toHaveBeenCalledWith("compact_conversation", {
-      conversationId: "old-conv-id",
-      model: "llama3:latest",
-      title: "Compacted",
-    });
-  });
-
-  it("compactConversation calls loadConversations(true) after compacting", async () => {
-    const store = useChatStore();
-    mockInvoke.mockImplementation(async (cmd) => {
-      if (cmd === "compact_conversation") return "new-conv-id";
-      if (cmd === "list_conversations") return [];
+      if (cmd === "compact_conversation") return null;
+      if (cmd === "get_messages") return [];
       if (cmd === "get_folder_contexts") return [];
       return null;
     });
 
     await store.compactConversation("old-conv-id", "llama3:latest");
-    expect(mockInvoke).toHaveBeenCalledWith("list_conversations", {
-      limit: 20,
-      offset: 0,
+    expect(mockInvoke).toHaveBeenCalledWith("compact_conversation", {
+      conversationId: "old-conv-id",
+      model: "llama3:latest",
     });
+  });
+
+  it("compactConversation does not reload messages itself (compact:done event owns that)", async () => {
+    const store = useChatStore();
+    store.activeConversationId = "old-conv-id";
+    mockInvoke.mockResolvedValue(null);
+
+    await store.compactConversation("old-conv-id", "llama3:latest");
+
+    // Reload is delegated to the compact:done event handler, not done inline.
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "get_messages",
+      expect.anything(),
+    );
   });
 
   it("loadConversations handles pagination and appends to existing list", async () => {

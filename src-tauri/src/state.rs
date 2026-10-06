@@ -6,6 +6,7 @@ use std::sync::{Mutex, RwLock};
 use tokio::sync::{broadcast, oneshot};
 
 use crate::db::DbConn;
+use crate::folder_watcher::FolderWatcher;
 
 // ── Application state ──────────────────────────────────────────────────────────
 
@@ -27,6 +28,10 @@ pub struct AppState {
     /// Send on this channel to interrupt an in-progress generation.
     /// Set to `None` when no generation is running.
     pub cancel_tx: Mutex<Option<broadcast::Sender<()>>>,
+
+    /// Send on this channel to cancel an in-progress compaction.
+    /// Set to `None` when no compaction is running.
+    pub compact_cancel_tx: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 
     /// Per-model cancellation senders for in-progress create_model commands.
     /// Key is the model name; dropping the sender also cancels the stream.
@@ -56,6 +61,10 @@ pub struct AppState {
 
     /// Send on this channel to shut down the model-update background loop on app exit.
     pub update_check_loop_shutdown: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
+
+    /// Active filesystem watchers, keyed by context_id.
+    /// Dropping an entry cancels the underlying inotify watch.
+    pub folder_watchers: Mutex<HashMap<String, FolderWatcher>>,
 }
 
 /// Builds a reqwest client configured with an optional HTTP or SOCKS5 proxy.
@@ -138,6 +147,7 @@ impl AppState {
             db_path,
             http_client: RwLock::new(http_client),
             cancel_tx: Mutex::new(None),
+            compact_cancel_tx: Mutex::new(None),
             model_create_cancel_tx: Mutex::new(HashMap::new()),
             health_loop_shutdown: Mutex::new(None),
             health_loop_handle: std::sync::Mutex::new(None),
@@ -146,6 +156,7 @@ impl AppState {
             models_with_updates: RwLock::new(Vec::new()),
             update_check_running: AtomicBool::new(false),
             update_check_loop_shutdown: Mutex::new(None),
+            folder_watchers: Mutex::new(HashMap::new()),
         })
     }
 }

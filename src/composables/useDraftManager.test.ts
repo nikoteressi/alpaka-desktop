@@ -93,7 +93,7 @@ describe("useDraftManager", () => {
     startNewChat("llama3");
     const draftId = store.draftConversation!.id;
     store.folderContexts[draftId] = [
-      { id: "f1", path: "/docs", content: "", token_estimate: 0 },
+      { id: "f1", name: "docs", path: "/docs", content: "", tokens: 0 },
     ];
 
     const fakeConv = {

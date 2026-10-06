@@ -400,6 +400,9 @@ async fn test_create_conversation_and_get_messages() {
             conversation_id: conv.id.clone(),
             role: db::messages::MessageRole::User,
             content: "First message".into(),
+            parent_id: None,
+            sibling_order: 0,
+            is_active: true,
             images_json: None,
             files_json: None,
             tokens_used: None,
@@ -411,6 +414,9 @@ async fn test_create_conversation_and_get_messages() {
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
             seed: None,
+            thinking: None,
+            tool_calls_json: None,
+            tool_name: None,
         },
     )
     .unwrap();
@@ -421,6 +427,9 @@ async fn test_create_conversation_and_get_messages() {
             conversation_id: conv.id.clone(),
             role: db::messages::MessageRole::Assistant,
             content: "Second message".into(),
+            parent_id: None,
+            sibling_order: 0,
+            is_active: true,
             images_json: None,
             files_json: None,
             tokens_used: Some(42),
@@ -432,6 +441,9 @@ async fn test_create_conversation_and_get_messages() {
             prompt_eval_duration_ms: None,
             eval_duration_ms: None,
             seed: None,
+            thinking: None,
+            tool_calls_json: None,
+            tool_name: None,
         },
     )
     .unwrap();
@@ -667,6 +679,263 @@ async fn test_chunked_boundary_streaming() {
         *done_received.lock().unwrap(),
         "chat:done not received after chunked boundary stream"
     );
+}
+
+mod native_roles {
+    use alpaka_desktop_lib::db::{messages, migrations};
+
+    fn in_memory_conn() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        migrations::run(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO conversations (id, title, model) VALUES ('c1', 'T', 'm')",
+            [],
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn tool_chain_messages_round_trip() {
+        let conn = in_memory_conn();
+
+        // User message
+        let user = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::User,
+                content: "What is the weather?".to_string(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // Intermediate assistant (tool dispatch)
+        let asst_tool = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "".to_string(),
+                parent_id: Some(user.id.clone()),
+                tool_calls_json: Some(r#"[{"type":"function","function":{"name":"web_search","arguments":{"query":"weather"}}}]"#.to_string()),
+                thinking: Some("I should search for this".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert!(asst_tool.tool_calls_json.is_some());
+        assert!(asst_tool.content.is_empty());
+
+        // Tool result
+        let tool_result = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Tool,
+                content: r#"{"results":[{"title":"Weather","url":"https://example.com","content":"Sunny 72°F"}]}"#.to_string(),
+                parent_id: Some(asst_tool.id.clone()),
+                tool_name: Some("web_search".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(tool_result.role, messages::MessageRole::Tool);
+        assert_eq!(tool_result.tool_name.as_deref(), Some("web_search"));
+
+        // Final assistant answer
+        let asst_final = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "The weather is sunny and 72°F.".to_string(),
+                parent_id: Some(tool_result.id.clone()),
+                thinking: Some("The search results show sunny 72°F".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(asst_final.content, "The weather is sunny and 72°F.");
+        assert!(!asst_final.content.contains("<tool_call>"));
+        assert!(!asst_final.content.contains("<think>"));
+
+        // Verify active path traversal includes all four messages
+        let path = messages::list_for_conversation(&conn, "c1").unwrap();
+        assert_eq!(
+            path.len(),
+            4,
+            "active path must include user + asst_tool + tool_result + asst_final"
+        );
+        assert_eq!(path[1].role, messages::MessageRole::Assistant);
+        assert!(path[1].tool_calls_json.is_some());
+        assert_eq!(path[2].role, messages::MessageRole::Tool);
+        assert_eq!(path[3].role, messages::MessageRole::Assistant);
+        assert!(path[3].tool_calls_json.is_none());
+    }
+
+    #[test]
+    fn tool_chain_regenerate_sibling() {
+        let conn = in_memory_conn();
+
+        // ── First generation ──────────────────────────────────────────────────
+        let user = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::User,
+                content: "Search for something".to_string(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // dispatch_1 — created the old way (plain create), simulating how the
+        // first generation is currently persisted by the orchestrator
+        let dispatch_1 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "".to_string(),
+                parent_id: Some(user.id.clone()),
+                tool_calls_json: Some(r#"[{"type":"function","function":{"name":"web_search","arguments":{"query":"x"}}}]"#.to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let tool_result_1 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Tool,
+                content: r#"{"results":[]}"#.to_string(),
+                parent_id: Some(dispatch_1.id.clone()),
+                tool_name: Some("web_search".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let _final_1 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "First answer".to_string(),
+                parent_id: Some(tool_result_1.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // ── Regeneration — dispatch_2 via create_sibling (the fix) ────────────
+        let dispatch_2 = messages::create_sibling(
+            &conn,
+            &user.id,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "".to_string(),
+                tool_calls_json: Some(r#"[{"type":"function","function":{"name":"web_search","arguments":{"query":"x"}}}]"#.to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let tool_result_2 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Tool,
+                content: r#"{"results":[]}"#.to_string(),
+                parent_id: Some(dispatch_2.id.clone()),
+                tool_name: Some("web_search".to_string()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let _final_2 = messages::create(
+            &conn,
+            messages::NewMessage {
+                conversation_id: "c1".to_string(),
+                role: messages::MessageRole::Assistant,
+                content: "Second answer".to_string(),
+                parent_id: Some(tool_result_2.id.clone()),
+                sibling_order: 0,
+                is_active: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // ── Assertions: sibling structure ─────────────────────────────────────
+        assert_eq!(dispatch_2.sibling_order, 1, "new dispatch must be order 1");
+        assert!(dispatch_2.is_active, "new dispatch must be active");
+
+        let dispatch_1_refreshed: bool = conn
+            .query_row(
+                "SELECT is_active FROM messages WHERE id = ?1",
+                rusqlite::params![dispatch_1.id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!dispatch_1_refreshed, "old dispatch must be deactivated");
+
+        // sibling_count for dispatch_2 — fetch via list_for_conversation since
+        // create_sibling returns 1 (the value is computed in the list query)
+        let path = messages::list_for_conversation(&conn, "c1").unwrap();
+        let dispatch_2_in_path = path.iter().find(|m| m.id == dispatch_2.id).unwrap();
+        assert_eq!(
+            dispatch_2_in_path.sibling_count, 2,
+            "sibling_count must reflect both dispatches"
+        );
+
+        // ── Assertions: active path shows only second chain ───────────────────
+        let contents: Vec<&str> = path.iter().map(|m| m.content.as_str()).collect();
+        assert!(
+            contents.contains(&"Second answer"),
+            "active path must include second chain final"
+        );
+        assert!(
+            !contents.contains(&"First answer"),
+            "active path must NOT include first chain final"
+        );
+
+        // ── Navigate back to first chain ──────────────────────────────────────
+        messages::set_active_sibling(&conn, &dispatch_1.id).unwrap();
+        let path2 = messages::list_for_conversation(&conn, "c1").unwrap();
+        let contents2: Vec<&str> = path2.iter().map(|m| m.content.as_str()).collect();
+        assert!(
+            contents2.contains(&"First answer"),
+            "after navigate, active path must include first chain final"
+        );
+        assert!(
+            !contents2.contains(&"Second answer"),
+            "after navigate, active path must NOT include second chain final"
+        );
+    }
 }
 
 // ── Chat options / preset forwarding ─────────────────────────────────────────

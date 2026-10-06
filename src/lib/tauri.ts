@@ -106,6 +106,9 @@ export const tauriApi = {
   exportConversation: (conversationId: string) =>
     invoke<void>("export_conversation", { conversationId }),
 
+  exportConversationMarkdown: (conversationId: string) =>
+    invoke<void>("export_conversation_markdown", { conversationId }),
+
   backupDatabase: () => invoke<void>("backup_database"),
 
   // Models
@@ -197,8 +200,20 @@ export const tauriApi = {
   listFolderFiles: (path: string) =>
     invoke<string[]>("list_folder_files", { path }),
 
-  updateIncludedFiles: (folderId: string, includedFiles: string[]) =>
-    invoke<void>("update_included_files", { folderId, includedFiles }),
+  getIncludedFilesContent: (id: string) =>
+    invoke<{ token_estimate: number; content: string }>(
+      "get_included_files_content",
+      { id },
+    ),
+
+  updateIncludedFiles: (id: string, includedFiles: string[]) =>
+    invoke<{ token_estimate: number; content: string }>(
+      "update_included_files",
+      { id, includedFiles },
+    ),
+
+  setAutoRefresh: (id: string, enabled: boolean) =>
+    invoke<void>("set_auto_refresh", { id, enabled }),
 
   estimateTokens: (folderId: string) =>
     invoke<number>("estimate_tokens", { folderId }),

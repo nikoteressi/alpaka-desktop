@@ -2,6 +2,7 @@ pub mod auth;
 pub mod commands;
 pub mod db;
 pub mod error;
+mod folder_watcher;
 pub mod ollama;
 pub mod services;
 pub mod state;
@@ -59,9 +60,16 @@ pub fn run() {
             commands::chat::send_message,
             commands::chat::stop_generation,
             commands::chat::export_conversation,
+            commands::chat::export_conversation_markdown,
             commands::chat::backup_database,
             commands::chat::restore_database,
             commands::chat::compact_conversation,
+            commands::chat::cancel_compaction,
+            commands::chat::get_archived_messages,
+            commands::chat::regenerate_message,
+            commands::chat::switch_version,
+            commands::chat::navigate_version,
+            commands::chat::truncate_from,
             commands::service::start_ollama,
             commands::service::stop_ollama,
             commands::service::ollama_service_status,
@@ -82,9 +90,11 @@ pub fn run() {
             commands::model_user_data::list_model_user_data,
             commands::folders::link_folder,
             commands::folders::unlink_folder,
+            commands::folders::set_auto_refresh,
             commands::folders::get_folder_contexts,
             commands::folders::list_folder_files,
             commands::folders::update_included_files,
+            commands::folders::get_included_files_content,
             commands::folders::estimate_tokens,
             commands::library::search_ollama_library,
             commands::library::get_library_tags,
@@ -92,6 +102,7 @@ pub fn run() {
             commands::system_info::detect_hardware,
             commands::system::report_active_view,
             commands::system::open_browser,
+            commands::system::get_db_key_in_file,
             commands::model_updates::get_models_with_updates,
             commands::model_updates::check_model_updates,
             commands::attachments::read_image_file,
@@ -173,12 +184,10 @@ pub fn run() {
                     .update_check_loop_shutdown
                     .lock()
                     .unwrap() = Some(upd_shutdown_tx);
-                let _ = tauri::async_runtime::spawn(
-                    crate::services::model_updates::run_update_check_loop(
-                        app.handle().clone(),
-                        upd_shutdown_rx,
-                    ),
-                );
+                tauri::async_runtime::spawn(crate::services::model_updates::run_update_check_loop(
+                    app.handle().clone(),
+                    upd_shutdown_rx,
+                ));
             }
 
             Ok(())

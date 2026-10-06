@@ -1,46 +1,8 @@
-export type MessagePart = {
-  type: "markdown" | "code" | "think" | "tool";
-  content: string;
-  language?: string;
-  rendered?: string;
-  toolName?: string;
-  toolQuery?: string;
-};
+import type { MessagePart } from "../types/chat";
 
 // Matches fully-closed blocks (strict — code fence requires closing ```)
-const STRICT_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)\`\`\`|<think.*?<\/think>|<tool_call\b[^>]*>.*?<\/tool_call>`;
-// Matches blocks where a trailing code fence is optional (for streaming tails)
-const TAIL_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)(?:\`\`\`|$)|<think.*?<\/think>|<tool_call\b[^>]*>.*?<\/tool_call>`;
-
-function parseThink(matchText: string): MessagePart {
-  const startTagMatch = matchText.match(/^<think([^>]*)>/i);
-  const startTag = startTagMatch ? startTagMatch[1] : "";
-  const timeMatch = startTag.match(/time=["']?([\d.]+)["']?/i);
-  const contentMatch = matchText.match(/^<think[^>]*>(.*)<\/think>$/is);
-  return {
-    type: "think",
-    content: contentMatch
-      ? contentMatch[1].trim()
-      : matchText.replace(/^<think[^>]*>/i, "").trim(),
-    language: timeMatch ? timeMatch[1] : undefined,
-  };
-}
-
-function parseToolCall(matchText: string): MessagePart {
-  const nameM = matchText.match(/\bname="([^"]*)"/i);
-  const queryM = matchText.match(/\bquery="([^"]*)"/i);
-  const openEnd = matchText.indexOf(">");
-  const closeStart = matchText.lastIndexOf("</tool_call>");
-  return {
-    type: "tool",
-    toolName: nameM?.[1],
-    toolQuery: queryM?.[1],
-    content:
-      openEnd >= 0 && closeStart > openEnd
-        ? matchText.slice(openEnd + 1, closeStart)
-        : "",
-  };
-}
+const STRICT_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)\`\`\``;
+const TAIL_PATTERN = String.raw`\`\`\`(\w+)?\n(.*?)(?:\`\`\`|$)`;
 
 function parseCode(match: RegExpExecArray): MessagePart {
   return {
@@ -64,12 +26,7 @@ function pushMarkdown(
 }
 
 export function parseBlockMatch(match: RegExpExecArray): MessagePart | null {
-  const matchText = match[0];
-  if (matchText.toLowerCase().startsWith("<think"))
-    return parseThink(matchText);
-  if (matchText.toLowerCase().startsWith("<tool_call"))
-    return parseToolCall(matchText);
-  if (matchText.startsWith("```")) return parseCode(match);
+  if (match[0].startsWith("```")) return parseCode(match);
   return null;
 }
 

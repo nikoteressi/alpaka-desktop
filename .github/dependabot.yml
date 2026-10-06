@@ -34,13 +34,14 @@ updates:
       # range and vue-tsc can't drive it yet.
       - dependency-name: "typescript"
         versions: [">=7"]
-      # vitest 3.x leaves @vitest/ui and @vitest/coverage-v8 behind and breaks
-      # ChatView.spec (rAF faking); the plan is a single vitest 4.1.x + vite 8
-      # migration. 4.1.11+ stays allowed.
+      # vitest 5 needs Node >= 22.12; CI and release builds run Node 20.
       - dependency-name: "vitest"
-        versions: [">=3.0.0 <4.1.11"]
-      - dependency-name: "@vitest/mocker"
-        versions: [">=3.0.0 <4.1.11"]
+        versions: [">=5"]
+      - dependency-name: "@vitest/*"
+        versions: [">=5"]
+      # Keep Node typings on the Node major CI and release builds run (20).
+      - dependency-name: "@types/node"
+        versions: [">=21"]
       # jsdom 28+ needs Node >= 22; CI and release builds run Node 20.
       - dependency-name: "jsdom"
         versions: [">=28"]
