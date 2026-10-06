@@ -742,6 +742,14 @@ pub struct OllamaClient {
 **Stored in keyring:**
 - OAuth access/refresh tokens (Ollama Cloud)
 - Per-host bearer tokens (optional)
+- The SQLCipher database key (`alpaka-desktop-internal` / `database-encryption-key`)
+
+**Database key without a keyring:** if no Secret Service is available on a fresh install
+(minimal window managers, sandboxes, no D-Bus session), the database key is written to
+`<app data dir>/db.key` (mode `0600`) instead of aborting startup. Once that file exists it
+is always used, so a keyring that appears later never changes the key. An existing
+keyring-encrypted database is never re-keyed: with the keyring down, startup fails with an
+error asking the user to start their keyring. See `db::resolve_db_key`.
 
 **Stored in SQLite (NOT secrets):**
 - Conversations, messages, settings, host metadata (URLs, names), folder contexts, model cache
@@ -982,7 +990,7 @@ Stop generation uses a `tokio::sync::broadcast` channel stored in `AppState::can
 | ADR-01 | **Tauri events** for streaming (not WS/SSE) | Native IPC, zero overhead, built-in cancellation |
 | ADR-02 | **Pinia** for state management | Official Vue 3 store, TypeScript-native, simple API |
 | ADR-03 | **rusqlite** (not SQLx/Diesel) | Sync API fits Tauri's threading model; WAL mode; embedded |
-| ADR-04 | **keyring crate** for secrets | DE-agnostic via Secret Service API; never plaintext |
+| ADR-04 | **keyring crate** for secrets | DE-agnostic via Secret Service API; never plaintext. Exception: on a fresh install with no keyring, the DB key falls back to a `0600` key file so the app can start (the DB stays encrypted, but the key sits next to it) |
 | ADR-05 | **reqwest** for HTTP | Async, streaming support, rustls TLS, mature |
 | ADR-06 | **tokio::select!** for stream cancellation | Instant stop-generation without aborting the async task |
 | ADR-07 | **Single shared `AppState`** (not per-command) | Tauri's `manage()` pattern; simple ownership model |
