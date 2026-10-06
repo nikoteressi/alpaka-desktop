@@ -280,11 +280,13 @@ mod tests {
             hosts[0].id.clone()
         };
         // The seeded default host is localhost — must be rejected before any network call.
+        // Assert without formatting the result: it comes from the API-key code path,
+        // so printing it would be flagged as cleartext logging (rust/cleartext-logging).
         let result = perform_validate_api_key(&client, db.clone(), host_id).await;
-        match result {
-            Err(AppError::Auth(msg)) if msg.contains("Ollama Cloud host") => (),
-            other => panic!("Expected Auth error for non-cloud host, got: {:?}", other),
-        }
+        assert!(
+            matches!(result, Err(AppError::Auth(ref msg)) if msg.contains("Ollama Cloud host")),
+            "Expected an Auth error rejecting the non-cloud host"
+        );
     }
 
     #[tokio::test]
@@ -321,7 +323,7 @@ mod tests {
                     || msg.contains("Platform secure storage")
                     || msg.contains("ServiceUnknown") => {}
             Err(AppError::NotFound(_)) => (), // Host not found edge case
-            Err(e) => panic!("Unexpected error from perform_validate_api_key: {:?}", e),
+            Err(_) => panic!("Unexpected error variant from perform_validate_api_key"),
         }
     }
 

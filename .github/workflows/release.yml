@@ -164,7 +164,30 @@ jobs:
             librsvg2-dev \
             patchelf \
             libayatana-appindicator3-dev \
-            pkg-config
+            pkg-config \
+            squashfs-tools
+
+      # ------------------------------------------------------------------ #
+      # 5b. Pre-seed Tauri's AppRun with a world-executable mode            #
+      # ------------------------------------------------------------------ #
+      # tauri-bundler downloads AppRun into ~/.cache/tauri with mode 0770 and
+      # fs::copy()s it into the AppDir, where linuxdeploy renames it to
+      # AppRun.wrapped. Root-owned and 0770 in the squashfs, it cannot be run
+      # by any other user (AppImageHub's test fails with "Permission denied").
+      # The bundler only downloads AppRun when the cached file is missing, so
+      # seeding it here with 0755 fixes the packaged mode. Same upstream asset
+      # the bundler fetches, pinned by checksum.
+      - name: Pre-seed Tauri AppRun (0755)
+        env:
+          APPRUN_SHA256: f30140a43a0a59e46db21bdefdf749b9e9f2c6946e92afabbacf98b8ae73fb4f
+        run: |
+          set -euo pipefail
+          TOOLS="${XDG_CACHE_HOME:-${HOME}/.cache}/tauri"
+          mkdir -p "${TOOLS}"
+          curl -fsSL --proto '=https' --tlsv1.2 -o "${TOOLS}/AppRun-x86_64" \
+            https://github.com/tauri-apps/binary-releases/releases/download/apprun-old/AppRun-x86_64
+          echo "${APPRUN_SHA256}  ${TOOLS}/AppRun-x86_64" | sha256sum -c -
+          chmod 0755 "${TOOLS}/AppRun-x86_64"
 
       # ------------------------------------------------------------------ #
       # 6. Build distributable bundles                                      #
@@ -193,6 +216,27 @@ jobs:
           echo "deb=${DEB}" >> "$GITHUB_OUTPUT"
           echo "Found AppImage: ${APPIMAGE}"
           echo "Found deb:      ${DEB}"
+
+      - name: Verify AppImage file permissions
+        run: |
+          set -euo pipefail
+          APPIMAGE="$(realpath "${{ steps.artifacts.outputs.appimage }}")"
+          OFFSET="$("${APPIMAGE}" --appimage-offset)"
+          # Read modes from the squashfs itself: --appimage-extract run as root
+          # does not reproduce directory modes faithfully. Everything must be
+          # readable by all users, directories traversable, and anything
+          # executable by its owner executable by all users too.
+          BAD="$(unsquashfs -o "${OFFSET}" -lln "${APPIMAGE}" | awk '
+            $1 ~ /^d/ && substr($1, 8, 3) !~ /^r.x$/ { print; next }
+            $1 ~ /^-/ && (substr($1, 8, 1) != "r" ||
+              (substr($1, 4, 1) == "x" && substr($1, 10, 1) != "x")) { print }
+          ')"
+          if [ -n "${BAD}" ]; then
+            echo "::error::AppImage contains files not usable by other users:"
+            echo "${BAD}"
+            exit 1
+          fi
+          echo "AppImage permissions OK"
 
       - name: Generate SHA256 checksums
         id: checksums
