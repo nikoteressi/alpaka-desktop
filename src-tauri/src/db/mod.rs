@@ -178,6 +178,12 @@ pub fn seed_default_host(conn: &Connection) -> Result<(), AppError> {
     Ok(())
 }
 
+/// True when the database key lives in the `db.key` fallback file rather than the
+/// system keyring (see `resolve_db_key`).
+pub fn uses_key_file(app_data_dir: &Path) -> bool {
+    app_data_dir.join(DB_KEY_FILE_NAME).exists()
+}
+
 /// Returns the SQLCipher key for the database in `app_data_dir`, creating one on first run.
 #[cfg(not(feature = "test-mode"))]
 fn get_or_create_db_key(app_data_dir: &Path) -> Result<String, AppError> {
@@ -525,6 +531,16 @@ mod db_key_tests {
         let err = resolve_db_key(dir.path(), keyring_down).unwrap_err();
         assert!(matches!(err, AppError::Auth(ref msg) if msg.contains("keyring")));
         assert!(!dir.path().join(DB_KEY_FILE_NAME).exists());
+    }
+
+    #[test]
+    fn uses_key_file_reports_the_fallback() {
+        let dir = tempfile::tempdir().unwrap();
+        resolve_db_key(dir.path(), keyring_ok).unwrap();
+        assert!(!uses_key_file(dir.path()));
+        let other = tempfile::tempdir().unwrap();
+        resolve_db_key(other.path(), keyring_down).unwrap();
+        assert!(uses_key_file(other.path()));
     }
 
     #[test]
