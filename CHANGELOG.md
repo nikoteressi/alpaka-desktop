@@ -12,6 +12,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 - Long responses are no longer cut off after 5 minutes (#234). The fixed 5-minute limit on a whole chat turn is replaced by an idle timeout: a request is abandoned only after 10 minutes with no data from Ollama. Web-search tool requests now time out after 30 seconds so a stuck search cannot stall the turn
 
+### Changed
+- Dependabot version-update PRs now target `develop` instead of `main`, so dependency bumps follow the normal GitFlow path
+
 ---
 
 ## [1.4.0] - 2026-10-06
