@@ -1,6 +1,11 @@
 use crate::db::DbConn;
 use crate::error::AppError;
 use serde_json::json;
+use std::time::Duration;
+
+/// Upper bound for one web-search request. The chat agent loop has no overall
+/// deadline, so a search that never answers must not stall the conversation.
+const SEARCH_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Execute a web search by posting natively to the Ollama Cloud Search endpoint.
 /// This fulfills the user's request to rely 100% on the backend's cloud authentication without third-party local search engines.
@@ -36,6 +41,7 @@ pub async fn execute_web_search(
             let resp = http_client
                 .post(&proxy_url)
                 .header("User-Agent", "OllamaDesktop/0.1.0 (Linux)")
+                .timeout(SEARCH_TIMEOUT)
                 .json(&json!({ "query": query }))
                 .send()
                 .await;
@@ -83,6 +89,7 @@ pub async fn execute_web_search(
             let resp = http_client
                 .post(local_proxy)
                 .header("User-Agent", "OllamaDesktop/0.1.0 (Linux)")
+                .timeout(SEARCH_TIMEOUT)
                 .json(&json!({ "query": query }))
                 .send()
                 .await;
@@ -185,6 +192,7 @@ pub async fn perform_search(
         .post("https://ollama.com/api/web_search")
         .header("Authorization", format!("Bearer {}", token))
         .header("User-Agent", "OllamaDesktop/0.1.0 (Linux)")
+        .timeout(SEARCH_TIMEOUT)
         .json(&payload)
         .send()
         .await

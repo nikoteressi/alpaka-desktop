@@ -11,8 +11,7 @@ use crate::error::AppError;
 use crate::ollama::types::{ChatOptions, Message, ThinkParam, Tool};
 use crate::state::AppState;
 use chrono::Local;
-use std::time::Duration;
-use tauri::{AppHandle, Emitter, Runtime};
+use tauri::{AppHandle, Runtime};
 
 /// Parameters for the full `ChatService::send()` lifecycle.
 pub struct SendParams {
@@ -287,9 +286,10 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         }
 
         // 5. Orchestrate (agent loop, event emission)
-        let orchestrate_result = tokio::time::timeout(
-            Duration::from_secs(300),
-            self.orchestrate_stream_with_context(
+        // No overall deadline: a long generation is legitimate. A stalled
+        // connection is caught by the per-chunk idle timeout in stream_chat.
+        let orchestrate_result = self
+            .orchestrate_stream_with_context(
                 conversation_id.clone(),
                 initial_messages,
                 model,
@@ -298,20 +298,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 options,
                 Some(original_content.as_str()),
                 user_msg_id.clone(),
-            ),
-        )
-        .await
-        .map_err(|_| {
-            log::error!("Agent loop timed out for conversation {}", conversation_id);
-            let _ = self.app.emit(
-                "chat:error",
-                serde_json::json!({
-                    "conversation_id": conversation_id,
-                    "error": "Request timed out after 5 minutes"
-                }),
-            );
-            AppError::Internal("Agent loop timed out after 300s".into())
-        })?;
+            )
+            .await;
 
         let result = match orchestrate_result {
             Ok(r) => r,
@@ -533,9 +521,10 @@ impl<'a, R: Runtime> ChatService<'a, R> {
         }
 
         // Orchestrate.
-        let orchestrate_result = tokio::time::timeout(
-            Duration::from_secs(300),
-            self.orchestrate_stream_with_context(
+        // No overall deadline: a long generation is legitimate. A stalled
+        // connection is caught by the per-chunk idle timeout in stream_chat.
+        let orchestrate_result = self
+            .orchestrate_stream_with_context(
                 conversation_id.clone(),
                 initial_messages,
                 model,
@@ -544,20 +533,8 @@ impl<'a, R: Runtime> ChatService<'a, R> {
                 options,
                 None,
                 parent_message_id.clone(),
-            ),
-        )
-        .await
-        .map_err(|_| {
-            log::error!("Agent loop timed out for conversation {}", conversation_id);
-            let _ = self.app.emit(
-                "chat:error",
-                serde_json::json!({
-                    "conversation_id": conversation_id,
-                    "error": "Request timed out after 5 minutes"
-                }),
-            );
-            AppError::Internal("Agent loop timed out after 300s".into())
-        })?;
+            )
+            .await;
 
         let result = match orchestrate_result {
             Ok(r) => r,
