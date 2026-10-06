@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 - `vue-router` 4 → 5, `notify-debouncer-mini` 0.3 → 0.7 (folder auto-refresh watcher), `tokio` 1.53.2, and CI action pins (`dtolnay/rust-toolchain`, `Swatinem/rust-cache`, `taiki-e/install-action`)
+- Dependabot version-update PRs now target `develop` instead of `main`, so dependency bumps follow the normal GitFlow path
 
 ### Removed
 - Unused `@vueuse/core` dependency
