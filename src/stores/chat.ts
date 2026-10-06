@@ -261,8 +261,7 @@ export const useChatStore = defineStore("chat", {
 
       // If we're continuing the same part type, append content
       if (
-        lastPart &&
-        lastPart.type === type &&
+        lastPart?.type === type &&
         (type === "markdown" || type === "think")
       ) {
         lastPart.content += content;

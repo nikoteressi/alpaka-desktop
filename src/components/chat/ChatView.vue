@@ -385,14 +385,11 @@ const pastMessageItems = computed<ScrollerItem[]>(() => {
     .filter(({ msg }) => {
       // Hide the old assistant response while regenerating so the new streaming
       // bubble appears in its place rather than appending below it.
-      if (
+      return !(
         regenParentId &&
         msg.role === "assistant" &&
         msg.parentId === regenParentId
-      ) {
-        return false;
-      }
-      return true;
+      );
     })
     .map(({ msg, originalIndex }) => ({
       id: msg.id ? `dbmsg-${msg.id}` : `msg-${originalIndex}`,

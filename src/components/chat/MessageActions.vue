@@ -168,7 +168,7 @@ async function handleCopy() {
   const content = props.isUser
     ? props.message.content
     : props.message.content
-        .replace(/<think[^>]*>[\s\S]*?<\/think>/g, "")
+        .replaceAll(/<think[^>]*>[\s\S]*?<\/think>/g, "")
         .trim();
   await copy(content);
 }

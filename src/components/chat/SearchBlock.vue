@@ -57,6 +57,7 @@
             >
               <img
                 :src="src"
+                alt=""
                 class="search-badge__favicon"
                 @error="handleFaviconError"
               />
@@ -80,6 +81,7 @@
             >
               <img
                 :src="src"
+                alt=""
                 class="search-badge__favicon"
                 @error="handleFaviconError"
               />
@@ -125,12 +127,12 @@ const chatStore = useChatStore();
 const isActive = computed(() => {
   return (
     chatStore.streaming.sidebarOpen &&
-    chatStore.streaming.activeSearchMessageId === props.messageId
+    chatStore.streaming.activeSearchMessageId === (props.messageId ?? null)
   );
 });
 
 const label = computed(() => {
-  const count = props.results?.length || 0;
+  const count = props.results?.length ?? 0;
   if (props.type === "found") {
     if (props.state === "reading") return `Searching web...`;
     return `Found ${count} web pages`;
@@ -159,7 +161,7 @@ function handleToggle() {
   if (isActive.value) {
     chatStore.closeSearchSidebar();
   } else {
-    chatStore.openSearchSidebar(props.messageId || null, props.results || []);
+    chatStore.openSearchSidebar(props.messageId ?? null, props.results ?? []);
   }
 }
 

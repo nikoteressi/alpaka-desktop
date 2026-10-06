@@ -216,3 +216,67 @@ describe("ThinkBlock", () => {
     expect(wrapper.findAll(".think-step").length).toBe(3);
   });
 });
+
+describe("ThinkBlock streaming labels", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  const toolPart = (isDone: boolean): MessagePart => ({
+    type: "tool",
+    content: "",
+    toolName: "web_search",
+    isDone,
+  });
+
+  function labelFor(parts: MessagePart[], isThinking = true): string {
+    const wrapper = mount(ThinkBlock, {
+      props: { parts, isThinking, isOverallStreaming: true },
+    });
+    return wrapper.find(".think-header__label").text();
+  }
+
+  it("reports a running and a finished web search", () => {
+    expect(labelFor([toolPart(false)])).toBe("Searching web...");
+    expect(labelFor([toolPart(true)])).toBe("Analyzing results...");
+  });
+
+  it("reports analysis right after a tool call, then thinking", () => {
+    expect(labelFor([toolPart(true), thinkPart("short")])).toBe(
+      "Analyzing results...",
+    );
+    expect(labelFor([toolPart(true), thinkPart("x".repeat(60))])).toBe(
+      "Thinking...",
+    );
+  });
+
+  it.each([
+    ["I should search for the docs", "Searching..."],
+    ["Let me look up the value", "Searching..."],
+    ["Plan: first step", "Planning..."],
+    ["Next step is clear", "Planning..."],
+    ["Calculating the total", "Calculating..."],
+    ["Let me verify this", "Verifying..."],
+    ["Double check the units", "Verifying..."],
+    ["Hmm, interesting", "Thinking..."],
+  ])("labels %j as %s", (line, expected) => {
+    expect(labelFor([thinkPart(`earlier line\n${line}`)])).toBe(expected);
+  });
+
+  it("does not report searching again once a tool has run", () => {
+    expect(
+      labelFor([toolPart(true), thinkPart("x".repeat(60) + "\nsearch more")]),
+    ).toBe("Thinking...");
+  });
+
+  it("falls back to Thinking... when no longer thinking mid-stream", () => {
+    expect(labelFor([thinkPart("plan it")], false)).toBe("Thinking...");
+  });
+
+  it('shows "Thought" when finished without a duration', () => {
+    const wrapper = mount(ThinkBlock, {
+      props: { parts: [thinkPart("done")], isThinking: false },
+    });
+    expect(wrapper.find(".think-header__label").text()).toBe("Thought");
+  });
+});

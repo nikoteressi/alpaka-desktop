@@ -2,7 +2,7 @@
 import { ref, computed } from "vue";
 import { renderMarkdown } from "../../lib/markdown";
 import type { Message, MessagePart } from "../../types/chat";
-import { useChatStore } from "../../stores/chat";
+import { useChatStore, uint8ArrayToBase64 } from "../../stores/chat";
 import ThinkBlock from "./ThinkBlock.vue";
 import CodeBlock from "./CodeBlock.vue";
 import SearchBlock from "./SearchBlock.vue";
@@ -10,7 +10,6 @@ import StatsBlock from "./StatsBlock.vue";
 import MessageActions from "./MessageActions.vue";
 import TypingIndicator from "./TypingIndicator.vue";
 import { useSettingsStore } from "../../stores/settings";
-import { uint8ArrayToBase64 } from "../../stores/chat";
 import { parseMessageParts } from "../../lib/messageParser";
 import { useVersionSwitcher } from "../../composables/useVersionSwitcher";
 
@@ -76,7 +75,7 @@ const displayParts = computed(() => {
   if (props.isStreaming) {
     return chatStore.streaming.activeMessageParts;
   }
-  return staticParts.value || [];
+  return staticParts.value ?? [];
 });
 
 // Unified Grouping Logic: sequential think/tool parts go together
@@ -90,7 +89,7 @@ const unifiedGroups = computed(() => {
     const lastGroup = groups[groups.length - 1];
 
     if (isThoughtRelated) {
-      if (lastGroup && lastGroup.type === "thought") {
+      if (lastGroup?.type === "thought") {
         lastGroup.parts.push(part);
       } else {
         groups.push({ type: "thought", parts: [part] });
@@ -128,7 +127,7 @@ const finalSearchResults = computed(() => {
   const searchMsg = [...toolMessages.value]
     .reverse()
     .find((m) => m.toolName === "web_search");
-  if (!searchMsg || !searchMsg.content) return [];
+  if (!searchMsg?.content) return [];
   try {
     const parsed = JSON.parse(searchMsg.content) as {
       results?: import("../../types/chat").SearchResult[];
@@ -180,6 +179,7 @@ function thinkTimeForGroup(group: { parts: MessagePart[] }): number | null {
             v-for="(img, idx) in message.images"
             :key="idx"
             :src="`data:image/png;base64,${uint8ArrayToBase64(img)}`"
+            :alt="`Attached image ${idx + 1}`"
             class="max-h-64 max-w-full rounded-lg border border-[var(--border-strong)]"
           />
         </div>

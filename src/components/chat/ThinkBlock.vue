@@ -157,43 +157,37 @@ const { isOpen, toggle: _toggle } = useCollapsibleState({
 
 const scrollArea = ref<HTMLElement | null>(null);
 
-const label = computed(() => {
-  if (props.isOverallStreaming) {
-    const lastPart = props.parts[props.parts.length - 1];
-    const hasToolCall = props.parts.some((p) => p.type === "tool");
+// Guesses the current activity from the last line of streamed reasoning.
+function activityFromLine(line: string, hasToolCall: boolean): string | null {
+  if (!hasToolCall && (line.includes("search") || line.includes("look up")))
+    return "Searching...";
+  if (line.includes("plan") || line.includes("step")) return "Planning...";
+  if (line.includes("calculat")) return "Calculating...";
+  if (line.includes("verif") || line.includes("check")) return "Verifying...";
+  return null;
+}
 
-    if (lastPart && lastPart.type === "tool") {
-      return lastPart.isDone ? "Analyzing results..." : "Searching web...";
-    }
+function streamingLabel(): string {
+  const lastPart = props.parts[props.parts.length - 1];
+  const hasToolCall = props.parts.some((p) => p.type === "tool");
 
-    if (props.isThinking && hasToolCall) {
-      const content = lastPart?.content || "";
-      if (content.length < 50) return "Analyzing results...";
-      return "Thinking...";
-    }
-
-    if (
-      props.isThinking &&
-      lastPart &&
-      lastPart.type === "think" &&
-      lastPart.content
-    ) {
-      const lastLines = lastPart.content.trim().split("\n");
-      const currentLine = lastLines[lastLines.length - 1].toLowerCase();
-      if (
-        !hasToolCall &&
-        (currentLine.includes("search") || currentLine.includes("look up"))
-      ) {
-        return "Searching...";
-      }
-      if (currentLine.includes("plan") || currentLine.includes("step"))
-        return "Planning...";
-      if (currentLine.includes("calculat")) return "Calculating...";
-      if (currentLine.includes("verif") || currentLine.includes("check"))
-        return "Verifying...";
-    }
-    return "Thinking...";
+  if (lastPart?.type === "tool") {
+    return lastPart.isDone ? "Analyzing results..." : "Searching web...";
   }
+  if (props.isThinking && hasToolCall) {
+    const content = lastPart?.content ?? "";
+    return content.length < 50 ? "Analyzing results..." : "Thinking...";
+  }
+  if (props.isThinking && lastPart?.type === "think" && lastPart.content) {
+    const lines = lastPart.content.trim().split("\n");
+    const currentLine = lines[lines.length - 1].toLowerCase();
+    return activityFromLine(currentLine, hasToolCall) ?? "Thinking...";
+  }
+  return "Thinking...";
+}
+
+const label = computed(() => {
+  if (props.isOverallStreaming) return streamingLabel();
 
   const t = props.thinkTime;
   if (t !== null && t !== undefined && !Number.isNaN(t)) {
@@ -460,6 +454,7 @@ defineExpose({ isOpen });
 .think-step__active {
   display: inline;
   vertical-align: baseline;
+  white-space: pre-wrap;
 }
 
 .think-timeline-tool {
@@ -497,11 +492,6 @@ defineExpose({ isOpen });
   50% {
     opacity: 0;
   }
-}
-
-.think-step__active {
-  display: inline;
-  white-space: pre-wrap;
 }
 
 .think-fade-enter-from,

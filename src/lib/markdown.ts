@@ -127,40 +127,36 @@ md.use(mk, { throwOnError: false, errorColor: "#ef4444" });
 
 // Replaces [1], [1 2], [1, 2] etc. in plain text nodes only — never inside HTML attributes.
 const CITATION_RE = /(\[\d+(?:[\s,]+\d+)*\])/;
+type CoreState = Parameters<Parameters<typeof md.core.ruler.push>[1]>[0];
+type InlineToken = CoreState["tokens"][number];
+
+function textToken(state: CoreState, type: string, content: string) {
+  const tok = new state.Token(type, "", 0);
+  tok.content = content;
+  return tok;
+}
+
+// Splits one text token into text and citation_pill tokens ("[1, 2]" -> two pills).
+function splitCitations(state: CoreState, child: InlineToken): InlineToken[] {
+  const parts = child.content.split(CITATION_RE);
+  if (parts.length === 1) return [child];
+  return parts.filter(Boolean).flatMap((part) =>
+    CITATION_RE.test(part)
+      ? part
+          .slice(1, -1)
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map((n) => textToken(state, "citation_pill", n))
+      : [textToken(state, "text", part)],
+  );
+}
+
 md.core.ruler.push("citation_pills", (state) => {
   for (const block of state.tokens) {
     if (block.type !== "inline" || !block.children) continue;
-    const next = [] as NonNullable<typeof block.children>;
-    for (const child of block.children) {
-      if (child.type !== "text") {
-        next.push(child);
-        continue;
-      }
-      const parts = child.content.split(CITATION_RE);
-      if (parts.length === 1) {
-        next.push(child);
-        continue;
-      }
-      for (const part of parts) {
-        if (!part) continue;
-        if (CITATION_RE.test(part)) {
-          const numbers = part
-            .slice(1, -1)
-            .split(/[\s,]+/)
-            .filter(Boolean);
-          for (const n of numbers) {
-            const tok = new state.Token("citation_pill", "", 0);
-            tok.content = n;
-            next.push(tok);
-          }
-        } else {
-          const tok = new state.Token("text", "", 0);
-          tok.content = part;
-          next.push(tok);
-        }
-      }
-    }
-    block.children = next;
+    block.children = block.children.flatMap((child) =>
+      child.type === "text" ? splitCitations(state, child) : [child],
+    );
   }
 });
 md.renderer.rules["citation_pill"] = (tokens, idx) => {
