@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.3.2] - 2026-10-06
+
 ### Changed
 - CI: GitHub Actions pins updated: actions/checkout 7.0.1, actions/setup-node 7.0.0, actions/attest-build-provenance 4.2.2, pnpm/action-setup 6.1.0, anchore/sbom-action 0.24.2, softprops/action-gh-release 3.0.3, taiki-e/install-action 2.87.21
 
@@ -154,7 +158,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.1...v1.3.0
 [1.2.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.1.1...v1.2.0
