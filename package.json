@@ -37,7 +37,6 @@
     "@tauri-apps/plugin-notification": "^2.0.0",
     "@traptitech/markdown-it-katex": "^3.6.0",
     "@types/markdown-it": "^14.1.0",
-    "@vueuse/core": "^14.0.0",
     "codemirror": "^6.0.2",
     "dompurify": "^3.4.16",
     "katex": "^0.18.11",
@@ -46,7 +45,7 @@
     "pinia": "^3.0.4",
     "shiki": "^4.1.0",
     "vue": "^3.5.43",
-    "vue-router": "^4.4.0",
+    "vue-router": "^5.3.1",
     "vue-virtual-scroller": "^3.0.5"
   },
   "devDependencies": {

@@ -14,7 +14,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The context length set in Settings → Engine is now actually used (#233). Every preset, built-in and custom, carried its own `num_ctx` (4096 or 8192) that silently overrode it, and there was no control to change it. Presets now cover sampling options only; `num_ctx` is dropped from custom presets saved by older versions
 
 ### Changed
+- `vue-router` 4 → 5, `notify-debouncer-mini` 0.3 → 0.7 (folder auto-refresh watcher), `tokio` 1.53.2, and CI action pins (`dtolnay/rust-toolchain`, `Swatinem/rust-cache`, `taiki-e/install-action`)
 - Dependabot version-update PRs now target `develop` instead of `main`, so dependency bumps follow the normal GitFlow path
+
+### Removed
+- Unused `@vueuse/core` dependency
 
 ---
 
