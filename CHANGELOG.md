@@ -31,6 +31,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - History context now uses native DB fields — `thinking` sent back as `message.thinking`, tool calls via `tool_calls_json`, tool results as `role=tool` messages; no XML stripping at replay time
 
 ### Changed
+- Rust dependencies brought up to the versions already shipped on `main` (tokio 1.53, uuid 1.26, serde 1.0.229, Tauri plugins and others), which earlier back-merges had left behind on `develop`
 - CI: clippy now also lints the production feature set (the `test-mode` build compiles out the keyring and background-loop code)
 - Dev tooling: TypeScript 5.9 → 6.0 (type checking only; no change to the built app)
 - Thinking content now stored in native `thinking` DB column; no longer embedded as `<think>` XML in `content`
