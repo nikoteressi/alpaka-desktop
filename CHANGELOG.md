@@ -14,6 +14,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 - CI, docs and release workflows run on Node 22 (Node 20 is end-of-life); `engines.node` is now `>=22.19`, which WebdriverIO 10 requires
+- CodeQL Action v3 → v4.38.2. v3 is deprecated (December 2026) and still ran on Node 20, which made the code-scanning tool status page report warnings
 
 ---
 
