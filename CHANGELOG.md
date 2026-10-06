@@ -16,6 +16,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - AppImage: the bundled `AppRun.wrapped` launcher is now world-executable (it was packaged root-owned with mode 0770, so the AppImage could not start for non-root users and AppImageHub's test failed with "Permission denied"); the release workflow now pre-seeds Tauri's AppRun with mode 0755 and fails the build if any file in the AppImage is not usable by other users
 
 ### Security
+- `source-map-js` 1.2.2 (transitive via the Vue compiler) for GHSA-68fv-2mgg-jv7q
+- Dev tooling: `postcss-selector-parser` 7.1.6 (used only by eslint-plugin-vue) for GHSA-rj75-hqrm-r3gf, which has no 6.x fix; not shipped in the app
 - Dev tooling: patched transitive dependencies of the E2E runner (WebdriverIO), eslint, vitest UI and VitePress via `pnpm.overrides`: undici 7.30, js-yaml 4.3.2, postcss 8.5.29, nanoid 3.3.18, basic-ftp 6.2.2, @humanfs/node 0.16.8, fflate 0.8.3, postcss-selector-parser 6.1.4; Rust `anyhow` 1.0.104 and `event-listener` 5.4.2 (RUSTSEC-2026-0190, RUSTSEC-2026-0221). None of these ship in the app
 - Dev tooling: `brace-expansion` pinned to patched releases (1.1.21 / 2.1.7 / 5.0.12) for GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895, GHSA-6j4f-fj2g-mc7p and GHSA-qhr7-859c-m2p7; not shipped in the app
 - `dompurify` 3.4.2 → 3.4.16 (Markdown HTML sanitizer), picking up the upstream fixes released since 3.4.2
