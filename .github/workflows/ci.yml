@@ -91,7 +91,7 @@ jobs:
 
       - name: Install Rust stable
         if: needs.changes.outputs.rust == 'true'
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # @stable (master)
         with:
           toolchain: stable
 
@@ -151,7 +151,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust 1.88.0 (MSRV)
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # @stable (master)
         with:
           toolchain: "1.88.0"
 
@@ -195,7 +195,7 @@ jobs:
       - name: Install Rust stable
         if: needs.changes.outputs.rust == 'true'
         id: rust-toolchain
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # @stable (master)
         with:
           toolchain: stable
           components: rustfmt, clippy
@@ -322,7 +322,7 @@ jobs:
 
       - name: Install Rust stable
         if: needs.changes.outputs.rust == 'true'
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # @stable (master)
         with:
           toolchain: stable
 
@@ -421,7 +421,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # @stable (master)
         with:
           toolchain: stable
 
@@ -502,7 +502,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # @stable (master)
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # @stable (master)
         with:
           toolchain: stable
 

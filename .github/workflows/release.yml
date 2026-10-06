@@ -122,7 +122,7 @@ jobs:
       # 2. Rust stable with Swatinem cache                                  #
       # ------------------------------------------------------------------ #
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9  # stable (2025-04)
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067  # stable (2025-04)
         with:
           toolchain: stable
 
