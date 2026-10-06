@@ -33,6 +33,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - History context now uses native DB fields — `thinking` sent back as `message.thinking`, tool calls via `tool_calls_json`, tool results as `role=tool` messages; no XML stripping at replay time
 
 ### Changed
+- CI: clippy now also lints the production feature set (the `test-mode` build compiles out the keyring and background-loop code)
 - Dev tooling: TypeScript 5.9 → 6.0 (type checking only; no change to the built app)
 - Thinking content now stored in native `thinking` DB column; no longer embedded as `<think>` XML in `content`
 - Tool-call exchanges stored as chained DB messages (`role=assistant/tool_calls` → `role=tool` → `role=assistant/final`); no longer embedded as `<tool_call>` XML
