@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Dependabot version-update PRs now target `develop` instead of `main`, so dependency bumps follow the normal GitFlow path
+
 ---
 
 ## [1.4.0] - 2026-10-06
