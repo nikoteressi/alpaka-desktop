@@ -397,7 +397,6 @@ function resolveCurrentOptions(): PresetOptions {
     temperature: mv.temperature ?? defaults.temperature,
     top_p: mv.top_p ?? defaults.top_p,
     top_k: mv.top_k ?? defaults.top_k,
-    num_ctx: mv.num_ctx ?? defaults.num_ctx,
     repeat_penalty: mv.repeat_penalty ?? defaults.repeat_penalty,
     repeat_last_n: mv.repeat_last_n ?? defaults.repeat_last_n,
     mirostat: mv.mirostat ?? defaults.mirostat,
