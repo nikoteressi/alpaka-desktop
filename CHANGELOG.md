@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.4.1] - 2026-10-06
+
 ### Fixed
 - Long responses are no longer cut off after 5 minutes (#234). The fixed 5-minute limit on a whole chat turn is replaced by an idle timeout: a request is abandoned only after 10 minutes with no data from Ollama. Web-search tool requests now time out after 30 seconds so a stuck search cannot stall the turn
 - The context length set in Settings → Engine is now actually used (#233). Every preset, built-in and custom, carried its own `num_ctx` (4096 or 8192) that silently overrode it, and there was no control to change it. Presets now cover sampling options only; `num_ctx` is dropped from custom presets saved by older versions
@@ -223,7 +227,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.1...v1.3.2
