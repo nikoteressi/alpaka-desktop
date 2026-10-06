@@ -15,6 +15,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - L-07/L-08: Wire `ErrorScreen.vue` into `App.vue` — connection error overlay now appears when the active Ollama host goes offline, with Retry, Start Ollama Service (localhost only), and Change Host / Settings actions
 
 ### Added
+- Settings → Maintenance shows a notice when the database key is kept in the `db.key` fallback file because no system keyring was available
 - LFC-05: Auto-refresh folder context — per-context toggle enables inotify watcher; token count updates on file change with ↻ pill flash
 - LFC-03: Clicking a linked folder context pill opens a file picker modal — users can select which files are included as LLM context. Unchecking all files and applying removes the folder link.
 - C-08/C-08b: Conversation export via sidebar context menu — right-click a conversation → Export → JSON or Markdown; dialog pre-filled with conversation title as default filename; Markdown export strips `<think>` and `<tool_call>` blocks for clean output (#156)
