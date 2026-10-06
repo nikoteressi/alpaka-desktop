@@ -5,13 +5,13 @@ Codename: stable
 Architectures: amd64
 Components: main
 Description: Alpaka Desktop APT repository
-Date: Tue, 06 Oct 2026 11:23:26 +0000
+Date: Tue, 06 Oct 2026 15:05:17 +0000
 MD5Sum:
- cc7534301f3c2087b50879b6895d7098              501 main/binary-amd64/Packages
- 6dde92a5f4a2502f4099174119a48a7c              384 main/binary-amd64/Packages.gz
+ 5bdaf8dfd9afdb7c5727d7e7fca0ec49              501 main/binary-amd64/Packages
+ 0180be0b4c435757ba6bb23fd625fa09              381 main/binary-amd64/Packages.gz
 SHA1:
- 27a37f7d40482ad0fcca62845365f02a285aa191              501 main/binary-amd64/Packages
- b88740625f75fc6c3041085b50ab75e657759546              384 main/binary-amd64/Packages.gz
+ 02ab9940f31486e5be2f46e68d39129774c9ec2c              501 main/binary-amd64/Packages
+ cb58d3fa46651bd2d5c69f6576b97a756a7d04cb              381 main/binary-amd64/Packages.gz
 SHA256:
- 645eb4d4990cbf3ec910f32d512bbb6d6950587bdf3d2db11c1e766e85566b53              501 main/binary-amd64/Packages
- 8dedda72a9cf1b643ac1e5ccc4025fa228ea0a523c0a5c2e4392f7d952e7550b              384 main/binary-amd64/Packages.gz
+ 22067eebac89eb2a80591ab61edd99bd46e6d0246f286956d834dd379b14e379              501 main/binary-amd64/Packages
+ 84c5952d3c164d3bd47f7a2b6be313114bc49e9fd059273eccd6e9048edd5c94              381 main/binary-amd64/Packages.gz
