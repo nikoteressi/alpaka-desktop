@@ -13,6 +13,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CI: GitHub Actions pins updated: actions/checkout 7.0.1, actions/setup-node 7.0.0, actions/attest-build-provenance 4.2.2, pnpm/action-setup 6.1.0, anchore/sbom-action 0.24.2, softprops/action-gh-release 3.0.3, taiki-e/install-action 2.87.21
 
 ### Security
+- Resolved CodeQL `rust/cleartext-logging` finding in the API-key tests (test assertions no longer format results from the API-key code path; no runtime change)
 - Dev tooling: patched transitive dependencies of the E2E runner (WebdriverIO), eslint, vitest UI and VitePress via `pnpm.overrides`: undici 7.30, js-yaml 4.3.2, postcss 8.5.29, nanoid 3.3.18, basic-ftp 6.2.2, @humanfs/node 0.16.8, fflate 0.8.3, postcss-selector-parser 6.1.4; Rust `anyhow` 1.0.104 and `event-listener` 5.4.2 (RUSTSEC-2026-0190, RUSTSEC-2026-0221). None of these ship in the app
 - Dev tooling: `brace-expansion` pinned to patched releases (1.1.21 / 2.1.7 / 5.0.12) for GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895, GHSA-6j4f-fj2g-mc7p and GHSA-qhr7-859c-m2p7; not shipped in the app
 - `dompurify` 3.4.2 → 3.4.16 (Markdown HTML sanitizer), picking up the upstream fixes released since 3.4.2
