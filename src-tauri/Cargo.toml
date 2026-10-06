@@ -1,6 +1,6 @@
 [package]
 name = "alpaka-desktop"
-version = "1.3.2"
+version = "1.3.3"
 description = "Native desktop client for Ollama"
 authors = ["nikoteressi@gmail.com"]
 edition = "2021"
