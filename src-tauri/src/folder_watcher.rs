@@ -28,10 +28,9 @@ impl FolderWatcher {
 
         let mut debouncer = new_debouncer(
             Duration::from_millis(500),
-            None,
             move |result: DebounceEventResult| {
-                if let Err(errors) = result {
-                    log::warn!("Watcher errors for context {ctx_id}: {errors:?}");
+                if let Err(err) = result {
+                    log::warn!("Watcher error for context {ctx_id}: {err}");
                     return;
                 }
                 match reestimate_tokens(&db, &ctx_id) {
@@ -115,4 +114,52 @@ fn reestimate_tokens(db: &DbConn, context_id: &str) -> Result<i64, AppError> {
     }
 
     Ok(token_estimate)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::folders::{add_folder_context, NewFolderContext};
+    use std::sync::{mpsc, Arc, Mutex};
+    use tauri::Listener;
+
+    #[test]
+    fn file_change_triggers_folder_refreshed_event() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "x".repeat(400)).unwrap();
+
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        conn.execute("INSERT INTO conversations (id) VALUES ('c')", [])
+            .unwrap();
+        let ctx = add_folder_context(
+            &conn,
+            NewFolderContext {
+                conversation_id: "c".into(),
+                path: dir.path().to_string_lossy().into_owned(),
+                included_files_json: None,
+                auto_refresh: true,
+                estimated_tokens: 0,
+            },
+        )
+        .unwrap();
+        let db: DbConn = Arc::new(Mutex::new(conn));
+
+        let app = tauri::test::mock_app();
+        let (tx, rx) = mpsc::channel::<String>();
+        app.listen("folder:refreshed", move |event| {
+            let _ = tx.send(event.payload().to_owned());
+        });
+
+        let _watcher = FolderWatcher::start(app.handle(), &ctx.id, dir.path(), db).unwrap();
+        std::fs::write(dir.path().join("b.txt"), "y".repeat(800)).unwrap();
+
+        let payload = rx
+            .recv_timeout(Duration::from_secs(10))
+            .expect("watcher should emit folder:refreshed after a file change");
+        let value: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        assert_eq!(value["context_id"], ctx.id.as_str());
+        assert!(value["token_estimate"].as_i64().unwrap() > 0);
+    }
 }

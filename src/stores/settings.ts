@@ -8,6 +8,16 @@ import type {
   PresetOptions,
 } from "../types/settings";
 
+// Presets saved before #233 carried num_ctx, which silently overrode the
+// context length set in Settings → Engine. Drop it when loading them.
+function withoutContextLength(preset: Preset): Preset {
+  const { num_ctx: _numCtx, ...options } =
+    preset.options as Preset["options"] & {
+      num_ctx?: number;
+    };
+  return { ...preset, options };
+}
+
 let _systemThemeListener: ((e: MediaQueryListEvent) => void) | null = null;
 
 export const BUILTIN_PRESETS: Preset[] = [
@@ -19,7 +29,6 @@ export const BUILTIN_PRESETS: Preset[] = [
       temperature: 1,
       top_p: 0.95,
       top_k: 40,
-      num_ctx: 4096,
       repeat_penalty: 1,
       repeat_last_n: 64,
     },
@@ -32,7 +41,6 @@ export const BUILTIN_PRESETS: Preset[] = [
       temperature: 0.7,
       top_p: 0.9,
       top_k: 40,
-      num_ctx: 4096,
       repeat_penalty: 1.1,
       repeat_last_n: 64,
     },
@@ -45,7 +53,6 @@ export const BUILTIN_PRESETS: Preset[] = [
       temperature: 0.2,
       top_p: 0.7,
       top_k: 20,
-      num_ctx: 4096,
       repeat_penalty: 1.15,
       repeat_last_n: 64,
     },
@@ -58,7 +65,6 @@ export const BUILTIN_PRESETS: Preset[] = [
       temperature: 0.1,
       top_p: 0.95,
       top_k: 40,
-      num_ctx: 8192,
       repeat_penalty: 1,
       repeat_last_n: 64,
     },
@@ -166,7 +172,9 @@ export const useSettingsStore = defineStore("settings", {
 
         if (allSettings.userPresets) {
           try {
-            const userPresets: Preset[] = JSON.parse(allSettings.userPresets);
+            const userPresets = (
+              JSON.parse(allSettings.userPresets) as Preset[]
+            ).map(withoutContextLength);
             store.presets = [...BUILTIN_PRESETS, ...userPresets];
           } catch (e) {
             console.error("Failed to parse userPresets setting:", e);

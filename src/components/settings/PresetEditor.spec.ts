@@ -308,7 +308,6 @@ describe("PresetEditor — delete preset flow", () => {
         temperature: 0.5,
         top_p: 0.9,
         top_k: 40,
-        num_ctx: 4096,
         repeat_penalty: 1.1,
         repeat_last_n: 64,
       },

@@ -15,15 +15,12 @@ export interface ChatOptions {
   num_gpu?: number;
 }
 
+// Presets describe sampling style only. Context length is a property of the
+// model and the hardware, set once in Settings → Engine (#233).
 export type PresetOptions = Required<
   Pick<
     ChatOptions,
-    | "temperature"
-    | "top_p"
-    | "top_k"
-    | "num_ctx"
-    | "repeat_penalty"
-    | "repeat_last_n"
+    "temperature" | "top_p" | "top_k" | "repeat_penalty" | "repeat_last_n"
   >
 > & {
   mirostat?: 0 | 1 | 2;

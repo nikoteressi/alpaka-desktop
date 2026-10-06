@@ -1,9 +1,13 @@
 version: 2
 
+# Version updates target develop (GitFlow): they reach main with the next
+# release instead of needing a manual port + back-merge. Security updates
+# ignore target-branch and still open against the default branch.
 updates:
   # NPM / pnpm dependencies
   - package-ecosystem: "npm"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -69,6 +73,7 @@ updates:
   # Cargo / Rust dependencies
   - package-ecosystem: "cargo"
     directory: "/src-tauri"
+    target-branch: "develop"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -107,6 +112,7 @@ updates:
   # GitHub Actions — keep action versions and their SHA pins up to date.
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
     schedule:
       interval: "monthly"
       time: "05:00"
