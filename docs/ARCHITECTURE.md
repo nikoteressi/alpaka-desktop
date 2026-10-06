@@ -1115,7 +1115,7 @@ graph LR
         markdown_it["markdown-it"]
         shiki["shiki (syntax HL)"]
         katex["KaTeX (math)"]
-        vue_router["vue-router 4"]
+        vue_router["vue-router 5"]
     end
 
     subgraph "Linux System"
