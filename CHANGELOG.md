@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- `katex` 0.16 → 0.18.11 (math rendering) for GHSA-238p-pmpm-9mq7; `@types/katex` dropped since KaTeX now ships its own types
+
 ### Fixed
 - `pnpm typecheck` (and the type-check step of `pnpm build`) checked nothing: the root `tsconfig.json` has `files: []`. Both now run against `tsconfig.app.json`, and the 14 type errors this exposed are fixed (unused bindings, test fixtures missing required fields or branded `ModelName` types, a `null` favicon URL bound to `<img src>`)
 - Tool-chain regeneration now creates a proper dispatch sibling, fixing broken version navigation when regenerating a web-search response (#167)
