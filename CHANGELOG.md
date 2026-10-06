@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.3.3] - 2026-10-06
+
 ### Fixed
 - The app no longer crashes at startup when no system keyring (Secret Service) is available, e.g. on minimal window managers or in sandboxes. A fresh install without a keyring now keeps its database key in a private `db.key` file (mode 0600) in the app data directory, with a warning in the log. An existing keyring-encrypted database is never re-keyed; if the keyring is down, startup reports a clear error instead
 
@@ -161,7 +165,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.3...HEAD
+[1.3.3]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.2.1...v1.3.0
