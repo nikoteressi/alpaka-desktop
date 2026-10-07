@@ -59,11 +59,11 @@
     "@vitest/ui": "^4.1.11",
     "@vue/test-utils": "^2.5.1",
     "@vue/tsconfig": "^0.9.1",
-    "@wdio/cli": "^9",
-    "@wdio/local-runner": "^9",
-    "@wdio/mocha-framework": "^9",
-    "@wdio/spec-reporter": "^9",
-    "@wdio/types": "^9",
+    "@wdio/cli": "^10.0.0",
+    "@wdio/local-runner": "^10.0.0",
+    "@wdio/mocha-framework": "^10.0.0",
+    "@wdio/spec-reporter": "^10.0.0",
+    "@wdio/types": "^10.0.0",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^9.0.0",
     "happy-dom": "^20.14.5",
@@ -80,10 +80,10 @@
     "vitepress-plugin-mermaid": "^2.0.17",
     "vitest": "^4.1.11",
     "vue-tsc": "^3.3.11",
-    "webdriverio": "^9"
+    "webdriverio": "^10.0.0"
   },
   "engines": {
-    "node": ">=20",
+    "node": ">=22.19",
     "pnpm": ">=9"
   },
   "packageManager": "pnpm@9.15.0",
@@ -109,7 +109,8 @@
       "fflate@>=0.8.0 <0.8.3": "^0.8.3",
       "postcss-selector-parser@<7.1.6": "^7.1.6",
       "source-map-js@>=1.0.0 <1.2.2": "^1.2.2",
-      "katex@<0.18.2": "^0.18.11"
+      "katex@<0.18.2": "^0.18.11",
+      "vite@<6.4.3": "^6.4.4"
     }
   }
 }

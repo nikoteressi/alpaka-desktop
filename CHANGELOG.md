@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+- Dev tooling only, nothing shipped in the app: WebdriverIO 9 → 10 (E2E tests) drops `extract-zip` (GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3) and `braces` (GHSA-vfj7-8cjw-p6xm), which have no patched releases; the docs site's vite is forced to 6.4.4+ (GHSA-fx2h-pf6j-xcff, GHSA-v6wh-96g9-6wx3, GHSA-4w7w-66w2-5vf9, plus the bundled esbuild GHSA-67mh-4wv8-2f99)
+
+### Changed
+- CI, docs and release workflows run on Node 22 (Node 20 is end-of-life); `engines.node` is now `>=22.19`, which WebdriverIO 10 requires
+- CodeQL Action v3 → v4.38.2. v3 is deprecated (December 2026) and still ran on Node 20, which made the code-scanning tool status page report warnings
+
 ---
 
 ## [1.4.1] - 2026-10-06
