@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [1.4.2] - 2026-10-07
+
 ### Security
 - Dev tooling only, nothing shipped in the app: WebdriverIO 9 → 10 (E2E tests) drops `extract-zip` (GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3) and `braces` (GHSA-vfj7-8cjw-p6xm), which have no patched releases; the docs site's vite is forced to 6.4.4+ (GHSA-fx2h-pf6j-xcff, GHSA-v6wh-96g9-6wx3, GHSA-4w7w-66w2-5vf9, plus the bundled esbuild GHSA-67mh-4wv8-2f99)
 
@@ -234,7 +238,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/nikoteressi/alpaka-desktop/compare/v1.3.2...v1.3.3
