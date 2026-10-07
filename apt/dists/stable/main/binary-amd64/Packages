@@ -1,14 +1,14 @@
 Package: alpaka-desktop
-Version: 1.4.1
+Version: 1.4.2
 Architecture: amd64
 Maintainer: nikoteressi@gmail.com
 Installed-Size: 14580
 Depends: libayatana-appindicator3-1, libwebkit2gtk-4.1-0, libgtk-3-0
-Filename: pool/main/a/alpaka-desktop/alpaka-desktop_1.4.1_amd64.deb
-Size: 8365552
-MD5sum: 1d5cc15e17f25074fb27d7a66ba49827
-SHA1: ba56beb32251752105102591847581981996b9aa
-SHA256: 7faf4309f7efb49636bddcc616fa64e17bffe636553de056464ec0fef1ba5cb6
+Filename: pool/main/a/alpaka-desktop/alpaka-desktop_1.4.2_amd64.deb
+Size: 8365422
+MD5sum: f3d8aa1150f3e7335fbb12d08987435e
+SHA1: 110603c6735093c0452e6545160d9b5245607596
+SHA256: 665f83b82440a478e1f1967ce67a0c2da5991cc9b037c9409cce2eb2d47e3b3a
 Priority: optional
 Description: Native desktop client for Ollama
  (none)
