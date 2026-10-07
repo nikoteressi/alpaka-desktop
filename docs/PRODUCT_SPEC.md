@@ -472,7 +472,7 @@ folder_contexts
 ```
 Build-time:
   rust >= 1.77.2
-  node >= 20 LTS (with pnpm >= 9)
+  node >= 22.19 LTS (with pnpm >= 9)
   tauri-cli >= 2.0
 
 Runtime (system packages):

@@ -45,12 +45,12 @@ jobs:
             libssl-dev \
             pkg-config
 
-      - uses: github/codeql-action/init@865f5f5c36632f18690a3d569fa0a764f2da0c3e # v3
+      - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
 
-      - uses: github/codeql-action/autobuild@865f5f5c36632f18690a3d569fa0a764f2da0c3e # v3
+      - uses: github/codeql-action/autobuild@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
 
-      - uses: github/codeql-action/analyze@865f5f5c36632f18690a3d569fa0a764f2da0c3e # v3
+      - uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           category: /language:${{ matrix.language }}
