@@ -68,7 +68,8 @@ thiserror = "2"
 tracing            = "0.1"
 
 # ── Utilities ─────────────────────────────────────────────────────────────
-uuid   = { version = "1", features = ["v4", "serde"] }
+# uuid 1.27+ requires Rust 1.89; keep compatibility with our Rust 1.88 MSRV.
+uuid   = { version = "~1.26.1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 dunce  = "1"
 url    = "2"

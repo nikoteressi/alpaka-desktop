@@ -88,6 +88,9 @@ updates:
       semver-minor-days: 7
       semver-patch-days: 3
     ignore:
+      # uuid 1.27+ requires Rust 1.89; lift this hold when the MSRV is raised.
+      - dependency-name: "uuid"
+        versions: [">=1.27"]
       # Same MSRV hold as the npm "@tauri-apps/*" rule above.
       - dependency-name: "tauri"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
