@@ -11,7 +11,8 @@ version = 2
 # Unmaintained advisories below are all transitive dependencies that cannot
 # be updated: GTK3 crates are locked by Tauri v2's Linux GTK3 requirement
 # until Tauri migrates to GTK4; the unic-* and proc-macro-error crates are
-# pulled in by other upstream deps with no available replacement.
+# pulled in by other upstream deps with no available replacement. D-Bus
+# helper crates remain until keyring/Tauri plugins migrate to zbus 6.
 ignore = [
     # gtk-rs GTK3 bindings — no longer maintained (RUSTSEC-2024-0411..0420)
     # Blocked by Tauri v2; will resolve when Tauri migrates to GTK4.
@@ -27,6 +28,12 @@ ignore = [
     { id = "RUSTSEC-2024-0420" },
     # proc-macro-error — unmaintained, pulled in by tray-icon via upstream deps
     { id = "RUSTSEC-2024-0370" },
+    # D-Bus helpers merged into zbus 6 (z-galaxy/zbus#2043). keyring 3 /
+    # secret-service 4 require zbus 4; Tauri notification/opener use zbus 5.
+    # Remove once these upstream consumers migrate; no vulnerable-code advisory.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant: blocked on upstream zbus 6 migration" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names: blocked on upstream zbus 6 migration" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive: blocked on upstream zbus 6 migration" },
     # fxhash — unmaintained, transitive dep
     { id = "RUSTSEC-2025-0057" },
     # unic-* Unicode crates — unmaintained (open-i18n/rust-unic)
