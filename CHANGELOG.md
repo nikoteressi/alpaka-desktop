@@ -11,6 +11,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.3] - 2026-10-19
+
+### Security
+- Update rustls to 0.23.46 and quinn-proto to 0.11.19 to address nine RustSec vulnerability findings in the HTTP client's dependency graph.
+- Update DOMPurify to 3.4.17 and markdown-it to 14.3.3 for sanitization hardening and backported security fixes.
+
+### Changed
+- Refresh frontend and development dependencies, including Vue 3.5.44, Vue Router 5.4.0, Pinia 4.1.0, and Vite 8.3.4; declare Pinia's required devtools peer explicitly.
+- Update Tokio to 1.53.3 and serde_json to 1.0.154 while retaining Rust 1.88 compatibility.
+
+---
+
 ## [1.4.2] - 2026-10-07
 
 ### Security
