@@ -67,7 +67,7 @@
     "@wdio/types": "^10.0.1",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^9.0.0",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.1",
     "jsdom": "^27.4.0",
     "mermaid": "^11.16.1",
     "prettier": "^3.9.10",
